@@ -39,6 +39,9 @@
 #define SERIAL_NUMBER       "20140606"
 #define PROTOCOL            "com.mxchip.basic"
 
+
+#define EasyLink_Needs_Reboot
+
 /************************************************************************
  * Application thread stack size */
 #define MICO_DEFAULT_APPLICATION_STACK_SIZE         (1024 * 6)
@@ -47,7 +50,7 @@
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */
 #define MICO_WLAN_CONNECTION_ENABLE
 
-#define MICO_CONFIG_MODE CONFIG_MODE_AWS
+#define MICO_CONFIG_MODE CONFIG_MODE_USER
 
 #define EasyLink_TimeOut                60000 /**< EasyLink timeout 60 seconds. */
 

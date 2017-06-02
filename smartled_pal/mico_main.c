@@ -63,17 +63,31 @@ int application_start( void )
     err = mico_system_init( mico_context );
     require_noerr( err, exit );
 
+#if 0
+    while(1)
+    {
+        app_log("------------------mico running-------------\r\n");        
+    }
+#endif    
+
     alink_get_firmware_version( version );
     app_log("firmware version: %s", version);
     app_log("product model: %s", product_model);
 
     alink_cli_user_commands_register( );
 
+    product_set_name(product_dev_name);
+    product_set_model(product_model);
+    product_set_key(product_key);
+    product_set_secret(product_secret);
+    start_aws_config_mode( );
+
     /* Wait for wlan connection*/
     mico_rtos_get_semaphore( &wait_sem, MICO_WAIT_FOREVER );
     app_log("wifi connected successful");
 
 //  ssl_set_loggingcb(ssl_log);
+
 
     start_alink_emb( );
 
