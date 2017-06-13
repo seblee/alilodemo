@@ -28,3 +28,13 @@ $(NAME)_COMPONENTS := lib_alink/alink_emb/alink_emb_pal \
 					  lib_alink/alink_common \
 				      protocols/libwebsocket
 
+
+$(NAME)_COMPONENTS += lib_audio_service
+
+$(NAME)_COMPONENTS += lib_audio_interface
+
+$(NAME)_COMPONENTS += lib_robot_event_notification
+
+$(NAME)_COMPONENTS += lib_http_file_download
+
+$(NAME)_COMPONENTS += lib_robot_key_led
