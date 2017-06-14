@@ -11,21 +11,22 @@ uint8_t ai_mic_record_id = 0;
 static void _recordKeyAction_cb( ROBOT_USER_EVENT event, void *data)
 {
     mscp_result_t result = MSCP_RST_ERROR;
-
+    hal_log(">>>>>>>>>> event: %d >>>>>>>>>>", event);
     switch(event)
     {
         case ROBOT_EVENT_KEY_AI_START:
-            hal_log(">>>>>>>>>>>>>>>>>>>");
+            hal_log("++++++++++++++++++++++");
             recordKeyStatus = KEY_PRESS;
             mico_rtos_set_semaphore(&recordKeyPress_Sem);
             break;
         case ROBOT_EVENT_KEY_AI_STOP:
-            hal_log(">>>>>>>>>>>>>>>>>>>");
+            hal_log("----------------------");
             recordKeyStatus = KEY_RELEASE;
             audio_service_mic_record_stop(&result, ai_mic_record_id);
             break;
         default:
-            hal_log(">>>>>>>>>>>>>>>>>>> other key response!!!");
+            recordKeyStatus = KEY_RELEASE;
+            hal_log("**********************");
             break;
     }
 }
