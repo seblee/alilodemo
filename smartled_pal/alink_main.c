@@ -28,8 +28,8 @@
 #include "mico.h"
 #include "mico_app_define.h"
 #include "alink_device.h"
-#include "media_play.h"
 #include "alink_config.h"
+#include "hal_alilo_rabbit.h"
 
 #define alink_main_log(format, ...)  custom_log("alink_main", format, ##__VA_ARGS__)
 
@@ -91,83 +91,11 @@ typedef enum {
 	AUDIO_FORMAT_DEFAULT = 0xff
 }audio_format_t;
 
-void callback_asr_get_result(const char *params, int len)
-{
-	int ret = 0;
-	alink_main_log("get resut:  %s , len : %d\n", params, len);
-}
-
-static const char *get_sample_file_name(void)
-{
-	int type = product_asr_get_audio_format();
-	if (type == AUDIO_FORMAT_PCM) {
-		return SAMPLE_AUDIO_PCM_FILE_NAME;
-	} else if (type == AUDIO_FORMAT_OGG) {
-		return SAMPLE_AUDIO_OGG_FILE_NAME;
-	} else {
-		return SAMPLE_AUDIO_OPUS_FILE_NAME;
-	}
-}
-
-void send_sample_audio(void)
-{
-    short raw[320] = {0};
-    int read;
-    alink_main_log("==== data add start \n");
-    memset(raw, 0x11,sizeof(raw));
-    read = sizeof(raw);
-    alink_main_log("read data len : %d\n", read);
-    alink_asr_send_buf(raw, read,ASR_MSG_AUDIO_DATA);
-    platform_msleep(100);
-    alink_main_log("==== add data finished\n");
-}
-extern int send_tts_request(char *text);
-int audio_test()
-{
-    alink_main_log("alink-emb asr audio module sample.\n");
-	alink_register_callback(ALINK_ASR_GET_RESULT, callback_asr_get_result);
-
-#ifdef __ALI_ONLINE__
-    alink_enable_daily_mode("online/alink.tcp.aliyun.com", 443);//alink.tcp.aliyun.com:443  //online/alink.tcp.aliyun.com
-	asr_init_server("mlabs.taobao.com", 443, 1);
-#else
-	alink_enable_daily_mode(NULL, 0);//daily/wsf.smart.aliyun-inc.com:9999
-	asr_init_server("10.218.129.125", 80, 0);
-#endif
-
-	alink_start();
-	alink_wait_connect(0);
-	alink_main_log("alink connect succeed. \n");
-
-	sleep(5);
-while(1)
-{
-//	send_sample_audio();
-//	alink_asr_send_buf(NULL, 0,ASR_MSG_AUDIO_DATA);
-
-        alink_asr_send_buf("你好我是苏泊尔电压力锅，请问有什么需要为您服务么",strlen("你好我是苏泊尔电压力锅，请问有什么需要为您服务么"), ASR_MSG_TTS_REQUEST);
-        sleep(5);
-        alink_asr_send_buf( NULL, 0, ASR_MSG_AUDIO_DATA );
-	alink_main_log("wait for alink_asr_send_buf result..................................................... .\n");
-
-	sleep(5);
-	printf("wait for result .\n");
-
-	sleep(10);
-};
-alink_main_log("alink exit\n");
-	alink_end();
-
-	return 0;
-}
-//shiner add end
-
 
 extern int asr_init_server(char *ip, int port, int is_ssl_enable);
 static void alink_main( uint32_t arg )
 {
-//    media_play_start();
-
+    hal_alilo_rabbit_init();
     alink_set_loglevel( ALINK_LL_TRACE );
     lws_set_log_level(0x01FF, NULL);
 #ifdef __ALI_ONLINE__
@@ -177,8 +105,6 @@ static void alink_main( uint32_t arg )
 	alink_enable_daily_mode(NULL, 0);//daily/wsf.smart.aliyun-inc.com:9999
 	asr_init_server("10.218.129.125", 80, 0);
 #endif
-
-//	audio_test();//shiner
 
     alink_device_state_mutex = platform_mutex_init( );
     alink_post_data_sem = platform_semaphore_init( );
@@ -211,20 +137,10 @@ static void alink_main( uint32_t arg )
     alink_wait_connect( ALINK_WAIT_FOREVER );
     alink_main_log("alink connect succeed. \n");
 
-    //start_asr_thread( );
+    start_asr_thread( );
 
     while ( 1 )
     {
-
-    #if 1
-            alink_main_log("device status changed, free memory %d", MicoGetMemoryInfo()->free_memory);
-            alink_asr_send_buf("你好我是苏泊尔电压力锅，请问有什么需要为您服务么",strlen("你好我是苏泊尔电压力锅，请问有什么需要为您服务么"), ASR_MSG_TTS_REQUEST);
-            sleep(5);
-            alink_asr_send_buf( NULL, 0, ASR_MSG_AUDIO_DATA );
-            alink_main_log("wait for alink_asr_send_buf result..................................................... .\n");
-            sleep(5);
-            continue;
-#endif
         if ( get_device_state( ) )
         {
             alink_main_log("device status changed, free memory %d", MicoGetMemoryInfo()->free_memory);

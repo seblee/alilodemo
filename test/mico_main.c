@@ -1,20 +1,11 @@
 #include "mico.h"
 #include "mico_app_define.h"
-#include "alink_device.h"
+#include "audio_service.h"
 
 #define app_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
 
 static mico_semaphore_t wait_sem = NULL;
-
-extern void alink_cli_user_commands_register( void );
-
-/* MICO system callback: Restore default configuration provided by application */
-void appRestoreDefault_callback( void * const user_config_data, uint32_t size )
-{
-    memset( user_config_data, 0x0, size );
-    alink_device_reset( );
-}
 
 static void micoNotify_WifiStatusHandler( WiFiEvent status, void* const inContext )
 {
@@ -63,26 +54,18 @@ int application_start( void )
     err = mico_system_init( mico_context );
     require_noerr( err, exit );
 
-    alink_get_firmware_version( version );
-    app_log("firmware version: %s", version);
-    app_log("product model: %s", product_model);
-
-    alink_cli_user_commands_register( );
-
-    product_set_name(product_dev_name);
-    product_set_model(product_model);
-    product_set_key(product_key);
-    product_set_secret(product_secret);
-    start_aws_config_mode( );
-
     /* Wait for wlan connection*/
     mico_rtos_get_semaphore( &wait_sem, MICO_WAIT_FOREVER );
     app_log("wifi connected successful");
 
 //  ssl_set_loggingcb(ssl_log);
 
-
-    start_alink_emb( );
+    audio_service_init();
+    while(1)
+    {
+        app_log("#####################################");
+        sleep(1);
+    }
 
     exit:
     mico_system_notify_remove( mico_notify_WIFI_STATUS_CHANGED,
