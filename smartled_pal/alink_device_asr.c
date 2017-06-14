@@ -173,6 +173,7 @@ void asr_thread( mico_thread_arg_t arg )
     int buf_len = 0;
     mscp_result_t result = MSCP_RST_ERROR;
     AUDIO_MIC_RECORD_START_S mic_record;
+    OSStatus err = kNoErr;
 
     asr_log("ASR Test Thread created. \n");
 
@@ -188,7 +189,18 @@ void asr_thread( mico_thread_arg_t arg )
         mic_record.record_id = ai_mic_record_id;
         mic_record.format = AUDIO_MIC_RESULT_FORMAT_SPEEX;
         mic_record.type = AUDIO_MIC_RESULT_TYPE_STREAM;
-        audio_service_mic_record_start(&result, &mic_record);
+
+        err = audio_service_mic_record_start(&result, &mic_record);
+        asr_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
+        if(err != kNoErr && result != MSCP_RST_SUCCESS)
+        {
+            asr_log("audio_service_mic_record_start >>> ERROR");
+            audio_service_mic_record_stop(&result, ai_mic_record_id);
+            continue;
+        }
+
+        asr_log(">>>>>>>>>>>>>>>>>>>");
+
         while ( recordKeyStatus == KEY_PRESS )
         {
             memset( buf, 0, sizeof(buf) );

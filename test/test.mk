@@ -22,7 +22,7 @@
 ############################################################################### 
 NAME := App_Smaartled_emb
 
-$(NAME)_SOURCES := mico_main.c
+$(NAME)_SOURCES := mico_main.c hal_alilo_rabbit.c
 
 $(NAME)_COMPONENTS := lib_http_file_download \
 					  lib_robot_event_notification \

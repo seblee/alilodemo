@@ -1,6 +1,7 @@
 #include "mico.h"
 #include "mico_app_define.h"
 #include "audio_service.h"
+#include "hal_alilo_rabbit.h"
 
 #define app_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
@@ -34,6 +35,9 @@ int application_start( void )
     app_context_t* app_context;
     char version[30];
 
+    mscp_result_t result = MSCP_RST_ERROR;
+    AUDIO_MIC_RECORD_START_S mic_record;
+
     /* Create application context */
     app_context = (app_context_t *) calloc( 1, sizeof(app_context_t) );
     require_action( app_context, exit, err = kNoMemoryErr );
@@ -60,11 +64,24 @@ int application_start( void )
 
 //  ssl_set_loggingcb(ssl_log);
 
-    audio_service_init();
+    err = hal_alilo_rabbit_init();
+    require_noerr( err, exit );
+
+
+    mic_record.record_id = audio_service_system_generate_record_id();
+    mic_record.format = AUDIO_MIC_RESULT_FORMAT_SPEEX;
+    mic_record.type = AUDIO_MIC_RESULT_TYPE_STREAM;
     while(1)
     {
-        app_log("#####################################");
-        sleep(1);
+        mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
+        err = audio_service_mic_record_start(&result, &mic_record);
+        app_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
+        if(err != kNoErr && result != MSCP_RST_SUCCESS)
+        {
+            app_log("audio_service_mic_record_start >>> ERROR");
+            audio_service_mic_record_stop(&result, ai_mic_record_id);
+            continue;
+        }
     }
 
     exit:
