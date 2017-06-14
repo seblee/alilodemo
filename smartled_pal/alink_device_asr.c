@@ -76,7 +76,7 @@ void deal_with_url_result( char *url )
 //    media_play_set_source_decoder_type( MEDIA_SOURCE_NET, filename );
 //    http_trans_set_url( HTTP_TYPE_GET, url );
 //    media_play_cmd_start( );
-
+    asr_log(">>>>>>>>>>>>>>>>>>> have got the url!!!");
     stream_play_opt.type = AUDIO_STREAM_TYPE_MP3;
     ai_stream_play_id = audio_service_system_generate_stream_id();
     stream_play_opt.stream_player_id = ai_stream_play_id;
@@ -96,6 +96,7 @@ void callback_alink_asr_get_result( char *params, int len )
     char url[256] = { 0 };
     bool is_play = false;
 
+    asr_log(">>>>>>>>>>>>>>>>>>> callback_alink_asr_get_result");
     asr_log("memshow %d", MicoGetMemoryInfo( )->free_memory);
 
     if ( params != NULL )

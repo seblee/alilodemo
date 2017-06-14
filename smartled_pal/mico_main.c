@@ -84,6 +84,8 @@ int application_start( void )
 
     start_alink_emb( );
 
+    app_log(">>>>>>>>>>>>>>>>>>> mico main finish...");
+
     exit:
     mico_system_notify_remove( mico_notify_WIFI_STATUS_CHANGED,
                                (void *) micoNotify_WifiStatusHandler );

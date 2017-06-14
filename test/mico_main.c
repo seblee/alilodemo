@@ -59,8 +59,8 @@ int application_start( void )
     require_noerr( err, exit );
 
     /* Wait for wlan connection*/
-    mico_rtos_get_semaphore( &wait_sem, MICO_WAIT_FOREVER );
-    app_log("wifi connected successful");
+//    mico_rtos_get_semaphore( &wait_sem, MICO_WAIT_FOREVER );
+//    app_log("wifi connected successful");
 
 //  ssl_set_loggingcb(ssl_log);
 
