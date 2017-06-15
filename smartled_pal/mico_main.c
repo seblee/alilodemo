@@ -1,6 +1,7 @@
 #include "mico.h"
 #include "mico_app_define.h"
 #include "alink_device.h"
+#include "hal_alilo_rabbit.h"
 
 #define app_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
@@ -39,6 +40,14 @@ int application_start( void )
 {
     app_log_trace();
     OSStatus err = kNoErr;
+
+#if HAL_TEST_EN
+
+    hal_alilo_rabbit_init();
+    start_asr_thread();
+
+#else
+
     mico_Context_t* mico_context;
     app_context_t* app_context;
     char version[30];
@@ -81,7 +90,6 @@ int application_start( void )
 
 //  ssl_set_loggingcb(ssl_log);
 
-
     start_alink_emb( );
 
     app_log(">>>>>>>>>>>>>>>>>>> mico main finish...");
@@ -91,6 +99,9 @@ int application_start( void )
                                (void *) micoNotify_WifiStatusHandler );
     mico_rtos_deinit_semaphore( &wait_sem );
     mico_rtos_delete_thread( NULL );
+
+#endif
+
     return err;
 }
 

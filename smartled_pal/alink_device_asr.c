@@ -168,6 +168,68 @@ void callback_alink_asr_get_result( char *params, int len )
     }
 }
 
+#if HAL_TEST_EN
+
+void asr_thread( mico_thread_arg_t arg )
+{
+    char * buf = malloc(1024*6);
+    char * buf_head = buf;
+    int buf_len = 0;
+    mscp_result_t result = MSCP_RST_ERROR;
+    AUDIO_MIC_RECORD_START_S mic_record;
+    OSStatus err = kNoErr;
+
+    asr_log("ASR Test Thread created. \n");
+
+    while ( 1 )
+    {
+        mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
+        asr_log("get audio start.\n");
+
+        buf = buf_head;
+        memset( buf, 0, 1024*6 );
+
+        mic_record_id = audio_service_system_generate_record_id();
+        mic_record.record_id = mic_record_id;
+        mic_record.format = AUDIO_MIC_RESULT_FORMAT_SPEEX;
+        mic_record.type = AUDIO_MIC_RESULT_TYPE_STREAM;
+
+        err = audio_service_mic_record_start(&result, &mic_record);
+        asr_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
+        if(err != kNoErr || result != MSCP_RST_SUCCESS)
+        {
+            asr_log("audio_service_mic_record_start >>> ERROR");
+            audio_service_stream_stop(&result, audio_play_id);
+            mico_thread_msleep(5);
+        }
+
+        while ( recordKeyStatus == KEY_PRESS )
+        {
+            buf_len = hal_getVoiceData( (uint8_t*)buf, 1024 );
+
+            if ( buf_len > 0 )
+            {
+                asr_log("get audio from mic ,len: %d\n",buf_len);
+                buf += buf_len;
+                asr_log("audio total len: %d", buf - buf_head + 1);
+                if(buf - buf_head >= 1024*5)
+                {
+                    asr_log("audio record buf is full!!!");
+                    recordKeyStatus = KEY_RELEASE;
+                    break;
+                }
+            }
+            mico_rtos_thread_msleep( 100 );
+        }
+        asr_log("get audio stop!");
+        audio_service_mic_record_stop(&result, mic_record_id);
+        err = hal_player_test(buf_head, buf-buf_head+1, 1024*6);
+        asr_log("play result: %d", err);
+    }
+}
+
+#else
+
 void asr_thread( mico_thread_arg_t arg )
 {
     char buf[1024];
@@ -186,18 +248,18 @@ void asr_thread( mico_thread_arg_t arg )
         mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
         asr_log("get audio start.\n");
 
-        ai_mic_record_id = audio_service_system_generate_record_id();
-        mic_record.record_id = ai_mic_record_id;
+        mic_record_id = audio_service_system_generate_record_id();
+        mic_record.record_id = mic_record_id;
         mic_record.format = AUDIO_MIC_RESULT_FORMAT_SPEEX;
         mic_record.type = AUDIO_MIC_RESULT_TYPE_STREAM;
 
         err = audio_service_mic_record_start(&result, &mic_record);
         asr_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
-        if(err != kNoErr && result != MSCP_RST_SUCCESS)
+        if(err != kNoErr || result != MSCP_RST_SUCCESS)
         {
             asr_log("audio_service_mic_record_start >>> ERROR");
-            audio_service_mic_record_stop(&result, ai_mic_record_id);
-            continue;
+            audio_service_stream_stop(&result, audio_play_id);
+            mico_thread_msleep(5);
         }
 
         asr_log(">>>>>>>>>>>>>>>>>>>");
@@ -215,9 +277,12 @@ void asr_thread( mico_thread_arg_t arg )
             mico_rtos_thread_msleep( 100 );
         }
         asr_log("get audio stop\n");
+        audio_service_mic_record_stop(&result, mic_record_id);
         alink_asr_send_buf( NULL, 0, ASR_MSG_AUDIO_DATA );
     }
 }
+
+#endif
 
 int start_asr_thread( void )
 {

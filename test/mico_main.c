@@ -76,7 +76,7 @@ int application_start( void )
         mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
         err = audio_service_mic_record_start(&result, &mic_record);
         app_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
-        if(err != kNoErr && result != MSCP_RST_SUCCESS)
+        if(err != kNoErr || result != MSCP_RST_SUCCESS)
         {
             app_log("audio_service_mic_record_start >>> ERROR");
             audio_service_mic_record_stop(&result, ai_mic_record_id);
