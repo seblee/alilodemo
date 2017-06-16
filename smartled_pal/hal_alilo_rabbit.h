@@ -4,7 +4,7 @@
 #include "audio_service.h"
 #include "http_file_download_thread.h"
 
-#define HAL_TEST_EN 1
+#define HAL_TEST_EN 0
 
 #define KEY_RELEASE false
 #define KEY_PRESS   true
@@ -22,6 +22,7 @@ extern mico_semaphore_t recordKeyPress_Sem;
 extern bool recordKeyStatus;
 extern uint8_t mic_record_id;
 extern uint8_t audio_play_id;
+extern uint8_t flag_mic_start;
 
 extern OSStatus hal_alilo_rabbit_init( void );
 extern int32_t  hal_getVoiceData     ( uint8_t* voice_buf, uint32_t voice_buf_len );

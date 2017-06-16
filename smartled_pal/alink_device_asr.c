@@ -69,13 +69,65 @@ static void file_download_state_cb(void *context, HTTP_FILE_DOWNLOAD_STATE_E sta
     return;
 }
 
+//static bool file_download_data_cb(void *context, const char *data, uint32_t data_len, uint32_t user_args)
+//{
+//    AUDIO_STREAM_PALY_S fm_stream;
+//    OSStatus err = kGeneralErr;
+//    FILE_DOWNLOAD_CONTEXT_S *file_download_context = (FILE_DOWNLOAD_CONTEXT_S *)context;
+//    mscp_result_t result = MSCP_RST_ERROR;
+//    PLAYER_OPTION_S *s_player_option_p = (PLAYER_OPTION_S *)user_args;
+//
+//    require_string((file_download_context != NULL) && (data_len <= 2000) && (data_len != 0), exit, "data len error");
+//
+//    fm_stream.type = s_player_option_p->type;
+//    fm_stream.stream_id = s_player_option_p->stream_player_id;
+//    fm_stream.total_len = file_download_context->file_info.file_total_len;
+//    fm_stream.stream_len = (uint16_t)(data_len & 0xFFFF); //len
+//    fm_stream.pdata = (const uint8_t *)data;
+//
+//    if((++fm_test_cnt) == 100)
+//    {
+//        fm_test_cnt = 0;
+//        stream_play_log("fm_stream.type[%d],fm_stream.stream_id[%d],fm_stream.total_len[%d],fm_stream.stream_len[%d]",
+//                        (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
+//    }
+//
+//audio_transfer:
+//    err = audio_service_stream_play(&result, &fm_stream);
+//    if (err != kNoErr)
+//    {
+//        stream_play_log("audio_stream_play() error!!!!");
+//        return false;
+//    }
+//    else
+//    {
+//        require_action_string(http_file_download_get_state(&file_download_context) != HTTP_FILE_DOWNLOAD_CONTROL_STATE_STOP, exit, err = kGeneralErr, "user set stop download!");
+//
+//        if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
+//        {
+//            stream_play_log("new slave set pause!!!");
+//            mico_rtos_thread_msleep(1000); //time set 1000ms!!!
+//            goto audio_transfer;
+//        }
+//        else
+//        {
+//            err = kNoErr;
+//        }
+//    }
+//
+//exit:
+//    if (err == kNoErr)
+//    {
+//        return true;
+//    }
+//    else
+//    {
+//        return false;
+//    }
+//}
+
 void deal_with_url_result( char *url )
 {
-//    char filename[] = "1.mp3";
-//
-//    media_play_set_source_decoder_type( MEDIA_SOURCE_NET, filename );
-//    http_trans_set_url( HTTP_TYPE_GET, url );
-//    media_play_cmd_start( );
     asr_log(">>>>>>>>>>>>>>>>>>> have got the url!!!");
     stream_play_opt.type = AUDIO_STREAM_TYPE_MP3;
     ai_stream_play_id = audio_service_system_generate_stream_id();
@@ -172,10 +224,11 @@ void callback_alink_asr_get_result( char *params, int len )
 
 void asr_thread( mico_thread_arg_t arg )
 {
-    char * buf = malloc(1024*6);
+    char * buf = malloc(2000);
     char * buf_head = buf;
     int buf_len = 0;
     mscp_result_t result = MSCP_RST_ERROR;
+    mscp_status_t audio_status = MSCP_STATUS_ERR;
     AUDIO_MIC_RECORD_START_S mic_record;
     OSStatus err = kNoErr;
 
@@ -184,15 +237,35 @@ void asr_thread( mico_thread_arg_t arg )
     while ( 1 )
     {
         mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
-        asr_log("get audio start.\n");
 
         buf = buf_head;
-        memset( buf, 0, 1024*6 );
+        memset( buf, 0, 2000 );
 
         mic_record_id = audio_service_system_generate_record_id();
         mic_record.record_id = mic_record_id;
-        mic_record.format = AUDIO_MIC_RESULT_FORMAT_SPEEX;
+        mic_record.format = AUDIO_MIC_RESULT_FORMAT_AMR;
         mic_record.type = AUDIO_MIC_RESULT_TYPE_STREAM;
+
+        asr_log("get audio start.\n");
+
+        err = audio_service_get_audio_status(&result, &audio_status);
+        asr_log("audio_service_get_audio_status >>> err: %d, result:%d, audio_status:%d", err, result, audio_status);
+        if(err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
+        {
+            if(audio_status != MSCP_STATUS_STREAM_PLAYING)
+                continue;
+            err = audio_service_stream_stop(&result, audio_play_id);
+            asr_log("audio_service_stream_stop >>> err: %d, result:%d", err, result);
+            if(err != kNoErr || result != MSCP_RST_SUCCESS)
+                continue;
+            else
+            {
+                err = audio_service_get_audio_status(&result, &audio_status);
+                asr_log("audio_service_get_audio_status >>> err: %d, result:%d, audio_status:%d", err, result, audio_status);
+                if(err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
+                    continue;
+            }
+        }
 
         err = audio_service_mic_record_start(&result, &mic_record);
         asr_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
@@ -201,7 +274,10 @@ void asr_thread( mico_thread_arg_t arg )
             asr_log("audio_service_mic_record_start >>> ERROR");
             audio_service_stream_stop(&result, audio_play_id);
             mico_thread_msleep(5);
+            continue;
         }
+
+        flag_mic_start = 1;
 
         while ( recordKeyStatus == KEY_PRESS )
         {
@@ -209,10 +285,10 @@ void asr_thread( mico_thread_arg_t arg )
 
             if ( buf_len > 0 )
             {
-                asr_log("get audio from mic ,len: %d\n",buf_len);
+                asr_log("get audio from mic ,len: %d",buf_len);
                 buf += buf_len;
-                asr_log("audio total len: %d", buf - buf_head + 1);
-                if(buf - buf_head >= 1024*5)
+                asr_log("audio total len: %d", buf - buf_head);
+                if(buf - buf_head >= 1500)
                 {
                     asr_log("audio record buf is full!!!");
                     recordKeyStatus = KEY_RELEASE;
@@ -222,8 +298,7 @@ void asr_thread( mico_thread_arg_t arg )
             mico_rtos_thread_msleep( 100 );
         }
         asr_log("get audio stop!");
-        audio_service_mic_record_stop(&result, mic_record_id);
-        err = hal_player_test(buf_head, buf-buf_head+1, 1024*6);
+        err = hal_player_test(buf_head, buf-buf_head, 2000);
         asr_log("play result: %d", err);
     }
 }
@@ -235,6 +310,7 @@ void asr_thread( mico_thread_arg_t arg )
     char buf[1024];
     int buf_len = 0;
     mscp_result_t result = MSCP_RST_ERROR;
+    mscp_status_t audio_status = MSCP_STATUS_ERR;
     AUDIO_MIC_RECORD_START_S mic_record;
     OSStatus err = kNoErr;
 
@@ -248,36 +324,51 @@ void asr_thread( mico_thread_arg_t arg )
         mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
         asr_log("get audio start.\n");
 
+        memset( buf, 0, sizeof(buf) );
+
         mic_record_id = audio_service_system_generate_record_id();
         mic_record.record_id = mic_record_id;
         mic_record.format = AUDIO_MIC_RESULT_FORMAT_SPEEX;
         mic_record.type = AUDIO_MIC_RESULT_TYPE_STREAM;
+
+        err = audio_service_get_audio_status(&result, &audio_status);
+        asr_log("audio_service_get_audio_status >>> err: %d, result:%d, audio_status:%d", err, result, audio_status);
+        if(err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
+        {
+            asr_log("audio_service_get_audio_status >>> ERROR");
+            continue;
+        }
 
         err = audio_service_mic_record_start(&result, &mic_record);
         asr_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
         if(err != kNoErr || result != MSCP_RST_SUCCESS)
         {
             asr_log("audio_service_mic_record_start >>> ERROR");
-            audio_service_stream_stop(&result, audio_play_id);
-            mico_thread_msleep(5);
+            continue;
         }
 
-        asr_log(">>>>>>>>>>>>>>>>>>>");
+        flag_mic_start = 1;
 
         while ( recordKeyStatus == KEY_PRESS )
         {
-            memset( buf, 0, sizeof(buf) );
             buf_len = hal_getVoiceData( (uint8_t*)buf, sizeof(buf) );
 
             if ( buf_len > 0 )
             {
                 asr_log("get audio from mic ,len: %d\n",buf_len);
+
+            #if 0
+                for(int i=0; i<buf_len; i++)
+                {
+                    asr_log("%02X", buf[i]);
+                }
+            #endif
+
                 alink_asr_send_buf( buf, buf_len, ASR_MSG_AUDIO_DATA );
             }
             mico_rtos_thread_msleep( 100 );
         }
         asr_log("get audio stop\n");
-        audio_service_mic_record_stop(&result, mic_record_id);
         alink_asr_send_buf( NULL, 0, ASR_MSG_AUDIO_DATA );
     }
 }

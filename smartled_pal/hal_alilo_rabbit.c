@@ -8,10 +8,13 @@ mico_semaphore_t recordKeyPress_Sem;
 bool recordKeyStatus = KEY_RELEASE;
 uint8_t mic_record_id = 0;
 uint8_t audio_play_id = 0;
+uint8_t flag_mic_start = 0;
+extern void PlatformEasyLinkButtonClickedCallback( void );
 
 static void _recordKeyAction_cb( ROBOT_USER_EVENT event, void *data)
 {
     mscp_result_t result = MSCP_RST_ERROR;
+    OSStatus err = kNoErr;
     hal_log(">>>>>>>>>> event: %d >>>>>>>>>>", event);
     switch(event)
     {
@@ -23,11 +26,26 @@ static void _recordKeyAction_cb( ROBOT_USER_EVENT event, void *data)
         case ROBOT_EVENT_KEY_AI_STOP:
             hal_log("----------------------");
             recordKeyStatus = KEY_RELEASE;
-            audio_service_mic_record_stop(&result, mic_record_id);
+            if(flag_mic_start)
+            {
+                flag_mic_start = 0;
+                audio_service_mic_record_stop(&result, mic_record_id);
+                hal_log("audio_service_mic_record_stop >>> err:%d, result:%d", err, result);
+            }
+            break;
+        case ROBOT_EVENT_KEY_NET_CONFIG:
+            hal_log("############## easylink call back ################");
+            PlatformEasyLinkButtonClickedCallback( );
             break;
         default:
-            recordKeyStatus = KEY_RELEASE;
             hal_log("**********************");
+            recordKeyStatus = KEY_RELEASE;
+            if(flag_mic_start)
+            {
+                flag_mic_start = 0;
+                audio_service_mic_record_stop(&result, mic_record_id);
+                hal_log("audio_service_mic_record_stop >>> err:%d, result:%d", err, result);
+            }
             break;
     }
 }
@@ -90,7 +108,7 @@ bool hal_player_test(const char *data, uint32_t data_len, uint32_t file_total_le
     hal_log(">>>>>>>>>>>>>>>>>> hal_player_test");
 
     audio_play_id = audio_service_system_generate_stream_id();
-    audio_stream_s_p.type = AUDIO_STREAM_TYPE_MP3;
+    audio_stream_s_p.type = AUDIO_STREAM_TYPE_AMR;
     audio_stream_s_p.pdata = (const uint8_t*)data;
     audio_stream_s_p.stream_id = audio_play_id;
     audio_stream_s_p.total_len = file_total_len;
@@ -99,7 +117,7 @@ bool hal_player_test(const char *data, uint32_t data_len, uint32_t file_total_le
     err = audio_service_stream_play(&result, &audio_stream_s_p);
     if(err != kNoErr)
     {
-        hal_log("audio played fail");
+        hal_log("audio played fail, result: %d", result);
         return false;
     }
     hal_log("audio playing ......");
