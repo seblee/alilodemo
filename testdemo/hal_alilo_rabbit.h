@@ -9,6 +9,8 @@
 #define KEY_RELEASE false
 #define KEY_PRESS   true
 
+#define ROBOT_EVENT_KEY_URL_FILEDNLD  ROBOT_EVENT_KEY_EAR_LED_ON_OFF
+
 typedef struct _PLAYER_OPTION_S
 {
   audio_stream_type_e type;         //The type of stream, MP3 OR AMR
@@ -19,13 +21,15 @@ typedef struct _PLAYER_OPTION_S
 
 
 extern mico_semaphore_t recordKeyPress_Sem;
+extern mico_semaphore_t urlFileDownload_Sem;
 extern bool recordKeyStatus;
 extern uint8_t mic_record_id;
 extern uint8_t audio_play_id;
 extern uint8_t flag_mic_start;
 
-extern OSStatus hal_alilo_rabbit_init( void );
-extern int32_t  hal_getVoiceData     ( uint8_t* voice_buf, uint32_t voice_buf_len );
-extern bool     hal_player_test      (const char *data, uint32_t data_len, uint32_t file_total_len);
+extern OSStatus hal_alilo_rabbit_init       ( void );
+extern int32_t  hal_getVoiceData            ( uint8_t* voice_buf, uint32_t voice_buf_len );
+extern bool     hal_player_start            (const char *data, uint32_t data_len, uint32_t file_total_len);
+extern OSStatus hal_url_fileDownload_start  (char * url);
 
 #endif

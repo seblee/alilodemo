@@ -22,12 +22,9 @@
 ############################################################################### 
 NAME := App_Smaartled_emb
 
-$(NAME)_SOURCES := alink_main.c mico_main.c alink_device_raw.c alink_device_json.c alink_device_asr.c hal_alilo_rabbit.c
+$(NAME)_SOURCES := mico_main.c audio_test.c hal_alilo_rabbit.c
 				   
-$(NAME)_COMPONENTS := lib_alink/alink_emb/alink_emb_pal \
-					  lib_alink/alink_common \
-				      protocols/libwebsocket \
-				      lib_http_file_download \
+$(NAME)_COMPONENTS := lib_http_file_download \
 					  lib_robot_event_notification \
 					  lib_audio_service
 					  

@@ -1,6 +1,6 @@
 #include "mico.h"
 #include "mico_app_define.h"
-#include "alink_device.h"
+#include "audio_test.h"
 #include "hal_alilo_rabbit.h"
 
 #define app_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
@@ -8,14 +8,7 @@
 
 static mico_semaphore_t wait_sem = NULL;
 
-extern void alink_cli_user_commands_register( void );
-
 /* MICO system callback: Restore default configuration provided by application */
-void appRestoreDefault_callback( void * const user_config_data, uint32_t size )
-{
-    memset( user_config_data, 0x0, size );
-    alink_device_reset( );
-}
 
 static void micoNotify_WifiStatusHandler( WiFiEvent status, void* const inContext )
 {
@@ -25,8 +18,8 @@ static void micoNotify_WifiStatusHandler( WiFiEvent status, void* const inContex
             mico_rtos_set_semaphore( &wait_sem );
             break;
         case NOTIFY_STATION_DOWN:
-            case NOTIFY_AP_UP:
-            case NOTIFY_AP_DOWN:
+        case NOTIFY_AP_UP:
+        case NOTIFY_AP_DOWN:
             break;
     }
 }
@@ -41,16 +34,8 @@ int application_start( void )
     app_log_trace();
     OSStatus err = kNoErr;
 
-#if HAL_TEST_EN
-
-    hal_alilo_rabbit_init();
-    start_asr_thread();
-
-#else
-
     mico_Context_t* mico_context;
     app_context_t* app_context;
-    char version[30];
 
     /* Create application context */
     app_context = (app_context_t *) calloc( 1, sizeof(app_context_t) );
@@ -72,35 +57,21 @@ int application_start( void )
     err = mico_system_init( mico_context );
     require_noerr( err, exit );
 
-    alink_get_firmware_version( version );
-    app_log("firmware version: %s", version);
-    app_log("product model: %s", product_model);
+    err = hal_alilo_rabbit_init();
+    require_noerr( err, exit );
 
-    alink_cli_user_commands_register( );
-
-    product_set_name(product_dev_name);
-    product_set_model(product_model);
-    product_set_key(product_key);
-    product_set_secret(product_secret);
-    start_aws_config_mode( );
+    err = start_test_thread();
+    require_noerr( err, exit );
 
     /* Wait for wlan connection*/
     mico_rtos_get_semaphore( &wait_sem, MICO_WAIT_FOREVER );
     app_log("wifi connected successful");
-
-//  ssl_set_loggingcb(ssl_log);
-
-    start_alink_emb( );
-
-    app_log(">>>>>>>>>>>>>>>>>>> mico main finish...");
 
     exit:
     mico_system_notify_remove( mico_notify_WIFI_STATUS_CHANGED,
                                (void *) micoNotify_WifiStatusHandler );
     mico_rtos_deinit_semaphore( &wait_sem );
     mico_rtos_delete_thread( NULL );
-
-#endif
 
     return err;
 }
