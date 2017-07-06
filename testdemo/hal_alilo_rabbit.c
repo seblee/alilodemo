@@ -244,8 +244,3 @@ OSStatus hal_url_fileDownload_start(char * url)
                                     file_download_data_cb,
                                     (uint32_t)&stream_play_opt);
 }
-
-OSStatus hal_micRecord2SdCard(void)
-{
-
-}
