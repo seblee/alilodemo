@@ -60,12 +60,12 @@ int application_start( void )
     err = hal_alilo_rabbit_init();
     require_noerr( err, exit );
 
-    err = start_test_thread();
-    require_noerr( err, exit );
-
     /* Wait for wlan connection*/
     mico_rtos_get_semaphore( &wait_sem, MICO_WAIT_FOREVER );
     app_log("wifi connected successful");
+
+    err = start_test_thread();
+    require_noerr( err, exit );
 
     exit:
     mico_system_notify_remove( mico_notify_WIFI_STATUS_CHANGED,
