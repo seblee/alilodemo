@@ -20,14 +20,20 @@
 #  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR 
 #  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ############################################################################### 
-NAME := App_Smaartled_emb
+NAME := App_Audio_7100
 
-$(NAME)_SOURCES := mico_main.c audio_test.c hal_alilo_rabbit.c
+$(NAME)_SOURCES := mico_main.c \
+				   audio_test.c \
+				   hal_alilo_rabbit.c
 				   
-$(NAME)_COMPONENTS := lib_http_file_download \
-					  lib_robot_event_notification \
-					  lib_audio_service
+$(NAME)_COMPONENTS := utilities/url \
+					  utilities
+				   
+$(NAME)_PREBUILT_LIBRARY := Lib_7100.Cortex-M4F.GCC.release.a
 					  
 GLOBAL_INCLUDES := .	
 
-$(NAME)_INCLUDES := .
+$(NAME)_INCLUDES := ../inc \
+					../mico-os/include \
+					../mico-os/template/includes
+					
