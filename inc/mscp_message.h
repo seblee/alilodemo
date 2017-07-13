@@ -5,7 +5,7 @@
 #ifndef _MSCP_MESSAGE_H_
 #define _MSCP_MESSAGE_H_
 
-#include "mscp_type.h"
+#include "../testdemo/inc/mscp_type.h"
 #include "mico.h"
 
 

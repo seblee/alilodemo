@@ -1,7 +1,7 @@
 #ifndef _ROBOT_EVENT_H_
 #define _ROBOT_EVENT_H_
 
-#include "event_notification.h"
+#include "../testdemo/inc/event_notification.h"
 
 #define ROBOT_EVENT_DEBUG_ENABLE            (1)
 
