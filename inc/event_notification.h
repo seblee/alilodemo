@@ -1,7 +1,7 @@
 #ifndef _EVENT_NOTIFICATION_H_
 #define _EVENT_NOTIFICATION_H_
 
-#include "../testdemo/inc/audio_service.h"
+#include "../alilodemo/inc/audio_service.h"
 #include "platform.h"
 
 #define ROBOT_EVENT_NOTIFICATION_DEBUG_ENABLE      (0)

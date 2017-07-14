@@ -1,7 +1,7 @@
 #ifndef _AUDIO_SERVICE_H_
 #define _AUDIO_SERVICE_H_
 
-#include "../testdemo/inc/mscp_type.h"
+#include "../alilodemo/inc/mscp_type.h"
 #include "mico.h"
 
 #define AUDIO_SERVICE_DEBUG_ENABLE          (1)

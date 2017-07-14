@@ -1,7 +1,7 @@
 #ifndef _HTTP_FILE_DOWNLOAD_H_
 #define _HTTP_FILE_DOWNLOAD_H_
 
-#include "../testdemo/inc/http_file_download_thread.h"
+#include "../alilodemo/inc/http_file_download_thread.h"
 
 #define HTTP_FILE_DOWNLOAD_DEBUG_ENABLE     (1)
 
