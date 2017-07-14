@@ -1,8 +1,8 @@
 #ifndef _HAL_ALILO_RABBIT_H
 #define _HAL_ALILO_RABBIT_H
 
-#include "audio_service.h"
-#include "http_file_download_thread.h"
+#include "../alilodemo/inc/audio_service.h"
+#include "../alilodemo/inc/http_file_download_thread.h"
 
 #define HAL_TEST_EN 0
 

@@ -1,7 +1,8 @@
-#include "audio_service.h"
-#include "robot_event.h"
-#include "http_file_download.h"
-#include "hal_alilo_rabbit.h"
+#include "../alilodemo/hal_alilo_rabbit.h"
+
+#include "../alilodemo/inc/audio_service.h"
+#include "../alilodemo/inc/http_file_download.h"
+#include "../alilodemo/inc/robot_event.h"
 
 #define hal_log(format, ...)  custom_log("HAL", format, ##__VA_ARGS__)
 

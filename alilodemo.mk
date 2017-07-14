@@ -24,10 +24,13 @@ NAME := App_Audio_7100
 
 $(NAME)_SOURCES := mico_main.c \
 				   audio_test.c \
-				   hal_alilo_rabbit.c
+				   hal_alilo_rabbit.c\
+				   netclock/netclock.c \
+				   netclock/netclock_httpd.c
 				   
 $(NAME)_COMPONENTS := utilities/url \
-					  utilities
+					  utilities\
+					  daemons/http_server
 				   
 $(NAME)_PREBUILT_LIBRARY := Lib_7100.Cortex-M4F.GCC.release.a
 					  
@@ -35,5 +38,6 @@ GLOBAL_INCLUDES := .
 
 $(NAME)_INCLUDES := inc \
 					../mico-os/include \
-					../mico-os/template/includes
+					../mico-os/template/includes\
+					netclock
 					

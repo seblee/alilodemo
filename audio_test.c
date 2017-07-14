@@ -25,11 +25,12 @@
  * PURPOSE, TITLE, AND NONINFRINGEMENT.
  */
 
+#include "../alilodemo/audio_test.h"
+
+#include "../alilodemo/hal_alilo_rabbit.h"
+#include "../alilodemo/hal_alilo_rabbit.h"
+#include "../alilodemo/inc/http_file_download.h"
 #include "mico.h"
-#include "hal_alilo_rabbit.h"
-#include "http_file_download.h"
-#include "hal_alilo_rabbit.h"
-#include "audio_test.h"
 
 #define test_log(format, ...)  custom_log("ASR", format, ##__VA_ARGS__)
 
