@@ -32,12 +32,12 @@
 #include "../alilodemo/inc/http_file_download.h"
 #include "mico.h"
 
-#define test_log(format, ...)  custom_log("ASR", format, ##__VA_ARGS__)
+#define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
-static void player_test_thread( mico_thread_arg_t arg )
+static void player_test_thread(mico_thread_arg_t arg)
 {
-    char * buf = malloc(2000);
-    char * buf_head = buf;
+    char *buf = malloc(2000);
+    char *buf_head = buf;
     int buf_len = 0;
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status = MSCP_STATUS_ERR;
@@ -46,12 +46,12 @@ static void player_test_thread( mico_thread_arg_t arg )
 
     test_log("player_test_thread created.");
 
-    while ( 1 )
+    while (1)
     {
         mico_rtos_get_semaphore(&recordKeyPress_Sem, MICO_WAIT_FOREVER);
 
         buf = buf_head;
-        memset( buf, 0, 2000 );
+        memset(buf, 0, 2000);
 
         mic_record_id = audio_service_system_generate_record_id();
         mic_record.record_id = mic_record_id;
@@ -62,26 +62,26 @@ static void player_test_thread( mico_thread_arg_t arg )
 
         err = audio_service_get_audio_status(&result, &audio_status);
         test_log("audio_service_get_audio_status >>> err: %d, result:%d, audio_status:%d", err, result, audio_status);
-        if(err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
+        if (err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
         {
-            if(audio_status != MSCP_STATUS_STREAM_PLAYING)
+            if (audio_status != MSCP_STATUS_STREAM_PLAYING)
                 continue;
             err = audio_service_stream_stop(&result, audio_play_id);
             test_log("audio_service_stream_stop >>> err: %d, result:%d", err, result);
-            if(err != kNoErr || result != MSCP_RST_SUCCESS)
+            if (err != kNoErr || result != MSCP_RST_SUCCESS)
                 continue;
             else
             {
                 err = audio_service_get_audio_status(&result, &audio_status);
                 test_log("audio_service_get_audio_status >>> err: %d, result:%d, audio_status:%d", err, result, audio_status);
-                if(err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
+                if (err != kNoErr || result != MSCP_RST_SUCCESS || audio_status != MSCP_STATUS_IDLE)
                     continue;
             }
         }
 
         err = audio_service_mic_record_start(&result, &mic_record);
         test_log("audio_service_mic_record_start >>> err:%d, result:%d", err, result);
-        if(err != kNoErr || result != MSCP_RST_SUCCESS)
+        if (err != kNoErr || result != MSCP_RST_SUCCESS)
         {
             test_log("audio_service_mic_record_start >>> ERROR");
             audio_service_stream_stop(&result, audio_play_id);
@@ -91,38 +91,37 @@ static void player_test_thread( mico_thread_arg_t arg )
 
         flag_mic_start = 1;
 
-        while ( recordKeyStatus == KEY_PRESS )
+        while (recordKeyStatus == KEY_PRESS)
         {
-            buf_len = hal_getVoiceData( (uint8_t*)buf, 1024 );
+            buf_len = hal_getVoiceData((uint8_t *)buf, 1024);
 
-            if ( buf_len > 0 )
+            if (buf_len > 0)
             {
-                test_log("get audio from mic ,len: %d",buf_len);
+                test_log("get audio from mic ,len: %d", buf_len);
                 buf += buf_len;
                 test_log("audio total len: %d", buf - buf_head);
-                if(buf - buf_head >= 1500)
+                if (buf - buf_head >= 1500)
                 {
                     test_log("audio record buf is full!!!");
                     recordKeyStatus = KEY_RELEASE;
                     break;
                 }
             }
-            mico_rtos_thread_msleep( 100 );
+            mico_rtos_thread_msleep(100);
         }
         test_log("get audio stop!");
-        err = hal_player_start(buf_head, buf-buf_head, 2000);
+        err = hal_player_start(buf_head, buf - buf_head, 2000);
         test_log("play result: %d", err);
     }
 }
 
-
-static void url_fileDownload_test_thread( mico_thread_arg_t arg )
+static void url_fileDownload_test_thread(mico_thread_arg_t arg)
 {
     OSStatus err = kNoErr;
 
     test_log("url_fileDownloadtest_thread created.");
 
-    while(1)
+    while (1)
     {
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
 
@@ -131,21 +130,19 @@ static void url_fileDownload_test_thread( mico_thread_arg_t arg )
     }
 }
 
-
-OSStatus start_test_thread( void )
+OSStatus start_test_thread(void)
 {
     OSStatus err = kNoErr;
-    err = mico_rtos_create_thread( NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_test_thread,
-                                   0x900,
-                                   0 );
-    require_noerr( err, exit );
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_test_thread,
+                                  0x900,
+                                  0);
+    require_noerr(err, exit);
 
-    err = mico_rtos_create_thread( NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread,
-                                   0x1500,
-                                   0 );
-    require_noerr( err, exit );
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread,
+                                  0x1500,
+                                  0);
+    require_noerr(err, exit);
 
-    exit:
-        return err;
+exit:
+    return err;
 }
-

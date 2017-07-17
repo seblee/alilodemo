@@ -9,7 +9,7 @@
  ******************************************************************************
  *
  *  The MIT License
- *  Copyright (c) 2014 MXCHIP Inc.
+ *  Copyright (c) 2016 MXCHIP Inc.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -27,38 +27,37 @@
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
  *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
  *  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
  ******************************************************************************
  */
 
 #pragma once
 
 #define APP_INFO "MiCO BASIC Demo"
-
 #define FIRMWARE_REVISION "MICO_BASIC_1_0"
 #define MANUFACTURER "MXCHIP Inc."
 #define SERIAL_NUMBER "20140606"
 #define PROTOCOL "com.mxchip.basic"
 
-#define EasyLink_Needs_Reboot
-
 /************************************************************************
  * Application thread stack size */
-#define MICO_DEFAULT_APPLICATION_STACK_SIZE (1024 * 6)
+#define MICO_DEFAULT_APPLICATION_STACK_SIZE (2048)
 
 /************************************************************************
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */
 #define MICO_WLAN_CONNECTION_ENABLE
 
-#define MICO_CONFIG_MODE CONFIG_MODE_NONE
+#define MICO_WLAN_CONFIG_MODE CONFIG_MODE_NONE
 
-#define EasyLink_TimeOut 60000 /**< EasyLink timeout 60 seconds. */
+#define EasyLink_TimeOut 600000 /**< EasyLink timeout 60 seconds. */
 
-#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \
+#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \
                                                 Restart easylink after timeout: 20 seconds. */
 
 /************************************************************************
  * Device enter MFG mode if MICO settings are erased. */
 //#define MFG_MODE_AUTO
+
 /************************************************************************
  * Command line interface */
 #define MICO_CLI_ENABLE
@@ -72,6 +71,7 @@
 /************************************************************************
  * Add service _easylink._tcp._local. for discovery */
 //#define MICO_SYSTEM_DISCOVERY_ENABLE
+
 /************************************************************************
  * MiCO TCP server used for configuration and ota. */
 //#define MICO_CONFIG_SERVER_ENABLE

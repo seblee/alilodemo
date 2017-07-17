@@ -1,0 +1,34 @@
+{
+    "ElandData": {
+        "ElandID": "0123456789ABCDEF",
+        "UserID": 1,
+        "ElandName": "Seblee",
+        "ZoneOffset": 0,
+        "Serial": "01000001",
+        "FirmwareVersion": "01.00",
+        "MAC": "B0F893100321",
+        "WIFISSID": "TP-LINK_4850",
+        "WIFIKEY": "cq68794850",
+        "DHCPEnable": 0,
+        "IPstr": "192.168.0.1",
+        "SubnetMask": "255.255.255.0",
+        "DefaultGateway": "255.255.255.255",
+        "BackLightOffEnablefield": 0,
+        "BackLightOffBeginTime": "05:00:00",
+        "BackLightOffEndTime": "05:00:00",
+        "FirmwareUpdateUrl": "url",
+        "AlarmData": {
+            "AlarmID": 1,
+            "AlarmDateTime": "2017-07-13 14:30:00",
+            "SnoozeEnabled": 0,
+            "SnoozeCount": 5,
+            "SnoozeIntervalMin": 10,
+            "AlarmPattern": 1,
+            "AlarmSoundDownloadURL": "url",
+            "AlarmVoiceDownloadURL": "url",
+            "AlarmVolume": 80,
+            "VolumeStepupEnabled": 0,
+            "AlarmContinueMin": 5
+        }
+    }
+}

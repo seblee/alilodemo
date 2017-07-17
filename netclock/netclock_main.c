@@ -1,17 +1,42 @@
-#include "../alilodemo/audio_test.h"
-#include "../alilodemo/hal_alilo_rabbit.h"
-#include "../alilodemo/mico_app_define.h"
+/**
+ ******************************************************************************
+ * @file    hello_world.c
+ * @author  William Xu
+ * @version V1.0.0
+ * @date    21-May-2015
+ * @brief   First MiCO application to say hello world!
+ ******************************************************************************
+ *
+ *  The MIT License
+ *  Copyright (c) 2016 MXCHIP Inc.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is furnished
+ *  to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in
+ *  all copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+ *  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ ******************************************************************************
+ */
+
 #include "mico.h"
 #include "netclockconfig.h"
 #include "netclock.h"
 
-#define app_netclock_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
+#define app_netclock_log(format, ...) custom_log("APP", format, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
-
 static mico_semaphore_t wifi_netclock = NULL;
-mico_semaphore_t wifi_SoftAP_Sem = NULL;
-mico_mutex_t WifiMutex = NULL;
-/* MICO system callback: Restore default configuration provided by application */
 
 void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 {
@@ -21,6 +46,7 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
     case NOTIFY_STATION_UP:
         app_netclock_log("Wi-Fi STATION connected.");
         mico_rtos_set_semaphore(&wifi_netclock);
+
         IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
         micoWlanGetIPStatus(IPStatus_Cache, Station);
         memset(netclock_des_g->ElandIPstr, 0, sizeof(netclock_des_g->ElandIPstr));
@@ -37,8 +63,7 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 
         break;
     case NOTIFY_AP_UP:
-        app_netclock_log("Wi-Fi Soft_AP ready!");
-        mico_rtos_set_semaphore(&wifi_SoftAP_Sem);
+        app_netclock_log("AP OK");
         IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
         micoWlanGetIPStatus(IPStatus_Cache, Soft_AP);
         memset(netclock_des_g->ElandIPstr, 0, sizeof(netclock_des_g->ElandIPstr));
@@ -58,29 +83,16 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
     }
 }
 
-void ssl_log(const int logLevel, const char *const logMessage)
-{
-    app_netclock_log("%s\r\n", logMessage);
-}
-
 int application_start(void)
 {
     app_log_trace();
     OSStatus err = kNoErr;
     mico_Context_t *mico_context;
     app_netclock_log("app start");
-    /*wifi station 信号量*/
-    mico_rtos_init_semaphore(&wifi_netclock, 1);
-    /*wifi softAP 信号量*/
-    mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
-    /*Register user Wifi set mutex: WiFi status changed*/
-    err = mico_rtos_init_mutex(&WifiMutex);
-    require_noerr(err, exit);
-    /*Register user function for MiCO nitification: WiFi status changed*/
+    err = mico_rtos_init_semaphore(&wifi_netclock, 1);
     err = mico_system_notify_register(mico_notify_WIFI_STATUS_CHANGED,
                                       (void *)micoNotify_WifiStatusHandler, NULL);
     require_noerr(err, exit);
-
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
     /*int fog v2 service*/
     app_netclock_log("init_netclock_service");
@@ -88,29 +100,28 @@ int application_start(void)
     require_noerr(err, exit);
     app_netclock_log("mico_system_init");
     /* Start MiCO system functions according to mico_config.h*/
-   // PlatformEasyLinkButtonLongPressedCallback();
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
-//    mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
+
     err = netclock_desInit(); //数据结构体初始化
     require_noerr(err, exit);
 
-    /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
-    app_netclock_log("wifi connected successful");
 
-    err = hal_alilo_rabbit_init();
+    app_netclock_log("start netclock service");
+    err = StartNetclockService();
     require_noerr(err, exit);
 
-    err = start_test_thread();
-    require_noerr(err, exit);
-
+/* Output on debug serial port */
 exit:
-    mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,
-                              (void *)micoNotify_WifiStatusHandler);
-    mico_rtos_deinit_semaphore(&wifi_netclock);
-    mico_rtos_delete_thread(NULL);
+    app_netclock_log("HELLO WORLD!");
 
-    return err;
+    /* Trigger MiCO system led available on most MiCOKit */
+
+    while (1)
+    {
+        MicoGpioOutputTrigger(MICO_SYS_LED);
+        mico_thread_sleep(1);
+    }
 }

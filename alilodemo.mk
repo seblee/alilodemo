@@ -26,7 +26,8 @@ $(NAME)_SOURCES := mico_main.c \
 				   audio_test.c \
 				   hal_alilo_rabbit.c\
 				   netclock/netclock.c \
-				   netclock/netclock_httpd.c
+				   netclock/netclock_httpd.c\
+				   netclock/netclock_wifi.c
 				   
 $(NAME)_COMPONENTS := utilities/url \
 					  utilities\
