@@ -13,13 +13,13 @@ void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
     {
         mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi station",
                                 Wifi_station_threed, 0x900, (mico_thread_arg_t)NULL);
+        mico_thread_sleep(3); //3秒 等待连接完成
     }
     else if (wifi_Mode == Soft_AP)
     {
         mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
                                 Wifi_SoftAP_threed, 0x900, (mico_thread_arg_t)NULL);
     }
-    mico_thread_sleep(3); //3秒 等待连接完成
 }
 
 void Wifi_station_threed(mico_thread_arg_t arg)

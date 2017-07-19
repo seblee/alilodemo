@@ -123,6 +123,7 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
 
     while (1)
     {
+        test_log("start while agien");
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
 
         err = hal_url_fileDownload_start(URL_FILE_DNLD);

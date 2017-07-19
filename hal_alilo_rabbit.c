@@ -4,7 +4,7 @@
 #include "../alilodemo/inc/http_file_download.h"
 #include "../alilodemo/inc/robot_event.h"
 
-#define hal_log(format, ...)  custom_log("HAL", format, ##__VA_ARGS__)
+#define hal_log(format, ...) custom_log("HAL", format, ##__VA_ARGS__)
 
 mico_semaphore_t recordKeyPress_Sem;
 mico_semaphore_t urlFileDownload_Sem;
@@ -12,64 +12,63 @@ bool recordKeyStatus = KEY_RELEASE;
 uint8_t mic_record_id = 0;
 uint8_t audio_play_id = 0;
 uint8_t flag_mic_start = 0;
-extern void PlatformEasyLinkButtonClickedCallback( void );
+extern void PlatformEasyLinkButtonClickedCallback(void);
 
-static uint16_t                 fm_test_cnt = 0;
-static PLAYER_OPTION_S          stream_play_opt;
-static uint8_t                  ai_stream_play_id = 0;
-static FILE_DOWNLOAD_CONTEXT    g_file_download_context_user = NULL;
+static uint16_t fm_test_cnt = 0;
+static PLAYER_OPTION_S stream_play_opt;
+static uint8_t ai_stream_play_id = 0;
+static FILE_DOWNLOAD_CONTEXT g_file_download_context_user = NULL;
 
-static void _recordKeyAction_cb( ROBOT_USER_EVENT event, void *data)
+static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
 {
     mscp_result_t result = MSCP_RST_ERROR;
     OSStatus err = kNoErr;
     hal_log(">>>>>>>>>> event: %d >>>>>>>>>>", event);
-    switch(event)
+    switch (event)
     {
-        case ROBOT_EVENT_KEY_AI_START:
-            hal_log("mic record start ...");
-            recordKeyStatus = KEY_PRESS;
-            mico_rtos_set_semaphore(&recordKeyPress_Sem);
-            break;
+    case ROBOT_EVENT_KEY_AI_START:
+        hal_log("mic record start ...");
+        recordKeyStatus = KEY_PRESS;
+        mico_rtos_set_semaphore(&recordKeyPress_Sem);
+        break;
 
-        case ROBOT_EVENT_KEY_AI_STOP:
-            recordKeyStatus = KEY_RELEASE;
-            if(flag_mic_start)
-            {
-                hal_log("mic record stop ...");
-                flag_mic_start = 0;
-                audio_service_mic_record_stop(&result, mic_record_id);
-                hal_log("audio_service_mic_record_stop >>> err:%d, result:%d", err, result);
-            }
-            break;
+    case ROBOT_EVENT_KEY_AI_STOP:
+        recordKeyStatus = KEY_RELEASE;
+        if (flag_mic_start)
+        {
+            hal_log("mic record stop ...");
+            flag_mic_start = 0;
+            audio_service_mic_record_stop(&result, mic_record_id);
+            hal_log("audio_service_mic_record_stop >>> err:%d, result:%d", err, result);
+        }
+        break;
 
-        case ROBOT_EVENT_KEY_NET_CONFIG:
-            hal_log("############## easylink call back ################");
-            PlatformEasyLinkButtonClickedCallback( );
-            break;
+    case ROBOT_EVENT_KEY_NET_CONFIG:
+        hal_log("############## easylink call back ################");
+        PlatformEasyLinkButtonClickedCallback();
+        break;
 
-        case ROBOT_EVENT_KEY_URL_FILEDNLD:
-            hal_log("url file download start ...");
-            mico_rtos_set_semaphore(&urlFileDownload_Sem);
-            break;
+    case ROBOT_EVENT_KEY_URL_FILEDNLD:
+        hal_log("url file download start ...");
+        mico_rtos_set_semaphore(&urlFileDownload_Sem);
+        break;
 
-        default:
-            recordKeyStatus = KEY_RELEASE;
-            if(flag_mic_start)
-            {
-                hal_log("mic record stop ...");
-                flag_mic_start = 0;
-                audio_service_mic_record_stop(&result, mic_record_id);
-                hal_log("audio_service_mic_record_stop >>> err:%d, result:%d", err, result);
-            }
-            break;
+    default:
+        recordKeyStatus = KEY_RELEASE;
+        if (flag_mic_start)
+        {
+            hal_log("mic record stop ...");
+            flag_mic_start = 0;
+            audio_service_mic_record_stop(&result, mic_record_id);
+            hal_log("audio_service_mic_record_stop >>> err:%d, result:%d", err, result);
+        }
+        break;
     }
 }
 
-
 static OSStatus user_key_init(void)
 {
-    return robot_event_service_start( _recordKeyAction_cb );
+    return robot_event_service_start(_recordKeyAction_cb);
 }
 
 OSStatus hal_alilo_rabbit_init(void)
@@ -87,32 +86,34 @@ OSStatus hal_alilo_rabbit_init(void)
     err = user_key_init();
     require_noerr(err, exit);
 
-    exit:
-        return err;
+exit:
+    return err;
 }
 
-int32_t hal_getVoiceData( uint8_t* voice_buf, uint32_t voice_buf_len)
+int32_t hal_getVoiceData(uint8_t *voice_buf, uint32_t voice_buf_len)
 {
     OSStatus err = kGeneralErr;
     AUDIO_MIC_RECORD_USER_PARAM_S record_user_param;
     mscp_result_t result = MSCP_RST_ERROR;
     hal_log(">>>>>>>>>>>>>>>>>>>");
-    record_user_param.user_data = (uint8_t *) voice_buf;
+    record_user_param.user_data = (uint8_t *)voice_buf;
     record_user_param.user_data_len = voice_buf_len;
 
-    err = audio_service_mic_record_get_result( &result, mic_record_id,
-                                               &record_user_param );
+    err = audio_service_mic_record_get_result(&result, mic_record_id,
+                                              &record_user_param);
 
-    if ( err != kNoErr )
+    if (err != kNoErr)
     {
         return -1;
-    } else
+    }
+    else
     {
-        if ( result == MSCP_RST_SUCCESS )
+        if (result == MSCP_RST_SUCCESS)
         {
-            hal_log( "read speex_ogg voice len:%d", record_user_param.cur_len );
+            hal_log("read speex_ogg voice len:%d", record_user_param.cur_len);
             return record_user_param.cur_len;
-        } else
+        }
+        else
         {
             return -1;
         }
@@ -128,13 +129,13 @@ bool hal_player_start(const char *data, uint32_t data_len, uint32_t file_total_l
 
     audio_play_id = audio_service_system_generate_stream_id();
     audio_stream_s_p.type = AUDIO_STREAM_TYPE_AMR;
-    audio_stream_s_p.pdata = (const uint8_t*)data;
+    audio_stream_s_p.pdata = (const uint8_t *)data;
     audio_stream_s_p.stream_id = audio_play_id;
     audio_stream_s_p.total_len = file_total_len;
     audio_stream_s_p.stream_len = (uint16_t)(data_len & 0xFFFF);
 
     err = audio_service_stream_play(&result, &audio_stream_s_p);
-    if(err != kNoErr)
+    if (err != kNoErr)
     {
         hal_log("audio played fail, result: %d", result);
         return false;
@@ -190,13 +191,13 @@ static bool file_download_data_cb(void *context, const char *data, uint32_t data
     fm_stream.stream_len = (uint16_t)(data_len & 0xFFFF); //len
     fm_stream.pdata = (const uint8_t *)data;
 
-//    hal_log("############# file_download_data callback ############# ");
+    //    hal_log("############# file_download_data callback ############# ");
 
-    if((++fm_test_cnt) == 100)
+    if ((++fm_test_cnt) == 100)
     {
         fm_test_cnt = 0;
         hal_log("fm_stream.type[%d],fm_stream.stream_id[%d],fm_stream.total_len[%d],fm_stream.stream_len[%d]",
-                        (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
+                (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
     }
 
 audio_transfer:
@@ -232,7 +233,7 @@ exit:
     }
 }
 
-OSStatus hal_url_fileDownload_start(char * url)
+OSStatus hal_url_fileDownload_start(char *url)
 {
     hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_test");
     stream_play_opt.type = AUDIO_STREAM_TYPE_MP3;
@@ -240,7 +241,7 @@ OSStatus hal_url_fileDownload_start(char * url)
     stream_play_opt.stream_player_id = ai_stream_play_id;
 
     return http_file_download_start((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user),
-                                    (const char*)url,
+                                    (const char *)url,
                                     file_download_state_cb,
                                     file_download_data_cb,
                                     (uint32_t)&stream_play_opt);

@@ -88,10 +88,10 @@ int application_start(void)
     require_noerr(err, exit);
     app_netclock_log("mico_system_init");
     /* Start MiCO system functions according to mico_config.h*/
-   // PlatformEasyLinkButtonLongPressedCallback();
+    // PlatformEasyLinkButtonLongPressedCallback();
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
-//    mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
+    //    mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     err = netclock_desInit(); //数据结构体初始化
     require_noerr(err, exit);
 

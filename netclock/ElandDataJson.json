@@ -15,7 +15,7 @@
         "DefaultGateway": "255.255.255.255",
         "BackLightOffEnablefield": 0,
         "BackLightOffBeginTime": "05:00:00",
-        "BackLightOffEndTime": "05:00:00",
+        "BackLightOffEndTime": "05:10:00",
         "FirmwareUpdateUrl": "url",
         "AlarmData": {
             "AlarmID": 1,
