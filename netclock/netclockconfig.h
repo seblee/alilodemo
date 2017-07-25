@@ -28,14 +28,23 @@
 #define ElandSsid_Len 32   //wifi 用户名长度
 #define ElandKey_Len 64    //wifi 密码长度
 #define ElandIPMax_Len 16  //Eland IP地址
-#define Time_Len 9         //"HH:mm:ss"的形式
+#define Time_Format_Len 8  //"HH:mm:ss"的形式
 #define URL_Len 32         //URL长度
-#define DateTime_Len 20    //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+#define DateTime_Len 19    //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+
+typedef struct _TIME_FORMAT_
+{
+    char hour[2];
+    char colon1;
+    char minute[2];
+    char colon2;
+    char second[2];
+} TIME_FORMAT;
 
 typedef struct _ElandAlarmData //闹钟情報结构体
 {
     int32_t AlarmID;                     //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
-    char AlarmDateTime[DateTime_Len];    //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+    iso8601_time_t AlarmDateTime;        //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
     int32_t SnoozeEnabled;               //继续响铃 有效标志  0：无效   1：有效
     int32_t SnoozeCount;                 //继续响铃的次数
     int32_t SnoozeIntervalMin;           //继续响铃的间隔。単位「分」
@@ -48,10 +57,10 @@ typedef struct _ElandAlarmData //闹钟情報结构体
 } ElandAlarmData;
 typedef struct _AlarmOffHistoryData //闹钟履历结构体
 {
-    int32_t AlarmID;           //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
-    char AlarmOnDateTime[25];  //闹钟播放时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
-    char AlarmOffDateTime[25]; //闹钟停止时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
-    int32_t AlarmOffReason;    //闹钟停止的理由。 1 : 用户操作 2 : 自動停止
+    int32_t AlarmID;                 //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
+    iso8601_time_t AlarmOnDateTime;  //闹钟播放时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
+    iso8601_time_t AlarmOffDateTime; //闹钟停止时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
+    int32_t AlarmOffReason;          //闹钟停止的理由。 1 : 用户操作 2 : 自動停止
 } AlarmOffHistoryData;
 
 typedef struct _ELAND_DES_S //设备状态结构
@@ -60,24 +69,24 @@ typedef struct _ELAND_DES_S //设备状态结构
     bool IsHava_superuser; //是否拥有超级用户
     bool IsRecovery;       //是否需要回收授权
 
-    char ElandID[ElandID_Len];                 //Eland唯一识别的ID
-    int32_t UserID;                            //用户唯一识别ID，用户登录时获取
-    char ElandName[ElandName_Len];             //Eland名称，用户输入
-    int32_t ElandZoneOffset;                   //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
-    char ElandSerial[ElandSerial_len];         //Eland的串口番号。
-    char ElandFirmwareVersion[ElandFW_V_Len];  //Eland固件版本号
-    char ElandMAC[ElandMAC_Len];               //MAC地址
-    char Wifissid[ElandSsid_Len];              //MAC地址
-    char WifiKey[ElandKey_Len];                //MAC地址
-    int32_t ElandDHCPEnable;                   //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
-    char ElandIPstr[ElandIPMax_Len];           //Eland IP地址
-    char ElandSubnetMask[ElandIPMax_Len];      //Eland的IPv4子网掩码。
-    char ElandDefaultGateway[ElandIPMax_Len];  //Eland的IPv4默认网关。
-    int32_t ElandBackLightOffEnable;           //指定時刻内背光是否熄灭的标志  0 : 無効 1 : 有効
-    char ElandBackLightOffBeginTime[Time_Len]; //设定背光开始熄灭的时刻 "HH:mm:ss"的形式。（ex: "05:00:00"）
-    char ElandBackLightOffEndTime[Time_Len];   //设定背光开始熄灭的时刻 "HH:mm:ss"的形式。（ex: "05:00:00"）
-    char ElandFirmwareUpdateUrl[URL_Len];      //固件升级下载的URL
-    ElandAlarmData ElandNextAlarmData;         //下次播报予定的闹钟情報
+    char ElandID[ElandID_Len];                //Eland唯一识别的ID
+    int32_t UserID;                           //用户唯一识别ID，用户登录时获取
+    char ElandName[ElandName_Len];            //Eland名称，用户输入
+    int32_t ElandZoneOffset;                  //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
+    char ElandSerial[ElandSerial_len];        //Eland的串口番号。
+    char ElandFirmwareVersion[ElandFW_V_Len]; //Eland固件版本号
+    char ElandMAC[ElandMAC_Len];              //MAC地址
+    char Wifissid[ElandSsid_Len];             //MAC地址
+    char WifiKey[ElandKey_Len];               //MAC地址
+    int32_t ElandDHCPEnable;                  //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
+    char ElandIPstr[ElandIPMax_Len];          //Eland IP地址
+    char ElandSubnetMask[ElandIPMax_Len];     //Eland的IPv4子网掩码。
+    char ElandDefaultGateway[ElandIPMax_Len]; //Eland的IPv4默认网关。
+    int32_t ElandBackLightOffEnable;          //指定時刻内背光是否熄灭的标志  0 : 無効 1 : 有効
+    TIME_FORMAT ElandBackLightOffBeginTime;   //设定背光开始熄灭的时刻 "HH:mm:ss"的形式。（ex: "05:00:00"）
+    TIME_FORMAT ElandBackLightOffEndTime;     //设定背光开始熄灭的时刻 "HH:mm:ss"的形式。（ex: "05:00:00"）
+    char ElandFirmwareUpdateUrl[URL_Len];     //固件升级下载的URL
+    ElandAlarmData ElandNextAlarmData;        //下次播报予定的闹钟情報
 
 } ELAND_DES_S;
 

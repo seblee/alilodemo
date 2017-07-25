@@ -251,8 +251,8 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(ElandJsonData, "SubnetMask", json_object_new_string(netclock_des_g->ElandSubnetMask));
     json_object_object_add(ElandJsonData, "DefaultGateway", json_object_new_string(netclock_des_g->ElandDefaultGateway));
     json_object_object_add(ElandJsonData, "BackLightOffEnablefield", json_object_new_int(netclock_des_g->ElandBackLightOffEnable));
-    json_object_object_add(ElandJsonData, "BackLightOffBeginTime", json_object_new_string(netclock_des_g->ElandBackLightOffBeginTime));
-    json_object_object_add(ElandJsonData, "BackLightOffEndTime", json_object_new_string(netclock_des_g->ElandBackLightOffBeginTime));
+    json_object_object_add(ElandJsonData, "BackLightOffBeginTime", json_object_new_string((const char *)&netclock_des_g->ElandBackLightOffBeginTime));
+    json_object_object_add(ElandJsonData, "BackLightOffEndTime", json_object_new_string((const char *)&netclock_des_g->ElandBackLightOffBeginTime));
     json_object_object_add(ElandJsonData, "FirmwareUpdateUrl", json_object_new_string(netclock_des_g->ElandFirmwareUpdateUrl));
 
     AlarmJsonData = json_object_new_object();
@@ -260,7 +260,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
 
     Eland_log("Begin add AlarmJsonData object");
     json_object_object_add(AlarmJsonData, "AlarmID", json_object_new_int(netclock_des_g->ElandNextAlarmData.AlarmID));
-    json_object_object_add(AlarmJsonData, "AlarmDateTime", json_object_new_string(netclock_des_g->ElandNextAlarmData.AlarmDateTime));
+    json_object_object_add(AlarmJsonData, "AlarmDateTime", json_object_new_string((const char *)&netclock_des_g->ElandNextAlarmData.AlarmDateTime));
     json_object_object_add(AlarmJsonData, "SnoozeEnabled", json_object_new_int(netclock_des_g->ElandNextAlarmData.SnoozeEnabled));
     json_object_object_add(AlarmJsonData, "SnoozeCount", json_object_new_int(netclock_des_g->ElandNextAlarmData.SnoozeCount));
     json_object_object_add(AlarmJsonData, "SnoozeIntervalMin", json_object_new_int(netclock_des_g->ElandNextAlarmData.SnoozeIntervalMin));
@@ -368,9 +368,9 @@ OSStatus ProcessPostJson(char *InputJson)
         }
         else if (!strcmp(key, "BackLightOffBeginTime"))
         {
-            memset(netclock_des_g->ElandBackLightOffBeginTime, 0, sizeof(netclock_des_g->ElandBackLightOffBeginTime));
-            sprintf(netclock_des_g->ElandBackLightOffBeginTime, "%s", json_object_get_string(val));
-            if (!strncmp(netclock_des_g->ElandBackLightOffBeginTime, "\0", 1))
+            memset(&netclock_des_g->ElandBackLightOffBeginTime, 0, sizeof(netclock_des_g->ElandBackLightOffBeginTime));
+            memcpy(&netclock_des_g->ElandBackLightOffBeginTime, json_object_get_string(val), Time_Format_Len);
+            if (!strncmp((char *)&netclock_des_g->ElandBackLightOffBeginTime, "\0", 1))
             {
                 Eland_log("BackLightOffBeginTime not Available");
                 goto exit;
@@ -378,9 +378,9 @@ OSStatus ProcessPostJson(char *InputJson)
         }
         else if (!strcmp(key, "BackLightOffEndTime"))
         {
-            memset(netclock_des_g->ElandBackLightOffEndTime, 0, sizeof(netclock_des_g->ElandBackLightOffEndTime));
-            sprintf(netclock_des_g->ElandBackLightOffEndTime, "%s", json_object_get_string(val));
-            if (!strncmp(netclock_des_g->ElandBackLightOffEndTime, "\0", 1))
+            memset(&netclock_des_g->ElandBackLightOffEndTime, 0, sizeof(netclock_des_g->ElandBackLightOffEndTime));
+            memcpy(&netclock_des_g->ElandBackLightOffEndTime, json_object_get_string(val), Time_Format_Len);
+            if (!strncmp((char *)&netclock_des_g->ElandBackLightOffEndTime, "\0", 1))
             {
                 Eland_log("BackLightOffBeginTime not Available");
                 goto exit;
@@ -412,9 +412,9 @@ OSStatus ProcessPostJson(char *InputJson)
         }
         else if (!strcmp(key1, "AlarmDateTime"))
         {
-            memset(netclock_des_g->ElandNextAlarmData.AlarmDateTime, 0, sizeof(netclock_des_g->ElandNextAlarmData.AlarmDateTime));
-            sprintf(netclock_des_g->ElandNextAlarmData.AlarmDateTime, "%s", json_object_get_string(val1));
-            if (!strncmp(netclock_des_g->ElandNextAlarmData.AlarmDateTime, "\0", 1))
+            memset(&netclock_des_g->ElandNextAlarmData.AlarmDateTime, 0, sizeof(iso8601_time_t));
+            memcpy(&netclock_des_g->ElandNextAlarmData.AlarmDateTime, json_object_get_string(val1), DateTime_Len);
+            if (!strncmp((char *)&netclock_des_g->ElandNextAlarmData.AlarmDateTime, "\0", 1))
             {
                 Eland_log("AlarmDateTime not Available");
                 goto exit;

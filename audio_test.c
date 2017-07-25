@@ -123,7 +123,8 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
 
     while (1)
     {
-        test_log("start while agien");
+        test_log("start while again");
+
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
 
         err = hal_url_fileDownload_start(URL_FILE_DNLD);
@@ -134,14 +135,10 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
 OSStatus start_test_thread(void)
 {
     OSStatus err = kNoErr;
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_test_thread,
-                                  0x900,
-                                  0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_test_thread, 0x900, 0);
     require_noerr(err, exit);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread,
-                                  0x1500,
-                                  0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread, 0x1500, 0);
     require_noerr(err, exit);
 
 exit:

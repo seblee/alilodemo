@@ -96,6 +96,7 @@ static int web_send_Post_Request(httpd_request_t *req)
         app_httpd_log("Json useful");
         Start_wifi_Station_SoftSP_Thread(Station);
         WifiStatus = malloc(sizeof(LinkStatusTypeDef));
+        mico_thread_sleep(1); //3秒 等待连接完成
         micoWlanGetLinkStatus(WifiStatus);
         if (WifiStatus->is_connected)
         {
