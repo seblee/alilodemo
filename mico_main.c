@@ -100,11 +100,11 @@ int application_start(void)
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
 
-    err = hal_alilo_rabbit_init();
-    require_noerr(err, exit);
+    //err = hal_alilo_rabbit_init();
+    //require_noerr(err, exit);
 
-    err = start_test_thread();
-    require_noerr(err, exit);
+    //err = start_test_thread();
+    //require_noerr(err, exit);
 
 exit:
     mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,

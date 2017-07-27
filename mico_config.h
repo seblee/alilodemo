@@ -53,15 +53,15 @@
 
 #define EasyLink_TimeOut 60000 /**< EasyLink timeout 60 seconds. */
 
-#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \
-                                                Restart easylink after timeout: 20 seconds. */
+#define EasyLink_ConnectWlan_Timeout 20000 //**< Connect to wlan after configured by easylink.
+                                           //     Restart easylink after timeout: 20 seconds.
 
 /************************************************************************
  * Device enter MFG mode if MICO settings are erased. */
 //#define MFG_MODE_AUTO
 /************************************************************************
  * Command line interface */
-#define MICO_CLI_ENABLE
+//#define MICO_CLI_ENABLE
 
 /************************************************************************
  * Start a system monitor daemon, application can register some monitor  
