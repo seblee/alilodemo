@@ -4,6 +4,8 @@
 #include "mico.h"
 #include "netclockconfig.h"
 #include "netclock.h"
+#include "netclock_uart.h"
+#include "sntp_client.h"
 
 #define app_netclock_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
@@ -76,19 +78,24 @@ int application_start(void)
     /*Register user Wifi set mutex: WiFi status changed*/
     err = mico_rtos_init_mutex(&WifiMutex);
     require_noerr(err, exit);
+    /*Register elandstate_queue: elandstate uart use*/
+    err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
+    require_noerr(err, exit);
     /*Register user function for MiCO nitification: WiFi status changed*/
     err = mico_system_notify_register(mico_notify_WIFI_STATUS_CHANGED,
                                       (void *)micoNotify_WifiStatusHandler, NULL);
     require_noerr(err, exit);
 
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
+    /*start init uart & start service*/
+    start_uart_service();
+
     /*int fog v2 service*/
     app_netclock_log("init_netclock_service");
     err = InitNetclockService();
     require_noerr(err, exit);
     app_netclock_log("mico_system_init");
     /* Start MiCO system functions according to mico_config.h*/
-    // PlatformEasyLinkButtonLongPressedCallback();
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
     //    mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
@@ -100,11 +107,14 @@ int application_start(void)
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
 
-    //err = hal_alilo_rabbit_init();
-    //require_noerr(err, exit);
+    /*start sntp service*/
+    start_sntp_service();
 
-    //err = start_test_thread();
-    //require_noerr(err, exit);
+//err = hal_alilo_rabbit_init();
+//require_noerr(err, exit);
+
+//err = start_test_thread();
+//require_noerr(err, exit);
 
 exit:
     mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,

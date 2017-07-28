@@ -76,7 +76,7 @@ static int web_send_Post_Request(httpd_request_t *req)
     int buf_size = 1024;
     char *buf = NULL;
     char post_back_body[20] = {"post response body"};
-    mico_Context_t *context = NULL;
+    //mico_Context_t *context = NULL;
     bool para_succ = false;
     LinkStatusTypeDef *WifiStatus;
     app_httpd_log("web_send_Post_Request");
