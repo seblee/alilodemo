@@ -20,15 +20,15 @@ mico_mutex_t ElandStateDateMutex = NULL; //传输数据独立访问
 uint16_t ElandStateDate[2];
 mico_queue_t elandstate_queue = NULL;
 
-//uint8_t ElandTranmmiteToMcu[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 TxDataStc ElandTranmmiteToMcu = {
-    0, 10,
+    0, 0,
 };
 
 /*************************/
 void start_uart_service(void)
 {
     OSStatus err = kNoErr;
+    msg_queue my_message;
     //eland 状态数据互锁
     err = mico_rtos_init_mutex(&ElandStateDateMutex);
     require_noerr(err, exit);
@@ -38,7 +38,10 @@ void start_uart_service(void)
     /*Register queue receive thread*/
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "queue receiver", StateReceivethread, 0x500, 0);
     require_noerr(err, exit);
-
+    //Eland 设置状态
+    my_message.type = Queue_ElandState_type;
+    my_message.value = ElandBegin;
+    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 exit:
     return;
 }
@@ -69,14 +72,40 @@ void netclock_uart_thread(mico_thread_arg_t args)
 }
 void uart_send_thread_DDE(uint32_t arg)
 {
+    uint8_t *SendBuffToMcu;
+    SendBuffToMcu = malloc(sizeof(TxDataStc));
+    mico_rtos_lock_mutex(&ElandStateDateMutex);
+    ElandTranmmiteToMcu.Elandheader = '{';
+    ElandTranmmiteToMcu.ElandTrail = '}';
+    ElandTranmmiteToMcu.Elandstatus = ElandBegin;
+    ElandTranmmiteToMcu.ElandRtctime.year = 0;
+    ElandTranmmiteToMcu.ElandRtctime.month = 1;
+    ElandTranmmiteToMcu.ElandRtctime.date = 1;
+    ElandTranmmiteToMcu.ElandRtctime.weekday = 7;
+    ElandTranmmiteToMcu.ElandRtctime.hr = 0;
+    ElandTranmmiteToMcu.ElandRtctime.min = 0;
+    ElandTranmmiteToMcu.ElandRtctime.sec = 0;
+
+    // ElandTranmmiteToMcu.ElandRtctime.year = 1;
+    // ElandTranmmiteToMcu.ElandRtctime.month = 2;
+    // ElandTranmmiteToMcu.ElandRtctime.date = 3;
+    // ElandTranmmiteToMcu.ElandRtctime.weekday = 4;
+    // ElandTranmmiteToMcu.ElandRtctime.hr = 5;
+    // ElandTranmmiteToMcu.ElandRtctime.min = 6;
+    // ElandTranmmiteToMcu.ElandRtctime.sec = 7;
+    mico_rtos_unlock_mutex(&ElandStateDateMutex);
+
     while (1)
     {
         mico_rtos_lock_mutex(&ElandStateDateMutex);
-        ElandTranmmiteToMcu.ElandTrail = sizeof(TxDataStc);
-        MicoUartSend(MICO_UART_2, &(ElandTranmmiteToMcu), sizeof(TxDataStc));
+        memset(SendBuffToMcu, 0, sizeof(TxDataStc));
+        memcpy(SendBuffToMcu, &(ElandTranmmiteToMcu), sizeof(TxDataStc));
+        MicoUartSend(MICO_UART_2, SendBuffToMcu, sizeof(TxDataStc));
         mico_rtos_unlock_mutex(&ElandStateDateMutex);
         mico_thread_msleep(300); //300ms 发送一次
     }
+    if (SendBuffToMcu != NULL)
+        free(SendBuffToMcu);
     mico_rtos_delete_thread(NULL);
 }
 
@@ -99,7 +128,6 @@ void uart_recv_thread_DDE(uint32_t arg)
             //printf( "%02x ", inDataBuffer[i] );
             MicoUartSend(MICO_UART_2, &(inDataBuffer[i]), 1);
         }
-        MicoGpioOutputTrigger(MICO_SYS_LED);
         //printf( "\r\n\r\n" );
         //uart_cmd_process( inDataBuffer, recvlen );
         //mico_rtos_set_semaphore( &postfog_sem );
@@ -162,7 +190,7 @@ void StateReceivethread(mico_thread_arg_t arg)
         }
         else if (received.type == Queue_ElandState_type)
         {
-            ElandTranmmiteToMcu.Elandstatus = received.value;
+            ElandTranmmiteToMcu.Elandstatus = (Eland_Status_type)received.value;
         }
         mico_rtos_unlock_mutex(&ElandStateDateMutex);
         //netclock_uart_log( "Received data from queue:value = %d",received.value );

@@ -17,7 +17,7 @@ json_object *AlarmJsonData = NULL;
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
-   // LinkStatusTypeDef *WifiStatus;
+    // LinkStatusTypeDef *WifiStatus;
     if (false == CheckNetclockDESSetting())
     {
         //结构体覆盖
@@ -26,7 +26,7 @@ OSStatus netclock_desInit(void)
         require_noerr(err, exit);
     }
     Eland_log("local firmware version:%s", netclock_des_g->ElandFirmwareVersion);
-//check_ElangActivate_state:
+    //check_ElangActivate_state:
     if (netclock_des_g->IsActivate == false) //没激活
     {
         Eland_log("未激活");
@@ -186,8 +186,8 @@ void ElandParameterConfiguration(mico_thread_arg_t args)
     // network_InitTypeDef_st wNetConfig;
     Eland_log("Soft_ap_Server");
     Start_wifi_Station_SoftSP_Thread(Soft_AP);
-    // memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
 
+    // memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
     // strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
     // strcpy((char *)wNetConfig.wifi_key, ELAND_AP_KEY);
 

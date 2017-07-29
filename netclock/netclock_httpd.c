@@ -38,6 +38,7 @@
 #include "mico.h"
 #include "httpd_priv.h"
 #include "netclock_wifi.h"
+#include "netclock_uart.h"
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
 
 #define HTTPD_HDR_DEFORT (HTTPD_HDR_ADD_CONN_CLOSE)
@@ -79,6 +80,8 @@ static int web_send_Post_Request(httpd_request_t *req)
     //mico_Context_t *context = NULL;
     bool para_succ = false;
     LinkStatusTypeDef *WifiStatus;
+    msg_queue my_message;
+
     app_httpd_log("web_send_Post_Request");
     buf = malloc(buf_size);
     memset(buf, 0, buf_size);
@@ -90,7 +93,7 @@ static int web_send_Post_Request(httpd_request_t *req)
 
     err = httpd_send_body(req->sock, (const unsigned char *)post_back_body, strlen(post_back_body));
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-    mico_thread_sleep(1); //3秒 等待连接完成
+    mico_thread_sleep(1); //等待连接完成
     if (ProcessPostJson(buf) == kNoErr)
     {
         app_httpd_log("Json useful");
@@ -100,6 +103,10 @@ static int web_send_Post_Request(httpd_request_t *req)
         micoWlanGetLinkStatus(WifiStatus);
         if (WifiStatus->is_connected)
         {
+            my_message.type = Queue_ElandState_type;
+            my_message.value = ElandWifyConnectedStatus;
+            mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+
             app_httpd_log("Wifi parameter is correct");
             Eland_httpd_stop(); //stop http server mode
             /*
@@ -203,7 +210,7 @@ exit:
 int Eland_httpd_start(void)
 {
     OSStatus err = kNoErr;
-
+    msg_queue my_message;
     err = _app_httpd_start();
     require_noerr(err, exit);
 
@@ -212,7 +219,9 @@ int Eland_httpd_start(void)
         app_http_register_handlers();
         is_handlers_registered = true;
     }
-
+    my_message.type = Queue_ElandState_type;
+    my_message.value = ElandHttpServerStatus;
+    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 exit:
     return err;
 }

@@ -2,9 +2,10 @@
 #include "mico.h"
 #include "sntp.h"
 #include <time.h>
+#include "netclock_uart.h"
 #define sntp_demo_log(M, ...) custom_log("Stnp", M, ##__VA_ARGS__)
 
-#define TIME_SYNC_PERIOD (60 * SECONDS)
+#define TIME_SYNC_PERIOD (6 * SECONDS)
 
 void start_sntp_service(void)
 {
@@ -17,12 +18,12 @@ static void sntp_time_synced(void)
     iso8601_time_t iso8601_time;
     mico_utc_time_t utc_time;
     mico_rtc_time_t rtc_time;
+    msg_queue my_message;
 
     mico_time_get_iso8601_time(&iso8601_time);
     sntp_demo_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
 
     mico_time_get_utc_time(&utc_time);
-
     currentTime = localtime((const time_t *)&utc_time);
     rtc_time.sec = currentTime->tm_sec;
     rtc_time.min = currentTime->tm_min;
@@ -34,6 +35,10 @@ static void sntp_time_synced(void)
     rtc_time.year = (currentTime->tm_year + 1900) % 100;
 
     MicoRtcSetTime(&rtc_time);
+    mico_time_get_utc_time(&utc_time);
+    my_message.type = Queue_UTC_type;
+    my_message.value = utc_time;
+    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 }
 
 /**/

@@ -110,11 +110,11 @@ int application_start(void)
     /*start sntp service*/
     start_sntp_service();
 
-//err = hal_alilo_rabbit_init();
-//require_noerr(err, exit);
+    err = hal_alilo_rabbit_init();
+    require_noerr(err, exit);
 
-//err = start_test_thread();
-//require_noerr(err, exit);
+    err = start_test_thread();
+    require_noerr(err, exit);
 
 exit:
     mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,

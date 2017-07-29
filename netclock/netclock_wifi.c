@@ -6,6 +6,7 @@
  */
 #include "mico.h"
 #include "netclock_wifi.h"
+#include "netclock_uart.h"
 #define WifiSet_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
 {
@@ -50,6 +51,7 @@ void Wifi_station_threed(mico_thread_arg_t arg)
 void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_st wNetConfig;
+    msg_queue my_message;
     mico_rtos_lock_mutex(&WifiMutex);
     WifiSet_log("Soft_ap_Server");
 
@@ -66,6 +68,9 @@ void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
+    my_message.type = Queue_ElandState_type;
+    my_message.value = ElandAPStatus;
+    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
     mico_rtos_unlock_mutex(&WifiMutex);
     mico_rtos_delete_thread(NULL);
 }

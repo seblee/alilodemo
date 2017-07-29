@@ -10,15 +10,19 @@
 #include "mico.h"
 
 //状态宏定义
-#define ElandBegin 0x0000
-#define ElandAPStatus 0x0001
-#define ElandHttpServerStatus 0x0002
-#define ElandWifyConnectedStatus 0x0004
+/*Eland 状态*/
+typedef enum {
+    ElandBegin = 0,
+    ElandAPStatus,
+    ElandHttpServerStatus,
+    ElandWifyConnectedStatus,
+} Eland_Status_type;
 
 typedef enum {
     Queue_UTC_type,
     Queue_ElandState_type,
 } msg_queue_type;
+
 typedef struct __msg_queue
 {
     msg_queue_type type;
@@ -29,14 +33,13 @@ typedef struct __TxDataStc
 {
     uint8_t Elandheader;
     // uint8_t ElandLen;
-    uint8_t Elandstatus;
+    Eland_Status_type Elandstatus;
     mico_rtc_time_t ElandRtctime;
     uint8_t ElandTrail;
 } TxDataStc;
 
 /*全局变量*/
 extern mico_queue_t elandstate_queue;
-//extern uint8_t ElandTranmmiteToMcu[10];
 extern TxDataStc ElandTranmmiteToMcu;
 
 /*函数*/
