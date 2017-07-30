@@ -52,7 +52,7 @@ void netclock_uart_thread(mico_thread_arg_t args)
     mico_Context_t *mico_context;
     /*UART receive thread*/
     mico_context = mico_system_context_get();
-    uart_config.baud_rate = 115200;
+    uart_config.baud_rate = 57600;
     uart_config.data_width = DATA_WIDTH_8BIT;
     uart_config.parity = NO_PARITY;
     uart_config.stop_bits = STOP_BITS_1;
@@ -86,13 +86,6 @@ void uart_send_thread_DDE(uint32_t arg)
     ElandTranmmiteToMcu.ElandRtctime.min = 0;
     ElandTranmmiteToMcu.ElandRtctime.sec = 0;
 
-    // ElandTranmmiteToMcu.ElandRtctime.year = 1;
-    // ElandTranmmiteToMcu.ElandRtctime.month = 2;
-    // ElandTranmmiteToMcu.ElandRtctime.date = 3;
-    // ElandTranmmiteToMcu.ElandRtctime.weekday = 4;
-    // ElandTranmmiteToMcu.ElandRtctime.hr = 5;
-    // ElandTranmmiteToMcu.ElandRtctime.min = 6;
-    // ElandTranmmiteToMcu.ElandRtctime.sec = 7;
     mico_rtos_unlock_mutex(&ElandStateDateMutex);
 
     while (1)

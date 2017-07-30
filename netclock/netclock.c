@@ -4,6 +4,7 @@
 #include "json_c/json.h"
 #include "netclock_wifi.h"
 #include "mico.h"
+#include "netclock_uart.h"
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
 ELAND_DES_S *netclock_des_g = NULL;
@@ -183,10 +184,14 @@ OSStatus Netclock_des_recovery(void)
 }
 void ElandParameterConfiguration(mico_thread_arg_t args)
 {
+    msg_queue my_message;
     // network_InitTypeDef_st wNetConfig;
     Eland_log("Soft_ap_Server");
     Start_wifi_Station_SoftSP_Thread(Soft_AP);
-
+    my_message.type = Queue_ElandState_type;
+    my_message.value = ElandAPStatus;
+    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+    mico_rtos_unlock_mutex(&WifiMutex);
     // memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
     // strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
     // strcpy((char *)wNetConfig.wifi_key, ELAND_AP_KEY);

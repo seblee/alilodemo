@@ -87,6 +87,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
+
     /*start init uart & start service*/
     start_uart_service();
 
