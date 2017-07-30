@@ -3,15 +3,18 @@
 #include "../alilodemo/inc/audio_service.h"
 #include "../alilodemo/inc/http_file_download.h"
 #include "../alilodemo/inc/robot_event.h"
-
+#include "netclock_uart.h"
 #define hal_log(format, ...) custom_log("HAL", format, ##__VA_ARGS__)
 
 mico_semaphore_t recordKeyPress_Sem;
 mico_semaphore_t urlFileDownload_Sem;
+mico_semaphore_t urlPalyStreamStop_Sem;
 bool recordKeyStatus = KEY_RELEASE;
 uint8_t mic_record_id = 0;
 uint8_t audio_play_id = 0;
 uint8_t flag_mic_start = 0;
+uint8_t flagAudioPlay = 0;
+
 extern void PlatformEasyLinkButtonClickedCallback(void);
 
 static uint16_t fm_test_cnt = 0;
@@ -50,9 +53,13 @@ static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
 
     case ROBOT_EVENT_KEY_URL_FILEDNLD:
         hal_log("url file download start ...");
-        mico_rtos_set_semaphore(&urlFileDownload_Sem);
+        if (flagAudioPlay != 0)
+            mico_rtos_set_semaphore(&urlFileDownload_Sem);
         break;
-
+    case ROBOT_EVENT_KEY_PLAY_PAUSE:
+        if ((flagAudioPlay == 2) || (flagAudioPlay == 3))
+            mico_rtos_set_semaphore(&urlPalyStreamStop_Sem);
+        break;
     default:
         recordKeyStatus = KEY_RELEASE;
         if (flag_mic_start)
@@ -78,6 +85,9 @@ OSStatus hal_alilo_rabbit_init(void)
     require_noerr(err, exit);
 
     err = mico_rtos_init_semaphore(&urlFileDownload_Sem, 1);
+    require_noerr(err, exit);
+
+    err = mico_rtos_init_semaphore(&urlPalyStreamStop_Sem, 1);
     require_noerr(err, exit);
 
     err = audio_service_init();
@@ -245,4 +255,21 @@ OSStatus hal_url_fileDownload_start(char *url)
                                     file_download_state_cb,
                                     file_download_data_cb,
                                     (uint32_t)&stream_play_opt);
+}
+OSStatus hal_url_fileDownload_pause(void)
+{
+    hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_pause");
+
+    return http_file_download_pause((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user));
+}
+OSStatus hal_url_fileDownload_continue(void)
+{
+    hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_continue");
+
+    return http_file_download_continue((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user));
+}
+OSStatus hal_url_fileDownload_stop(void)
+{
+    hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_stop");
+    return  http_file_download_stop((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user), true);
 }

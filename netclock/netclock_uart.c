@@ -195,3 +195,10 @@ exit:
 
     mico_rtos_delete_thread(NULL);
 }
+void SendElandQueue(msg_queue_type Type,uint32_t value)
+{
+    msg_queue my_message;
+    my_message.type = Type;
+    my_message.value = value;
+    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+}

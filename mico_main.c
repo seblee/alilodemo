@@ -110,7 +110,6 @@ int application_start(void)
 
     /*start sntp service*/
     start_sntp_service();
-
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
 

@@ -31,7 +31,7 @@
 #include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/inc/http_file_download.h"
 #include "mico.h"
-
+#include "netclock_uart.h"
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
 static void player_test_thread(mico_thread_arg_t arg)
@@ -118,17 +118,58 @@ static void player_test_thread(mico_thread_arg_t arg)
 static void url_fileDownload_test_thread(mico_thread_arg_t arg)
 {
     OSStatus err = kNoErr;
-
+    mscp_result_t result = MSCP_RST_ERROR;
     test_log("url_fileDownloadtest_thread created.");
-
+    mico_rtos_thread_sleep(1);
+    flagAudioPlay = 1;
     while (1)
     {
         test_log("start while again");
 
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
+        switch (flagAudioPlay)
+        {
+        case 1:
+            err = hal_url_fileDownload_start(URL_FILE_DNLD);
+            test_log("file download status: err = %d", err);
+            SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
+            flagAudioPlay = 2;
+            break;
+        case 2:
+            err = hal_url_fileDownload_pause();
+            audio_service_stream_pause(&result);
+            test_log("file pause status: err = %d", err);
+            SendElandQueue(Queue_ElandState_type, ElandAliloPause);
+            flagAudioPlay = 3;
+            break;
+        case 3:
+            err = hal_url_fileDownload_continue();
+            test_log("file continue status: err = %d", err);
+            audio_service_stream_continue(&result);
+            SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
+            flagAudioPlay = 2;
+            break;
+        default:
+            flagAudioPlay = 1;
+            break;
+        }
+    }
+}
 
-        err = hal_url_fileDownload_start(URL_FILE_DNLD);
-        test_log("file download status: err = %d", err);
+static void url_paly_stop_thread(mico_thread_arg_t arg)
+{
+    OSStatus err = kNoErr;
+    mscp_result_t result = MSCP_RST_ERROR;
+    while (1)
+    {
+        mico_rtos_get_semaphore(&urlPalyStreamStop_Sem, MICO_WAIT_FOREVER);
+
+        err = hal_url_fileDownload_stop();
+        test_log("file stop status: err = %d", err);
+
+        audio_service_stream_stop(&result, audio_service_system_generate_stream_id());
+        flagAudioPlay = 1;
+        SendElandQueue(Queue_ElandState_type, ElandAliloStop);
     }
 }
 
@@ -139,6 +180,8 @@ OSStatus start_test_thread(void)
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread, 0x1500, 0);
+    require_noerr(err, exit);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "url PlayStop Thread", url_paly_stop_thread, 0x1500, 0);
     require_noerr(err, exit);
 
 exit:

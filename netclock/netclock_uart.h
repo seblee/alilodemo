@@ -16,6 +16,9 @@ typedef enum {
     ElandAPStatus,
     ElandHttpServerStatus,
     ElandWifyConnectedStatus,
+    ElandAliloPlay,
+    ElandAliloPause,
+    ElandAliloStop,
 } Eland_Status_type;
 
 typedef enum {
@@ -49,5 +52,6 @@ void uart_recv_thread_DDE(uint32_t arg);
 void uart_send_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void StateReceivethread(mico_thread_arg_t arg);
+void SendElandQueue(msg_queue_type Type,uint32_t value);
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */
