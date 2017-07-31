@@ -98,13 +98,15 @@ static int web_send_Post_Request(httpd_request_t *req)
     {
         app_httpd_log("Json useful");
         Start_wifi_Station_SoftSP_Thread(Station);
+
         WifiStatus = malloc(sizeof(LinkStatusTypeDef));
-        mico_thread_sleep(1); //3秒 等待连接完成
+        memset(WifiStatus, 0, sizeof(LinkStatusTypeDef));
+        mico_thread_sleep(3); //3秒 等待连接完成
         micoWlanGetLinkStatus(WifiStatus);
         if (WifiStatus->is_connected)
         {
             my_message.type = Queue_ElandState_type;
-            my_message.value = ElandWifyConnectedStatus;
+            my_message.value = ElandWifyConnectedSuccessed;
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 
             app_httpd_log("Wifi parameter is correct");
@@ -134,6 +136,10 @@ static int web_send_Post_Request(httpd_request_t *req)
         {
             app_httpd_log("correct wifi failed");
             Start_wifi_Station_SoftSP_Thread(Soft_AP);
+            my_message.type = Queue_ElandState_type;
+            my_message.value = ElandWifyConnectedFailed;
+            mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+
         }
         free(WifiStatus);
 
