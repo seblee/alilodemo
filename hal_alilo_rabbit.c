@@ -4,6 +4,8 @@
 #include "../alilodemo/inc/http_file_download.h"
 #include "../alilodemo/inc/robot_event.h"
 #include "netclock_uart.h"
+#include "mico.h"
+#include "platform.h"
 #define hal_log(format, ...) custom_log("HAL", format, ##__VA_ARGS__)
 
 mico_semaphore_t recordKeyPress_Sem;
@@ -16,6 +18,7 @@ uint8_t flag_mic_start = 0;
 uint8_t flagAudioPlay = 0;
 
 extern void PlatformEasyLinkButtonClickedCallback(void);
+extern void PlatformEasyLinkButtonLongPressedCallback(void);
 
 static uint16_t fm_test_cnt = 0;
 static PLAYER_OPTION_S stream_play_opt;
@@ -29,6 +32,14 @@ static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
     hal_log(">>>>>>>>>> event: %d >>>>>>>>>>", event);
     switch (event)
     {
+    case ROBOT_EVENT_KEY_AUTO_SLEEP_ON_OFF:
+        if ((flagAudioPlay == 2) || (flagAudioPlay == 3))
+        {
+            mico_rtos_set_semaphore(&urlPalyStreamStop_Sem);
+            mico_rtos_thread_sleep(1);
+        }
+        PlatformEasyLinkButtonLongPressedCallback();
+        break;
     case ROBOT_EVENT_KEY_AI_START:
         hal_log("mic record start ...");
         recordKeyStatus = KEY_PRESS;
@@ -271,5 +282,5 @@ OSStatus hal_url_fileDownload_continue(void)
 OSStatus hal_url_fileDownload_stop(void)
 {
     hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_stop");
-    return  http_file_download_stop((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user), true);
+    return http_file_download_stop((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user), true);
 }

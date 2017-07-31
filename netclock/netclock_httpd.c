@@ -45,6 +45,8 @@
 static bool is_http_init;
 static bool is_handlers_registered;
 struct httpd_wsgi_call g_app_handlers[];
+mico_semaphore_t wifi_netclock = NULL;
+mico_semaphore_t wifi_SoftAP_Sem = NULL;
 
 static int web_send_Get_Request(httpd_request_t *req)
 {
@@ -77,10 +79,11 @@ static int web_send_Post_Request(httpd_request_t *req)
     int buf_size = 1024;
     char *buf = NULL;
     char post_back_body[20] = {"post response body"};
-    //mico_Context_t *context = NULL;
+    mico_Context_t *context = NULL;
     bool para_succ = false;
     LinkStatusTypeDef *WifiStatus;
     msg_queue my_message;
+    msg_wify_queue received;
 
     app_httpd_log("web_send_Post_Request");
     buf = malloc(buf_size);
@@ -98,20 +101,20 @@ static int web_send_Post_Request(httpd_request_t *req)
     {
         app_httpd_log("Json useful");
         Start_wifi_Station_SoftSP_Thread(Station);
-
+        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+        while (!mico_rtos_is_queue_empty(&wifistate_queue))
+            mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
         WifiStatus = malloc(sizeof(LinkStatusTypeDef));
         memset(WifiStatus, 0, sizeof(LinkStatusTypeDef));
-        mico_thread_sleep(3); //3秒 等待连接完成
         micoWlanGetLinkStatus(WifiStatus);
-        if (WifiStatus->is_connected)
+        if (received.value == Wify_Station_Connect_Successed)
         {
             my_message.type = Queue_ElandState_type;
             my_message.value = ElandWifyConnectedSuccessed;
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 
             app_httpd_log("Wifi parameter is correct");
-            Eland_httpd_stop(); //stop http server mode
-            /*
+
             netclock_des_g->IsActivate = true;
             app_httpd_log("save wifi para,update flash"); //save
             context = mico_system_context_get();
@@ -128,37 +131,20 @@ static int web_send_Post_Request(httpd_request_t *req)
 
             context->micoSystemConfig.configured = allConfigured;
             mico_system_context_update(context);
-            */
-            //app_httpd_log("system restart");
-            //mico_system_power_perform(context, eState_Software_Reset);
+
+            app_httpd_log("system restart");
+            mico_system_power_perform(context, eState_Software_Reset);
+            Eland_httpd_stop(); //stop http server mode
         }
         else
         {
-            app_httpd_log("correct wifi failed");
+            app_httpd_log("connect wifi failed");
             Start_wifi_Station_SoftSP_Thread(Soft_AP);
             my_message.type = Queue_ElandState_type;
             my_message.value = ElandWifyConnectedFailed;
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
-
         }
         free(WifiStatus);
-
-        // if (wifiConnectADV() == kNoErr)
-        // {
-        //     // context = mico_system_context_get();
-        //     // strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
-        //     // strncpy(context->micoSystemConfig.key, netclock_des_g->WifiKey, ElandKey_Len);
-        //     // strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
-        //     // context->micoSystemConfig.keyLength = strlen(context->micoSystemConfig.key);
-        //     // context->micoSystemConfig.user_keyLength = strlen(context->micoSystemConfig.key);
-
-        //     // context->micoSystemConfig.channel = 0;
-        //     // memset(context->micoSystemConfig.bssid, 0x0, 6);
-        //     // context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
-        //     // context->micoSystemConfig.dhcpEnable = true;
-
-        //     // para_succ = true;
-        // }
     }
 
     if (para_succ == true)

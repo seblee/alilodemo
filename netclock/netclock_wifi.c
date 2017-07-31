@@ -8,13 +8,73 @@
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
 #define WifiSet_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+
+mico_queue_t wifistate_queue = NULL;
+
+void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
+{
+    msg_wify_queue my_message;
+    IPStatusTypedef *IPStatus_Cache = NULL;
+    switch (status)
+    {
+    case NOTIFY_STATION_UP:
+        WifiSet_log("Wi-Fi STATION connected.");
+        mico_rtos_set_semaphore(&wifi_netclock);
+        IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
+        micoWlanGetIPStatus(IPStatus_Cache, Station);
+        memset(netclock_des_g->ElandIPstr, 0, sizeof(netclock_des_g->ElandIPstr));
+        sprintf(netclock_des_g->ElandIPstr, IPStatus_Cache->ip);
+        netclock_des_g->ElandDHCPEnable = IPStatus_Cache->dhcp;
+        memset(netclock_des_g->ElandSubnetMask, 0, sizeof(netclock_des_g->ElandSubnetMask));
+        sprintf(netclock_des_g->ElandSubnetMask, IPStatus_Cache->mask);
+        memset(netclock_des_g->ElandDefaultGateway, 0, sizeof(netclock_des_g->ElandDefaultGateway));
+        sprintf(netclock_des_g->ElandDefaultGateway, IPStatus_Cache->gate);
+        free(IPStatus_Cache);
+        /*Send wifi state station*/
+        my_message.value = Wify_Station_Connect_Successed;
+        if (wifistate_queue != NULL)
+            mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
+        break;
+    case NOTIFY_STATION_DOWN:
+        WifiSet_log("Wi-Fi STATION disconnected.");
+
+        break;
+    case NOTIFY_AP_UP:
+        WifiSet_log("Wi-Fi Soft_AP ready!");
+        mico_rtos_set_semaphore(&wifi_SoftAP_Sem);
+        IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
+        micoWlanGetIPStatus(IPStatus_Cache, Soft_AP);
+        memset(netclock_des_g->ElandIPstr, 0, sizeof(netclock_des_g->ElandIPstr));
+        sprintf(netclock_des_g->ElandIPstr, IPStatus_Cache->ip);
+        netclock_des_g->ElandDHCPEnable = IPStatus_Cache->dhcp;
+        memset(netclock_des_g->ElandSubnetMask, 0, sizeof(netclock_des_g->ElandSubnetMask));
+        sprintf(netclock_des_g->ElandSubnetMask, IPStatus_Cache->mask);
+        memset(netclock_des_g->ElandDefaultGateway, 0, sizeof(netclock_des_g->ElandDefaultGateway));
+        sprintf(netclock_des_g->ElandDefaultGateway, IPStatus_Cache->gate);
+        free(IPStatus_Cache);
+        break;
+    case NOTIFY_AP_DOWN:
+        WifiSet_log("uAP disconnected.");
+        break;
+    default:
+        break;
+    }
+}
+void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
+{
+    msg_wify_queue my_message;
+    WifiSet_log("Wi-Fi STATION connecte failed");
+    my_message.value = Wify_Station_Connect_Failed;
+    if (wifistate_queue != NULL)
+        mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
+}
+
 void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
 {
     if (wifi_Mode == Station)
     {
         mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi station",
                                 Wifi_station_threed, 0x900, (mico_thread_arg_t)NULL);
-        mico_thread_sleep(3); //3秒 等待连接完成
     }
     else if (wifi_Mode == Soft_AP)
     {
@@ -44,7 +104,6 @@ void Wifi_station_threed(mico_thread_arg_t arg)
     WifiSet_log("connecting to %s...", wNetConfigAdv.ap_info.ssid);
     micoWlanStartAdv(&wNetConfigAdv);
 
-    mico_thread_sleep(3); //3秒 等待连接完成
     mico_rtos_unlock_mutex(&WifiMutex);
     mico_rtos_delete_thread(NULL);
 }
@@ -69,4 +128,30 @@ void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
     mico_rtos_delete_thread(NULL);
+}
+
+OSStatus ElandWifyStateNotifyInit(void)
+{
+    OSStatus err;
+    /*wifi station 信坷針*/
+    mico_rtos_init_semaphore(&wifi_netclock, 1);
+    /*wifi softAP 信坷針*/
+    mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
+    /*wifi state 消杯隊列傳非*/
+    err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
+    require_noerr(err, exit);
+    /*Register user function for MiCO nitification: WiFi status changed*/
+    err = mico_rtos_init_mutex(&WifiMutex);
+    require_noerr(err, exit);
+    /*Register user Wifi set mutex: WiFi status changed*/
+    err = mico_system_notify_register(mico_notify_WIFI_STATUS_CHANGED,
+                                      (void *)micoNotify_WifiStatusHandler, NULL);
+    require_noerr(err, exit);
+    /*Register user Wifi set mutex: WiFi status changed*/
+    err = mico_system_notify_register(mico_notify_WIFI_CONNECT_FAILED,
+                                      (void *)micoNotify_WifiConnectFailedHandler, NULL);
+    require_noerr(err, exit);
+
+exit:
+    return err;
 }

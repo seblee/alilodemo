@@ -15,10 +15,14 @@ static mico_semaphore_t WifiConnectSem = NULL;
 
 json_object *ElandJsonData = NULL;
 json_object *AlarmJsonData = NULL;
+
+extern void PlatformEasyLinkButtonLongPressedCallback(void);
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
-    // LinkStatusTypeDef *WifiStatus;
+    LinkStatusTypeDef *WifiStatus;
+    msg_wify_queue received;
+    msg_queue my_message;
     if (false == CheckNetclockDESSetting())
     {
         //结构体覆盖
@@ -27,32 +31,40 @@ OSStatus netclock_desInit(void)
         require_noerr(err, exit);
     }
     Eland_log("local firmware version:%s", netclock_des_g->ElandFirmwareVersion);
-    //check_ElangActivate_state:
+check_ElangActivate_state:
     if (netclock_des_g->IsActivate == false) //没激活
     {
         Eland_log("未激活");
         mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Para_config",
                                 ElandParameterConfiguration, 0x2000, (uint32_t)NULL);
     }
-    /*    else if (strncmp(netclock_des_g->Wifissid, "\0", 1))
+    else if (strncmp(netclock_des_g->Wifissid, "\0", 1))
     {
         Eland_log("已经激活");
         Start_wifi_Station_SoftSP_Thread(Station);
+        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+        while (!mico_rtos_is_queue_empty(&wifistate_queue))
+            mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
         WifiStatus = malloc(sizeof(LinkStatusTypeDef));
+        memset(WifiStatus, 0, sizeof(LinkStatusTypeDef));
         micoWlanGetLinkStatus(WifiStatus);
-        if (WifiStatus->is_connected)
+        if (received.value == Wify_Station_Connect_Successed)
         {
+            my_message.type = Queue_ElandState_type;
+            my_message.value = ElandWifyConnectedSuccessed;
+            mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
         }
         else
         {
-            Eland_log("清除数据");
-            PlatformEasyLinkButtonLongPressedCallback();
+            Eland_log("清除激活狀態");
+            netclock_des_g->IsActivate = false;
+            //PlatformEasyLinkButtonLongPressedCallback();
             free(WifiStatus);
             goto check_ElangActivate_state;
         }
         free(WifiStatus);
     }
-*/
+
     return kNoErr;
 exit:
     Eland_log("netclock_des_g init err");

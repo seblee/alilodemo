@@ -195,7 +195,7 @@ exit:
 
     mico_rtos_delete_thread(NULL);
 }
-void SendElandQueue(msg_queue_type Type,uint32_t value)
+void SendElandQueue(msg_queue_type Type, uint32_t value)
 {
     msg_queue my_message;
     my_message.type = Type;

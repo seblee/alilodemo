@@ -124,8 +124,6 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
     flagAudioPlay = 1;
     while (1)
     {
-        test_log("start while again");
-
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
         switch (flagAudioPlay)
         {
@@ -181,6 +179,7 @@ OSStatus start_test_thread(void)
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread, 0x1500, 0);
     require_noerr(err, exit);
+
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "url PlayStop Thread", url_paly_stop_thread, 0x1500, 0);
     require_noerr(err, exit);
 
