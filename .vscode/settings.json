@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "sntp_client.h": "c",
+        "netclock_uart.h": "c",
+        "vcruntime.h": "c",
+        "minwindef.h": "c",
+        "corecrt.h": "c",
+        "audio_test.h": "c"
+    }
+}

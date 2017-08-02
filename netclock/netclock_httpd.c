@@ -81,7 +81,6 @@ static int web_send_Post_Request(httpd_request_t *req)
     char post_back_body[20] = {"post response body"};
     mico_Context_t *context = NULL;
     bool para_succ = false;
-    LinkStatusTypeDef *WifiStatus;
     msg_queue my_message;
     msg_wify_queue received;
 
@@ -96,7 +95,7 @@ static int web_send_Post_Request(httpd_request_t *req)
 
     err = httpd_send_body(req->sock, (const unsigned char *)post_back_body, strlen(post_back_body));
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-    mico_thread_sleep(1); //等待连接完成
+    mico_thread_sleep(2); //等待连接完成
     if (ProcessPostJson(buf) == kNoErr)
     {
         app_httpd_log("Json useful");
@@ -104,9 +103,6 @@ static int web_send_Post_Request(httpd_request_t *req)
         mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
         while (!mico_rtos_is_queue_empty(&wifistate_queue))
             mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-        WifiStatus = malloc(sizeof(LinkStatusTypeDef));
-        memset(WifiStatus, 0, sizeof(LinkStatusTypeDef));
-        micoWlanGetLinkStatus(WifiStatus);
         if (received.value == Wify_Station_Connect_Successed)
         {
             my_message.type = Queue_ElandState_type;
@@ -139,12 +135,12 @@ static int web_send_Post_Request(httpd_request_t *req)
         else
         {
             app_httpd_log("connect wifi failed");
-            Start_wifi_Station_SoftSP_Thread(Soft_AP);
+
+            //Start_wifi_Station_SoftSP_Thread(Soft_AP);/*保持原來狀態就好，此處無需再配置*/
             my_message.type = Queue_ElandState_type;
             my_message.value = ElandWifyConnectedFailed;
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
         }
-        free(WifiStatus);
     }
 
     if (para_succ == true)
