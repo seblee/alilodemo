@@ -76,7 +76,6 @@ void uart_send_thread_DDE(uint32_t arg)
     SendBuffToMcu = malloc(sizeof(TxDataStc));
     mico_rtos_lock_mutex(&ElandStateDateMutex);
     ElandTranmmiteToMcu.Elandheader = '{';
-    ElandTranmmiteToMcu.ElandTrail = '}';
     ElandTranmmiteToMcu.Elandstatus = ElandBegin;
     ElandTranmmiteToMcu.ElandRtctime.year = 0;
     ElandTranmmiteToMcu.ElandRtctime.month = 1;
@@ -85,6 +84,7 @@ void uart_send_thread_DDE(uint32_t arg)
     ElandTranmmiteToMcu.ElandRtctime.hr = 0;
     ElandTranmmiteToMcu.ElandRtctime.min = 0;
     ElandTranmmiteToMcu.ElandRtctime.sec = 0;
+    ElandTranmmiteToMcu.ElandTrail = '}';
 
     mico_rtos_unlock_mutex(&ElandStateDateMutex);
 

@@ -136,7 +136,7 @@ static int web_send_Post_Request(httpd_request_t *req)
         {
             app_httpd_log("connect wifi failed");
 
-            //Start_wifi_Station_SoftSP_Thread(Soft_AP);/*保持原來狀態就好，此處無需再配置*/
+            Start_wifi_Station_SoftSP_Thread(Soft_AP); /*保持原來狀態就好，此處無需再配置*/
             my_message.type = Queue_ElandState_type;
             my_message.value = ElandWifyConnectedFailed;
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);

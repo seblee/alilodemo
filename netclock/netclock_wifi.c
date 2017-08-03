@@ -1,5 +1,4 @@
-/*
- * netclock_wifi.c
+/* netclock_wifi.c
  *
  *  Created on: 2017年7月14日
  *      Author: ceeu
@@ -127,17 +126,18 @@ void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
+    mico_rtos_unlock_mutex(&WifiMutex);
     mico_rtos_delete_thread(NULL);
 }
 
 OSStatus ElandWifyStateNotifyInit(void)
 {
     OSStatus err;
-    /*wifi station 信坷針*/
+    /*wifi station 信號量*/
     mico_rtos_init_semaphore(&wifi_netclock, 1);
-    /*wifi softAP 信坷針*/
+    /*wifi softAP 信號量*/
     mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
-    /*wifi state 消杯隊列傳非*/
+    /*wifi state 消息隊列傳輸*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);
     /*Register user function for MiCO nitification: WiFi status changed*/
