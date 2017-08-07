@@ -2,6 +2,7 @@
     "files.associations": {
         "sntp_client.h": "c",
         "netclock_uart.h": "c",
+        "netclock_wifi.h": "c",
         "vcruntime.h": "c",
         "minwindef.h": "c",
         "corecrt.h": "c",

@@ -1,6 +1,6 @@
 /* netclock_wifi.c
  *
- *  Created on: 2017年7月14日
+ *  Created on: 2017年8月3日
  *      Author: ceeu
  */
 #include "mico.h"
@@ -137,7 +137,7 @@ OSStatus ElandWifyStateNotifyInit(void)
     mico_rtos_init_semaphore(&wifi_netclock, 1);
     /*wifi softAP 信號量*/
     mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
-    /*wifi state 消息隊列傳輸*/
+    /*wifi state 消息隊列*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);
     /*Register user function for MiCO nitification: WiFi status changed*/

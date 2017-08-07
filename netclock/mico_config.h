@@ -49,10 +49,12 @@
 
 #define MICO_WLAN_CONFIG_MODE CONFIG_MODE_NONE
 
-#define EasyLink_TimeOut 600000 /**< EasyLink timeout 60 seconds. */
+/**< EasyLink timeout 60 seconds. */
+#define EasyLink_TimeOut 600000
 
-#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \
-                                                Restart easylink after timeout: 20 seconds. */
+/*************************************************************************************************
+< Connect to wlan after configured by easylink.Restart easylink after timeout: 20 seconds. */
+#define EasyLink_ConnectWlan_Timeout 20000
 
 /************************************************************************
  * Device enter MFG mode if MICO settings are erased. */

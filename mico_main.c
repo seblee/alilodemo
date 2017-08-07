@@ -25,7 +25,7 @@ int application_start(void)
     OSStatus err = kNoErr;
     mico_Context_t *mico_context;
     app_netclock_log("app start");
-    ElandWifyStateNotifyInit();
+    err = ElandWifyStateNotifyInit();
     /*Register elandstate_queue: elandstate uart use*/
     err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
 
