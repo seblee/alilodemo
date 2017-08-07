@@ -6,7 +6,7 @@ git config --global user.name "seblee"
 git filter-branch --env-filter '
 
 OLD_EMAIL="chenchi@mxchip.com"
-CORRECT_NAME="Yisa Lee"
+CORRECT_NAME="seblee"
 CORRECT_EMAIL="ceeu@vip.qq.com"
 
 if [ "$GIT_COMMITTER_EMAIL" = "$OLD_EMAIL" ]
