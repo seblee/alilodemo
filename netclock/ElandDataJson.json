@@ -1,34 +1,27 @@
 {
-    "ElandData": {
-        "ElandID": "0123456789ABCDEF",
-        "UserID": 1,
-        "ElandName": "ElandDemo",
-        "ZoneOffset": 0,
-        "Serial": "01000001",
-        "FirmwareVersion": "01.00",
-        "MAC": "B0F893100321",
-        "WIFISSID": "TP-LINK_4850",
-        "WIFIKEY": "cq68794850",
-        "DHCPEnable": 0,
-        "IPstr": "192.168.0.1",
-        "SubnetMask": "255.255.255.0",
-        "DefaultGateway": "255.255.255.255",
-        "BackLightOffEnablefield": 0,
-        "BackLightOffBeginTime": "05:00:00",
-        "BackLightOffEndTime": "05:10:00",
-        "FirmwareUpdateUrl": "url",
-        "AlarmData": {
-            "AlarmID": 1,
-            "AlarmDateTime": "2017-07-13 14:30:00",
-            "SnoozeEnabled": 0,
-            "SnoozeCount": 5,
-            "SnoozeIntervalMin": 10,
-            "AlarmPattern": 1,
-            "AlarmSoundDownloadURL": "url",
-            "AlarmVoiceDownloadURL": "url",
-            "AlarmVolume": 80,
-            "VolumeStepupEnabled": 0,
-            "AlarmContinueMin": 5
-        }
+    "ssid": "TP-LINK_4850",
+    "password": "cq68794850",
+    "device": {
+        "eland_id": "0123456789ABCDEF",
+        "user_id": "00000001",
+        "eland_name": "netclock",
+        "timezone_offset_sec": 32400,
+        "serial_number": "00000001",
+        "firmware_version": "01.00",
+        "mac_address": "B0F893105BEC",
+        "dhcp_enabled": 1,
+        "ip_address": "192.168.0.1",
+        "subnet_mask": "255.255.255.0",
+        "default_gateway": "255.255.255.255",
+        "time_display_format": 0,
+        "brightness_normal": 0,
+        "brightness_night": 0,
+        "night_mode_enabled": 0,
+        "night_mode_begin_time": "",
+        "night_mode_end_time": "",
+        "firmware_update_download_url": ""
     }
 }
+//ota_md 59751ab69698b249a529ca3fd12f7147b
+//ota_url http://xiaowine.cee0.com/ota.bin
+//ota_op start

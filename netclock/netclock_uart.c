@@ -34,7 +34,7 @@ void start_uart_service(void)
     require_noerr(err, exit);
 
     /*Register uart thread*/
-    mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "netclock_uart_thread", netclock_uart_thread, 0x1000, (uint32_t)NULL);
+    //mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "netclock_uart_thread", netclock_uart_thread, 0x1000, (uint32_t)NULL);
     /*Register queue receive thread*/
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "queue receiver", StateReceivethread, 0x500, 0);
     require_noerr(err, exit);

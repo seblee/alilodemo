@@ -11,7 +11,7 @@
 
 #define Eland_ID ("0123456789ABCDEF")    //Eland唯一识别的ID
 #define Eland_Firmware_Version ("01.00") //Eland固件版本号
-#define Serial_Number ("01000001")       //Eland的串口番号
+#define Serial_Number ("00000001")       //Eland的串口番号
 
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
@@ -20,17 +20,23 @@
 #define ELAND_AP_SSID ("Eland")   //配置模式ssid
 #define ELAND_AP_KEY ("12345678") //配置模式key
 
-#define ElandID_Len 16     //Eland唯一识别的ID
-#define ElandName_Len 16   //Eland名称，用户输入
-#define ElandSerial_len 20 //Eland的串口番号。
-#define ElandFW_V_Len 10   //Eland固件版本号
-#define ElandMAC_Len 13    //MAC地址
-#define ElandSsid_Len 32   //wifi 用户名长度
-#define ElandKey_Len 64    //wifi 密码长度
-#define ElandIPMax_Len 16  //Eland IP地址
-#define Time_Format_Len 8  //"HH:mm:ss"的形式
-#define URL_Len 32         //URL长度
-#define DateTime_Len 19    //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+#define eland_id_Len 16        //Eland唯一识别的ID
+#define user_id_len 36         //Eland name
+#define eland_name_Len 150     //Eland名称，用户输入
+#define serial_number_len 12   //Eland的串口番号。
+#define firmware_version_len 6 //Eland固件版本号
+#define mac_address_Len 18     //MAC地址
+#define ElandSsid_Len 32       //wifi 用户名长度
+#define ElandKey_Len 64        //wifi 密码长度
+#define ip_address_Len 16      //Eland IP地址
+#define Time_Format_Len 9      //"HH:mm:ss"的形式
+#define DateTime_Len 19        //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+#define Date_formate_len 11    //日期为"yyyy-MM-dd "的形式
+#define URL_Len 128            //URL长度
+
+#define alarm_id_len 37   //闹钟唯一识别的ID。
+#define alarm_color_len 8 //闹钟颜色的RGB字符串。"#RRGGBB"的形式。
+#define
 
 typedef struct _TIME_FORMAT_
 {
@@ -69,25 +75,26 @@ typedef struct _ELAND_DES_S //设备状态结构
     bool IsHava_superuser; //是否拥有超级用户
     bool IsRecovery;       //是否需要回收授权
 
-    char ElandID[ElandID_Len];                //Eland唯一识别的ID
-    int32_t UserID;                           //用户唯一识别ID，用户登录时获取
-    char ElandName[ElandName_Len];            //Eland名称，用户输入
-    int32_t ElandZoneOffset;                  //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
-    char ElandSerial[ElandSerial_len];        //Eland的串口番号。
-    char ElandFirmwareVersion[ElandFW_V_Len]; //Eland固件版本号
-    char ElandMAC[ElandMAC_Len];              //MAC地址
-    char Wifissid[ElandSsid_Len];             //MAC地址
-    char WifiKey[ElandKey_Len];               //MAC地址
-    int32_t ElandDHCPEnable;                  //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
-    char ElandIPstr[ElandIPMax_Len];          //Eland IP地址
-    char ElandSubnetMask[ElandIPMax_Len];     //Eland的IPv4子网掩码。
-    char ElandDefaultGateway[ElandIPMax_Len]; //Eland的IPv4默认网关。
-    int32_t ElandBackLightOffEnable;          //指定時刻内背光是否熄灭的标志  0 : 無効 1 : 有効
-    TIME_FORMAT ElandBackLightOffBeginTime;   //设定背光开始熄灭的时刻 "HH:mm:ss"的形式。（ex: "05:00:00"）
-    TIME_FORMAT ElandBackLightOffEndTime;     //设定背光开始熄灭的时刻 "HH:mm:ss"的形式。（ex: "05:00:00"）
-    char ElandFirmwareUpdateUrl[URL_Len];     //固件升级下载的URL
-    ElandAlarmData ElandNextAlarmData;        //下次播报予定的闹钟情報
-
+    char eland_id[eland_id_Len];                 //Eland唯一识别的ID
+    char user_id[user_id_len];                   //用户唯一识别ID，用户登录时获取
+    char eland_name[eland_name_Len];             //Eland名称，用户输入
+    int32_t timezone_offset_sec;                 //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
+    char serial_number[serial_number_len];       //Eland的串口番号。
+    char firmware_version[firmware_version_len]; //Eland固件版本号
+    char mac_address[mac_address_Len];           //MAC地址
+    int32_t dhcp_enabled;                        //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
+    char ip_address[ip_address_Len];             //Eland IP地址
+    char subnet_mask[ip_address_Len];            //Eland的IPv4子网掩码。
+    char default_gateway[ip_address_Len];        //Eland的IPv4默认网关。
+    int32_t time_display_format;                 //12小时显示还是24小时显示的代码  1:12時間表示(AM/PM表示) 2 : 24時間表示
+    int32_t brightness_normal;                   //通常时的液晶显示亮度。
+    int32_t brightness_night;                    //夜间模式时的液晶显示亮度
+    int32_t night_mode_enabled;                  //指定時刻间、是否调节背光亮度
+    char Wifissid[ElandSsid_Len];                //wifi 賬號
+    char WifiKey[ElandKey_Len];                  //wifi 密碼
+    char night_mode_begin_time[Time_Format_Len]; //设定背光的亮度调节的开始时刻
+    char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
+    char firmware_update_download_url[URL_Len];  //固件升级下载的URL
 } ELAND_DES_S;
 
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

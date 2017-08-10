@@ -1,11 +1,7 @@
-/* 
- *  netclock_wifi.c
- *  Created on: 2017年8月3日
- *  Author: ceeu
- */
 #include "mico.h"
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
+#include "netclock_httpd.h"
 #define WifiSet_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
 mico_queue_t wifistate_queue = NULL;
@@ -21,13 +17,13 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         mico_rtos_set_semaphore(&wifi_netclock);
         IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
         micoWlanGetIPStatus(IPStatus_Cache, Station);
-        memset(netclock_des_g->ElandIPstr, 0, sizeof(netclock_des_g->ElandIPstr));
-        sprintf(netclock_des_g->ElandIPstr, IPStatus_Cache->ip);
-        netclock_des_g->ElandDHCPEnable = IPStatus_Cache->dhcp;
-        memset(netclock_des_g->ElandSubnetMask, 0, sizeof(netclock_des_g->ElandSubnetMask));
-        sprintf(netclock_des_g->ElandSubnetMask, IPStatus_Cache->mask);
-        memset(netclock_des_g->ElandDefaultGateway, 0, sizeof(netclock_des_g->ElandDefaultGateway));
-        sprintf(netclock_des_g->ElandDefaultGateway, IPStatus_Cache->gate);
+        memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
+        sprintf(netclock_des_g->ip_address, IPStatus_Cache->ip);
+        netclock_des_g->dhcp_enabled = IPStatus_Cache->dhcp;
+        memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));
+        sprintf(netclock_des_g->subnet_mask, IPStatus_Cache->mask);
+        memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
+        sprintf(netclock_des_g->default_gateway, IPStatus_Cache->gate);
         free(IPStatus_Cache);
         /*Send wifi state station*/
         my_message.value = Wify_Station_Connect_Successed;
@@ -43,13 +39,13 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         mico_rtos_set_semaphore(&wifi_SoftAP_Sem);
         IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
         micoWlanGetIPStatus(IPStatus_Cache, Soft_AP);
-        memset(netclock_des_g->ElandIPstr, 0, sizeof(netclock_des_g->ElandIPstr));
-        sprintf(netclock_des_g->ElandIPstr, IPStatus_Cache->ip);
-        netclock_des_g->ElandDHCPEnable = IPStatus_Cache->dhcp;
-        memset(netclock_des_g->ElandSubnetMask, 0, sizeof(netclock_des_g->ElandSubnetMask));
-        sprintf(netclock_des_g->ElandSubnetMask, IPStatus_Cache->mask);
-        memset(netclock_des_g->ElandDefaultGateway, 0, sizeof(netclock_des_g->ElandDefaultGateway));
-        sprintf(netclock_des_g->ElandDefaultGateway, IPStatus_Cache->gate);
+        memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
+        sprintf(netclock_des_g->ip_address, IPStatus_Cache->ip);
+        netclock_des_g->dhcp_enabled = IPStatus_Cache->dhcp;
+        memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));
+        sprintf(netclock_des_g->subnet_mask, IPStatus_Cache->mask);
+        memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
+        sprintf(netclock_des_g->default_gateway, IPStatus_Cache->gate);
         free(IPStatus_Cache);
         break;
     case NOTIFY_AP_DOWN:
@@ -133,11 +129,13 @@ void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 OSStatus ElandWifyStateNotifyInit(void)
 {
     OSStatus err;
-    /*wifi station 信號量*/
+    /*wifi station 信號針*/
     mico_rtos_init_semaphore(&wifi_netclock, 1);
-    /*wifi softAP 信號量*/
+    /*wifi softAP 信號針*/
     mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
-    /*wifi state 消息隊列*/
+    /*httpServer_softAP_event_Sem 信號量*/
+    mico_rtos_init_semaphore(&httpServer_softAP_event_Sem, 1);
+    /*wifi state 消杯隊列*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);
     /*Register user function for MiCO nitification: WiFi status changed*/

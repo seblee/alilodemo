@@ -1,3 +1,4 @@
+#include "hal_alilo_rabbit.h"
 #include "netclockconfig.h"
 #include "netclock.h"
 #include "netclock_httpd.h"
@@ -14,15 +15,16 @@ static mico_semaphore_t NetclockInitCompleteSem = NULL;
 static mico_semaphore_t WifiConnectSem = NULL;
 
 json_object *ElandJsonData = NULL;
+json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
 
 extern void PlatformEasyLinkButtonLongPressedCallback(void);
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
-    LinkStatusTypeDef *WifiStatus;
-    msg_wify_queue received;
-    msg_queue my_message;
+    //    LinkStatusTypeDef *WifiStatus;
+    //    msg_wify_queue received;
+    //    msg_queue my_message;
     if (false == CheckNetclockDESSetting())
     {
         //结构体覆盖
@@ -30,41 +32,7 @@ OSStatus netclock_desInit(void)
         err = Netclock_des_recovery();
         require_noerr(err, exit);
     }
-    Eland_log("local firmware version:%s", netclock_des_g->ElandFirmwareVersion);
-check_ElangActivate_state:
-    if (netclock_des_g->IsActivate == false) //没激活
-    {
-        Eland_log("未激活");
-        mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Para_config",
-                                ElandParameterConfiguration, 0x2000, (uint32_t)NULL);
-    }
-    else if (strncmp(netclock_des_g->Wifissid, "\0", 1))
-    {
-        Eland_log("已经激活");
-        Start_wifi_Station_SoftSP_Thread(Station);
-        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-        while (!mico_rtos_is_queue_empty(&wifistate_queue))
-            mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-        WifiStatus = malloc(sizeof(LinkStatusTypeDef));
-        memset(WifiStatus, 0, sizeof(LinkStatusTypeDef));
-        micoWlanGetLinkStatus(WifiStatus);
-        if (received.value == Wify_Station_Connect_Successed)
-        {
-            my_message.type = Queue_ElandState_type;
-            my_message.value = ElandWifyConnectedSuccessed;
-            mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
-        }
-        else
-        {
-            Eland_log("清除激活狀態");
-            netclock_des_g->IsActivate = false;
-            //PlatformEasyLinkButtonLongPressedCallback();
-            free(WifiStatus);
-            goto check_ElangActivate_state;
-        }
-        free(WifiStatus);
-    }
-
+    Eland_log("local firmware version:%s", Eland_Firmware_Version);
     return kNoErr;
 exit:
     Eland_log("netclock_des_g init err");
@@ -76,7 +44,6 @@ exit:
 
     return kGeneralErr;
 }
-
 /**/
 OSStatus InitNetclockService(void)
 {
@@ -141,20 +108,20 @@ bool CheckNetclockDESSetting(void)
     char firmware[64] = {0};
     sprintf(firmware, "%s", Eland_Firmware_Version);
     /*check Eland_ID*/
-    if (0 != strcmp(netclock_des_g->ElandID, Eland_ID))
+    if (0 != strcmp(netclock_des_g->eland_id, Eland_ID))
     {
         Eland_log("ElandID change!");
         return false;
     }
     /*check ElandFirmwareVersion*/
-    if (0 != strcmp(netclock_des_g->ElandFirmwareVersion, firmware))
+    if (0 != strcmp(netclock_des_g->firmware_version, firmware))
     {
         Eland_log("ElandFirmwareVersion changed!");
         return false;
     }
 
     /*check MAC Address*/
-    if (strlen(netclock_des_g->ElandMAC) != DEVICE_MAC_LEN)
+    if (strlen(netclock_des_g->mac_address) != DEVICE_MAC_LEN)
     {
         Eland_log("MAC Address err!");
         return false;
@@ -163,8 +130,8 @@ bool CheckNetclockDESSetting(void)
     if (netclock_des_g->IsActivate == true) //设备已激活
     {
         /*check UserID */
-        if ((netclock_des_g->ElandZoneOffset < Timezone_offset_sec_Min) ||
-            (netclock_des_g->ElandZoneOffset > Timezone_offset_sec_Max))
+        if ((netclock_des_g->timezone_offset_sec < Timezone_offset_sec_Min) ||
+            (netclock_des_g->timezone_offset_sec > Timezone_offset_sec_Max))
         {
             Eland_log("ElandZoneOffset is error!");
             return false;
@@ -183,42 +150,43 @@ OSStatus Netclock_des_recovery(void)
     netclock_des_g->IsHava_superuser = false;
     netclock_des_g->IsRecovery = false;
 
-    memcpy(netclock_des_g->ElandID, Eland_ID, strlen(Eland_ID));                                          //Eland唯一识别的ID    memcpy(netclock_des_g->ElandFirmwareVersion, Eland_Firmware_Version, strlen(Eland_Firmware_Version));//设置设备软件版本号
-    memcpy(netclock_des_g->ElandFirmwareVersion, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
-    wlan_get_mac_address(mac);                                                                            //MAC地址
-    memset(netclock_des_g->ElandMAC, 0, sizeof(netclock_des_g->ElandMAC));                                //MAC地址
-    sprintf(netclock_des_g->ElandMAC, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    Eland_log("device_mac:%s", netclock_des_g->ElandMAC);
+    memcpy(netclock_des_g->eland_id, Eland_ID, strlen(Eland_ID));                                     //Eland唯一识别的ID
+    memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
+    wlan_get_mac_address(mac);                                                                        //MAC地址
+    memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));                      //MAC地址
+    sprintf(netclock_des_g->mac_address, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
     mico_system_context_update(mico_system_context_get());
 
     return kNoErr;
 }
+/****start softAP event wait******/
+void start_HttpServer_softAP_thread(void)
+{
+
+    mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Para_config",
+                            ElandParameterConfiguration, 0x2000, (uint32_t)NULL);
+}
+
 void ElandParameterConfiguration(mico_thread_arg_t args)
 {
     msg_queue my_message;
-    // network_InitTypeDef_st wNetConfig;
-    Eland_log("Soft_ap_Server");
-    Start_wifi_Station_SoftSP_Thread(Soft_AP);
-    my_message.type = Queue_ElandState_type;
-    my_message.value = ElandAPStatus;
-    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
-    mico_rtos_unlock_mutex(&WifiMutex);
-    // memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
-    // strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
-    // strcpy((char *)wNetConfig.wifi_key, ELAND_AP_KEY);
+    flagHttpdServerAP = 1;
+    while (1)
+    {
+        /*********wait for softap event***********/
+        mico_rtos_get_semaphore(&httpServer_softAP_event_Sem, MICO_WAIT_FOREVER);
+        flagHttpdServerAP = 2;
+        Eland_log("Soft_ap_Server");
+        Start_wifi_Station_SoftSP_Thread(Soft_AP);
+        my_message.type = Queue_ElandState_type;
+        my_message.value = ElandAPStatus;
+        mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 
-    // wNetConfig.wifi_mode = Soft_AP;
-    // wNetConfig.dhcpMode = DHCP_Server;
-    // wNetConfig.wifi_retry_interval = 100;
-    // strcpy((char *)wNetConfig.local_ip_addr, "192.168.0.1");
-    // strcpy((char *)wNetConfig.net_mask, "255.255.255.0");
-    // strcpy((char *)wNetConfig.dnsServer_ip_addr, "192.168.0.1");
-    // Eland_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
-    // micoWlanStart(&wNetConfig);
-
-    /* start http server thread */
-    Eland_httpd_start();
+        /* start http server thread */
+        Eland_httpd_start();
+    }
     mico_rtos_delete_thread(NULL);
 }
 //获取网络连接状态
@@ -235,71 +203,55 @@ bool get_wifi_status(void)
 
 const char Eland_Data[11] = {"ElandData"};
 
-/********
-{"name":"ElandData","V":[{"N":"ElandID","Type":"str","V":"","T":"R"},{"N":"UserID","Type":"int32","V":0,"T":"W"},{"N":"N","Type":"str","V":"ElandName","T":"W"},{"N":"ZoneOffset","Type":"int32","V":32400,"T":"W"},{"N":"Serial","Type":"str","V":"000000","T":"R"},{"N":"FirmwareVersion","Type":"str","V":"01.00","T":"R"},{"N":"MAC","Type":"str","V":"000000000000","T":"R"},{"N":"DHCPEnable","Type":"int32","V":1,"T":"W"},{"N":"IPstr","Type":"str","V":"0","T":"W"},{"N":"SubnetMask","Type":"str","V":"0","T":"W"},{"N":"DefaultGateway","Type":"str","V":"0","T":"W"},{"N":"BackLightOffEnable","Type":"int32","V":1,"T":"W"},{"N":"BackLightOffBeginTime","Type":"str","V":"05:00:00","T":"W"},{"N":"BackLightOffEndTime","Type":"str","V":"05:10:00","T":"W"},{"N":"BackLightOffEndTime","Type":"str","V":"05:10:00","T":"W"},{"N":"FirmwareUpdateUrl","Type":"str","V":"url","T":"W"},[{"N":"AlarmData","V":[{"N":"AlarmID","Type":"int32","V":1,"T":"W"},{"N":"AlarmDateTime","Type":"str","V":"yyyy-MM-dd","T":"W"},{"N":"SnoozeEnabled","Type":"int32","V":0,"T":"W"},{"N":"SnoozeCount","Type":"int32","V":3,"T":"W"},{"N":"SnoozeIntervalMin","Type":"int32","V":10,"T":"W"},{"N":"AlarmPattern","Type":"int32","V":1,"T":"W"},{"N":"AlarmSoundDownloadURL","Type":"str","V":"url","T":"W"},{"N":"AlarmVoiceDownloadURL","Type":"str","V":"url","T":"W"},{"N":"AlarmVolume","Type":"int32","V":80,"T":"W"},{"N":"VolumeStepupEnabled","Type":"int32","V":0,"T":"W"},{"N":"AlarmContinueMin","Type":"int32","V":5,"T":"W"}]}]]}
-
-*******/
 OSStatus InitUpLoadData(char *OutputJsonstring)
 {
     OSStatus err = kNoErr;
-    json_object *peripherals_member = NULL;
     const char *generate_data = NULL;
     uint32_t generate_data_len = 0;
-    if ((ElandJsonData != NULL) || (AlarmJsonData != NULL))
+    if ((ElandJsonData != NULL) || (AlarmJsonData != NULL) || (DeviceJsonData != NULL))
     {
         free_json_obj(&ElandJsonData);
+        free_json_obj(&DeviceJsonData);
         free_json_obj(&AlarmJsonData);
     }
     ElandJsonData = json_object_new_object();
     require_action_string(ElandJsonData, exit, err = kNoMemoryErr, "create ElandJsonData object error!");
+    DeviceJsonData = json_object_new_object();
+    require_action_string(DeviceJsonData, exit, err = kNoMemoryErr, "create DeviceJsonData object error!");
 
-    Eland_log("Begin add ElandJsonData object");
-    json_object_object_add(ElandJsonData, "ElandID", json_object_new_string(Eland_ID));
-    json_object_object_add(ElandJsonData, "UserID", json_object_new_int(netclock_des_g->UserID));
-    json_object_object_add(ElandJsonData, "ElandName", json_object_new_string(netclock_des_g->ElandName));
-    json_object_object_add(ElandJsonData, "ZoneOffset", json_object_new_int(netclock_des_g->ElandZoneOffset));
-    json_object_object_add(ElandJsonData, "Serial", json_object_new_string(Serial_Number));
-    json_object_object_add(ElandJsonData, "FirmwareVersion", json_object_new_string(Eland_Firmware_Version));
-    json_object_object_add(ElandJsonData, "MAC", json_object_new_string(netclock_des_g->ElandMAC));
-    json_object_object_add(ElandJsonData, "WIFISSID", json_object_new_string(netclock_des_g->Wifissid));
-    json_object_object_add(ElandJsonData, "WIFIKEY", json_object_new_string(netclock_des_g->WifiKey));
-    json_object_object_add(ElandJsonData, "DHCPEnable", json_object_new_int(netclock_des_g->ElandDHCPEnable));
-    json_object_object_add(ElandJsonData, "IPstr", json_object_new_string(netclock_des_g->ElandIPstr));
-    json_object_object_add(ElandJsonData, "SubnetMask", json_object_new_string(netclock_des_g->ElandSubnetMask));
-    json_object_object_add(ElandJsonData, "DefaultGateway", json_object_new_string(netclock_des_g->ElandDefaultGateway));
-    json_object_object_add(ElandJsonData, "BackLightOffEnablefield", json_object_new_int(netclock_des_g->ElandBackLightOffEnable));
-    json_object_object_add(ElandJsonData, "BackLightOffBeginTime", json_object_new_string((const char *)&netclock_des_g->ElandBackLightOffBeginTime));
-    json_object_object_add(ElandJsonData, "BackLightOffEndTime", json_object_new_string((const char *)&netclock_des_g->ElandBackLightOffBeginTime));
-    json_object_object_add(ElandJsonData, "FirmwareUpdateUrl", json_object_new_string(netclock_des_g->ElandFirmwareUpdateUrl));
+    Eland_log("Begin add DeviceJsonData object");
+    json_object_object_add(DeviceJsonData, "eland_id", json_object_new_string(Eland_ID));
+    json_object_object_add(DeviceJsonData, "user_id", json_object_new_string(netclock_des_g->user_id));
+    json_object_object_add(DeviceJsonData, "eland_name", json_object_new_string(netclock_des_g->eland_name));
+    json_object_object_add(DeviceJsonData, "timezone_offset_sec", json_object_new_int(netclock_des_g->timezone_offset_sec));
+    json_object_object_add(DeviceJsonData, "serial_number", json_object_new_string(netclock_des_g->serial_number));
+    json_object_object_add(DeviceJsonData, "firmware_version", json_object_new_string(Eland_Firmware_Version));
+    json_object_object_add(DeviceJsonData, "mac_address", json_object_new_string(netclock_des_g->mac_address));
+    json_object_object_add(DeviceJsonData, "dhcp_enabled", json_object_new_int(netclock_des_g->dhcp_enabled));
+    json_object_object_add(DeviceJsonData, "ip_address", json_object_new_string(netclock_des_g->ip_address));
+    json_object_object_add(DeviceJsonData, "subnet_mask", json_object_new_string(netclock_des_g->subnet_mask));
+    json_object_object_add(DeviceJsonData, "default_gateway", json_object_new_string(netclock_des_g->default_gateway));
+    json_object_object_add(DeviceJsonData, "time_display_format", json_object_new_int(netclock_des_g->time_display_format));
+    json_object_object_add(DeviceJsonData, "brightness_normal", json_object_new_int(netclock_des_g->brightness_normal));
+    json_object_object_add(DeviceJsonData, "brightness_night", json_object_new_int(netclock_des_g->brightness_night));
+    json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
+    json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
+    json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
+    json_object_object_add(DeviceJsonData, "firmware_update_download_url", json_object_new_string(netclock_des_g->firmware_update_download_url));
 
-    AlarmJsonData = json_object_new_object();
-    require_action_string(AlarmJsonData, exit, err = kNoMemoryErr, "create AlarmJsonData object error!");
+    json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 
-    Eland_log("Begin add AlarmJsonData object");
-    json_object_object_add(AlarmJsonData, "AlarmID", json_object_new_int(netclock_des_g->ElandNextAlarmData.AlarmID));
-    json_object_object_add(AlarmJsonData, "AlarmDateTime", json_object_new_string((const char *)&netclock_des_g->ElandNextAlarmData.AlarmDateTime));
-    json_object_object_add(AlarmJsonData, "SnoozeEnabled", json_object_new_int(netclock_des_g->ElandNextAlarmData.SnoozeEnabled));
-    json_object_object_add(AlarmJsonData, "SnoozeCount", json_object_new_int(netclock_des_g->ElandNextAlarmData.SnoozeCount));
-    json_object_object_add(AlarmJsonData, "SnoozeIntervalMin", json_object_new_int(netclock_des_g->ElandNextAlarmData.SnoozeIntervalMin));
-    json_object_object_add(AlarmJsonData, "AlarmPattern", json_object_new_int(netclock_des_g->ElandNextAlarmData.AlarmPattern));
-    json_object_object_add(AlarmJsonData, "AlarmSoundDownloadURL", json_object_new_string(netclock_des_g->ElandNextAlarmData.AlarmSoundDownloadURL));
-    json_object_object_add(AlarmJsonData, "AlarmVoiceDownloadURL", json_object_new_string(netclock_des_g->ElandNextAlarmData.AlarmVoiceDownloadURL));
-    json_object_object_add(AlarmJsonData, "AlarmVolume", json_object_new_int(netclock_des_g->ElandNextAlarmData.AlarmVolume));
-    json_object_object_add(AlarmJsonData, "VolumeStepupEnabled", json_object_new_int(netclock_des_g->ElandNextAlarmData.VolumeStepupEnabled));
-    json_object_object_add(AlarmJsonData, "AlarmContinueMin", json_object_new_int(netclock_des_g->ElandNextAlarmData.AlarmContinueMin));
+    // peripherals_member = json_object_new_object();
+    // require_action_string(peripherals_member, exit, err = kNoMemoryErr, "create peripherals_member error!");
+    // json_object_object_add(peripherals_member, "ElandData", ElandJsonData);
 
-    json_object_object_add(ElandJsonData, "AlarmData", AlarmJsonData);
-    peripherals_member = json_object_new_object();
-    require_action_string(peripherals_member, exit, err = kNoMemoryErr, "create peripherals_member error!");
-    json_object_object_add(peripherals_member, "ElandData", ElandJsonData);
-
-    generate_data = json_object_to_json_string(peripherals_member);
+    generate_data = json_object_to_json_string(ElandJsonData);
     generate_data_len = strlen(generate_data);
     memcpy(OutputJsonstring, generate_data, generate_data_len);
 
 exit:
     free_json_obj(&ElandJsonData);
-    free_json_obj(&AlarmJsonData);
+    free_json_obj(&DeviceJsonData);
     return err;
 }
 
@@ -324,7 +276,8 @@ void destory_upload_data(void)
 //解析接收到的数据包
 OSStatus ProcessPostJson(char *InputJson)
 {
-    json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL, *AlarmJsonCache = NULL;
+    json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL;
+    Eland_log("ProcessPostJson");
     if (*InputJson != '{')
     {
         Eland_log("error:received err json format data");
@@ -336,8 +289,34 @@ OSStatus ProcessPostJson(char *InputJson)
         Eland_log("json_tokener_parse error");
         goto exit;
     }
+    json_object_object_foreach(ReceivedJsonCache, key1, val1)
+    {
+        if (!strcmp(key1, "ssid"))
+        {
+            memset(netclock_des_g->Wifissid, 0, sizeof(netclock_des_g->Wifissid));
+            sprintf(netclock_des_g->Wifissid, "%s", json_object_get_string(val1));
+            Eland_log("ssid = %s", netclock_des_g->Wifissid);
+            if (!strncmp(netclock_des_g->Wifissid, "\0", 1))
+            {
+                Eland_log("Wifissid not Available");
+                goto exit;
+            }
+        }
+        else if (!strcmp(key1, "password"))
+        {
+            memset(netclock_des_g->WifiKey, 0, sizeof(netclock_des_g->WifiKey));
+            sprintf(netclock_des_g->WifiKey, "%s", json_object_get_string(val1));
+            Eland_log("password = %s", netclock_des_g->WifiKey);
+            if (!strncmp(netclock_des_g->WifiKey, "\0", 1))
+            {
+                Eland_log("WifiKey not Available");
+                goto exit;
+            }
+        }
+    }
+    Eland_log("process device");
     //解析Elanddata
-    ElandJsonCache = json_object_object_get(ReceivedJsonCache, "ElandData");
+    ElandJsonCache = json_object_object_get(ReceivedJsonCache, "device");
     if ((ElandJsonCache == NULL) || ((json_object_get_object(ElandJsonCache)->head) == NULL))
     {
         Eland_log("get ElandJsonCache error");
@@ -346,185 +325,33 @@ OSStatus ProcessPostJson(char *InputJson)
     //解析ElandDATA
     json_object_object_foreach(ElandJsonCache, key, val)
     {
-        if (!strcmp(key, "UserID"))
+        if (!strcmp(key, "user_id"))
         {
-            netclock_des_g->UserID = json_object_get_int(val);
-        }
-        else if (!strcmp(key, "ElandName"))
-        {
-            memset(netclock_des_g->ElandName, 0, sizeof(netclock_des_g->ElandName));
-            sprintf(netclock_des_g->ElandName, "%s", json_object_get_string(val));
-        }
-        else if (!strcmp(key, "ZoneOffset"))
-        {
-            netclock_des_g->ElandZoneOffset = json_object_get_int(val);
-        }
-        else if (!strcmp(key, "WIFISSID"))
-        {
-            memset(netclock_des_g->Wifissid, 0, sizeof(netclock_des_g->Wifissid));
-            sprintf(netclock_des_g->Wifissid, "%s", json_object_get_string(val));
-            if (!strncmp(netclock_des_g->Wifissid, "\0", 1))
+            memset(netclock_des_g->user_id, 0, sizeof(netclock_des_g->user_id));
+            sprintf(netclock_des_g->user_id, "%s", json_object_get_string(val));
+            if (!strncmp(netclock_des_g->user_id, "\0", 1))
             {
-                Eland_log("WIFISSID not %s", netclock_des_g->Wifissid);
+                Eland_log("user_id  = %s", netclock_des_g->user_id);
                 goto exit;
             }
         }
-        else if (!strcmp(key, "WIFIKEY"))
+        else if (!strcmp(key, "eland_name"))
         {
-            memset(netclock_des_g->WifiKey, 0, sizeof(netclock_des_g->WifiKey));
-            sprintf(netclock_des_g->WifiKey, "%s", json_object_get_string(val));
-            if (!strncmp(netclock_des_g->WifiKey, "\0", 1))
-            {
-                Eland_log("WIFIKEY not Available");
-                goto exit;
-            }
+            memset(netclock_des_g->eland_name, 0, sizeof(netclock_des_g->eland_name));
+            sprintf(netclock_des_g->eland_name, "%s", json_object_get_string(val));
         }
-        else if (!strcmp(key, "BackLightOffEnablefield"))
+        else if (!strcmp(key, "timezone_offset_sec"))
         {
-            netclock_des_g->ElandBackLightOffEnable = json_object_get_int(val);
+            netclock_des_g->timezone_offset_sec = json_object_get_int(val);
         }
-        else if (!strcmp(key, "BackLightOffBeginTime"))
+        else if (!strcmp(key, "firmware_update_download_url"))
         {
-            memset(&netclock_des_g->ElandBackLightOffBeginTime, 0, sizeof(netclock_des_g->ElandBackLightOffBeginTime));
-            memcpy(&netclock_des_g->ElandBackLightOffBeginTime, json_object_get_string(val), Time_Format_Len);
-            if (!strncmp((char *)&netclock_des_g->ElandBackLightOffBeginTime, "\0", 1))
-            {
-                Eland_log("BackLightOffBeginTime not Available");
-                goto exit;
-            }
-        }
-        else if (!strcmp(key, "BackLightOffEndTime"))
-        {
-            memset(&netclock_des_g->ElandBackLightOffEndTime, 0, sizeof(netclock_des_g->ElandBackLightOffEndTime));
-            memcpy(&netclock_des_g->ElandBackLightOffEndTime, json_object_get_string(val), Time_Format_Len);
-            if (!strncmp((char *)&netclock_des_g->ElandBackLightOffEndTime, "\0", 1))
-            {
-                Eland_log("BackLightOffBeginTime not Available");
-                goto exit;
-            }
-        }
-        else if (!strcmp(key, "FirmwareUpdateUrl"))
-        {
-            memset(netclock_des_g->ElandFirmwareUpdateUrl, 0, sizeof(netclock_des_g->ElandFirmwareUpdateUrl));
-            sprintf(netclock_des_g->ElandFirmwareUpdateUrl, "%s", json_object_get_string(val));
-            if (!strncmp(netclock_des_g->ElandFirmwareUpdateUrl, "\0", 1))
+            memset(netclock_des_g->firmware_update_download_url, 0, sizeof(netclock_des_g->firmware_update_download_url));
+            sprintf(netclock_des_g->firmware_update_download_url, "%s", json_object_get_string(val));
+            if (!strncmp(netclock_des_g->firmware_update_download_url, "\0", 1))
             {
                 Eland_log("BackLightOffBeginTime not Available");
                 //goto exit;
-            }
-        }
-    }
-    //解析AlarmJsonCache
-    AlarmJsonCache = json_object_object_get(ElandJsonCache, "AlarmData");
-    if ((AlarmJsonCache == NULL) || ((json_object_get_object(AlarmJsonCache)->head) == NULL))
-    {
-        Eland_log("get AlarmJsonCache error");
-        goto exit;
-    }
-    json_object_object_foreach(AlarmJsonCache, key1, val1)
-    {
-        if (!strcmp(key1, "AlarmID"))
-        {
-            netclock_des_g->ElandNextAlarmData.AlarmID = json_object_get_int(val1);
-        }
-        else if (!strcmp(key1, "AlarmDateTime"))
-        {
-            memset(&netclock_des_g->ElandNextAlarmData.AlarmDateTime, 0, sizeof(iso8601_time_t));
-            memcpy(&netclock_des_g->ElandNextAlarmData.AlarmDateTime, json_object_get_string(val1), DateTime_Len);
-            if (!strncmp((char *)&netclock_des_g->ElandNextAlarmData.AlarmDateTime, "\0", 1))
-            {
-                Eland_log("AlarmDateTime not Available");
-                goto exit;
-            }
-        }
-        else if (!strcmp(key1, "SnoozeEnabled"))
-        {
-            netclock_des_g->ElandNextAlarmData.SnoozeEnabled = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.SnoozeEnabled > 1) ||
-                (netclock_des_g->ElandNextAlarmData.SnoozeEnabled < 0))
-            {
-                Eland_log("SnoozeEnabled not Available");
-                netclock_des_g->ElandNextAlarmData.SnoozeEnabled = 1;
-            }
-        }
-        else if (!strcmp(key1, "SnoozeCount"))
-        {
-            netclock_des_g->ElandNextAlarmData.SnoozeCount = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.SnoozeCount > 30) ||
-                (netclock_des_g->ElandNextAlarmData.SnoozeCount < 1))
-            {
-                Eland_log("SnoozeCount not Available");
-                netclock_des_g->ElandNextAlarmData.SnoozeCount = 3;
-            }
-        }
-        else if (!strcmp(key1, "SnoozeIntervalMin"))
-        {
-            netclock_des_g->ElandNextAlarmData.SnoozeIntervalMin = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.SnoozeIntervalMin > 30) ||
-                (netclock_des_g->ElandNextAlarmData.SnoozeIntervalMin < 1))
-            {
-                Eland_log("SnoozeIntervalMin not Available");
-                netclock_des_g->ElandNextAlarmData.SnoozeIntervalMin = 10;
-            }
-        }
-        else if (!strcmp(key1, "AlarmPattern"))
-        {
-            netclock_des_g->ElandNextAlarmData.AlarmPattern = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.AlarmPattern > 4) ||
-                (netclock_des_g->ElandNextAlarmData.AlarmPattern < 1))
-            {
-                Eland_log("AlarmPattern not Available");
-                netclock_des_g->ElandNextAlarmData.AlarmPattern = 1;
-            }
-        }
-        else if (!strcmp(key1, "AlarmSoundDownloadURL"))
-        {
-            memset(netclock_des_g->ElandNextAlarmData.AlarmSoundDownloadURL, 0,
-                   sizeof(netclock_des_g->ElandNextAlarmData.AlarmSoundDownloadURL));
-            sprintf(netclock_des_g->ElandNextAlarmData.AlarmSoundDownloadURL, "%s", json_object_get_string(val1));
-            if (!strncmp(netclock_des_g->ElandNextAlarmData.AlarmSoundDownloadURL, "\0", 1))
-            {
-                Eland_log("AlarmSoundDownloadURL not Available");
-            }
-        }
-        else if (!strcmp(key1, "AlarmVoiceDownloadURL"))
-        {
-            memset(netclock_des_g->ElandNextAlarmData.AlarmVoiceDownloadURL, 0,
-                   sizeof(netclock_des_g->ElandNextAlarmData.AlarmVoiceDownloadURL));
-            sprintf(netclock_des_g->ElandNextAlarmData.AlarmVoiceDownloadURL, "%s", json_object_get_string(val1));
-            if (!strncmp(netclock_des_g->ElandNextAlarmData.AlarmVoiceDownloadURL, "\0", 1))
-            {
-                Eland_log("AlarmVoiceDownloadURL not Available");
-            }
-        }
-        else if (!strcmp(key1, "AlarmVolume"))
-        {
-            netclock_des_g->ElandNextAlarmData.AlarmVolume = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.AlarmVolume > 100) ||
-                (netclock_des_g->ElandNextAlarmData.AlarmVolume < 0))
-            {
-                Eland_log("AlarmVolume not Available");
-                netclock_des_g->ElandNextAlarmData.AlarmVolume = 80;
-            }
-        }
-        else if (!strcmp(key1, "VolumeStepupEnabled"))
-        {
-            netclock_des_g->ElandNextAlarmData.VolumeStepupEnabled = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.VolumeStepupEnabled > 1) ||
-                (netclock_des_g->ElandNextAlarmData.VolumeStepupEnabled < 0))
-            {
-                Eland_log("VolumeStepupEnabled not Available");
-                netclock_des_g->ElandNextAlarmData.VolumeStepupEnabled = 0;
-            }
-        }
-        else if (!strcmp(key1, "AlarmContinueMin"))
-        {
-            netclock_des_g->ElandNextAlarmData.AlarmContinueMin = json_object_get_int(val1);
-            if ((netclock_des_g->ElandNextAlarmData.AlarmContinueMin > 30) ||
-                (netclock_des_g->ElandNextAlarmData.AlarmContinueMin < 1))
-            {
-                Eland_log("AlarmContinueMin not Available");
-                netclock_des_g->ElandNextAlarmData.AlarmContinueMin = 5;
             }
         }
     }

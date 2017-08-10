@@ -29,7 +29,7 @@
  *
  ******************************************************************************
  */
-
+#include "hal_alilo_rabbit.h"
 #include "netclock_httpd.h"
 #include "netclock.h"
 #include <httpd.h>
@@ -45,9 +45,9 @@
 static bool is_http_init;
 static bool is_handlers_registered;
 struct httpd_wsgi_call g_app_handlers[];
-mico_semaphore_t wifi_netclock = NULL;
-mico_semaphore_t wifi_SoftAP_Sem = NULL;
+mico_semaphore_t wifi_netclock = NULL, wifi_SoftAP_Sem = NULL, httpServer_softAP_event_Sem = NULL;
 
+/*****************Get_Request******************************************/
 static int web_send_Get_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
@@ -73,6 +73,7 @@ exit:
     destory_upload_data(); //回收资源
     return err;
 }
+/*****************Post_Request******************************************/
 static int web_send_Post_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
@@ -89,20 +90,23 @@ static int web_send_Post_Request(httpd_request_t *req)
     memset(buf, 0, buf_size);
     err = httpd_get_data(req, buf, buf_size);
     app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
-    app_httpd_log("web_send_Post_Request");
+    app_httpd_log(">>>>>>>>web_send_Post_Request>>>>>>>>>>>");
     err = httpd_send_all_header(req, HTTP_RES_200, strlen(post_back_body), HTTP_CONTENT_JSON_STR);
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
     err = httpd_send_body(req->sock, (const unsigned char *)post_back_body, strlen(post_back_body));
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-    mico_thread_sleep(2); //等待连接完成
+    mico_thread_sleep(3); //等待傳輸完成
     if (ProcessPostJson(buf) == kNoErr)
     {
         app_httpd_log("Json useful");
-        Start_wifi_Station_SoftSP_Thread(Station);
-        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+        /********清空消息隊列*************/
         while (!mico_rtos_is_queue_empty(&wifistate_queue))
             mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+        /********驗證wifi  ssid password*************/
+        Start_wifi_Station_SoftSP_Thread(Station);
+        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+
         if (received.value == Wify_Station_Connect_Successed)
         {
             my_message.type = Queue_ElandState_type;
@@ -110,7 +114,7 @@ static int web_send_Post_Request(httpd_request_t *req)
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 
             app_httpd_log("Wifi parameter is correct");
-
+            flagHttpdServerAP = 1;
             netclock_des_g->IsActivate = true;
             app_httpd_log("save wifi para,update flash"); //save
             context = mico_system_context_get();
@@ -136,11 +140,15 @@ static int web_send_Post_Request(httpd_request_t *req)
         {
             app_httpd_log("connect wifi failed");
 
-            Start_wifi_Station_SoftSP_Thread(Soft_AP); /*保持原來狀態就好，此處無需再配置*/
+            Start_wifi_Station_SoftSP_Thread(Soft_AP);
             my_message.type = Queue_ElandState_type;
             my_message.value = ElandWifyConnectedFailed;
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
         }
+    }
+    else
+    {
+        app_httpd_log("Json error");
     }
 
     if (para_succ == true)

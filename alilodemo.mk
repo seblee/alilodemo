@@ -29,12 +29,16 @@ $(NAME)_SOURCES := mico_main.c \
 				   netclock/netclock_httpd.c\
 				   netclock/netclock_wifi.c\
 				   netclock/sntp_client.c\
-				   netclock/netclock_uart.c
+				   netclock/netclock_uart.c\
+				   netclockota/netclock_ota.c
 				   
 $(NAME)_COMPONENTS := utilities/url \
 					  utilities\
 					  daemons/http_server\
 				 	  protocols/SNTP
+				 	  
+$(NAME)_COMPONENTS += daemons/ota_server
+
 $(NAME)_PREBUILT_LIBRARY := Lib_7100.Cortex-M4F.GCC.release.a
 					  
 GLOBAL_INCLUDES := .	
@@ -42,4 +46,5 @@ GLOBAL_INCLUDES := .
 $(NAME)_INCLUDES := inc \
 					../mico-os/include \
 					../mico-os/template/includes\
-					netclock
+					netclock\
+					netclockota

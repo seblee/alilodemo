@@ -1,11 +1,11 @@
 #include "../alilodemo/hal_alilo_rabbit.h"
-
 #include "../alilodemo/inc/audio_service.h"
 #include "../alilodemo/inc/http_file_download.h"
 #include "../alilodemo/inc/robot_event.h"
 #include "netclock_uart.h"
 #include "mico.h"
 #include "platform.h"
+#include "netclock_httpd.h"
 #define hal_log(format, ...) custom_log("HAL", format, ##__VA_ARGS__)
 
 mico_semaphore_t recordKeyPress_Sem;
@@ -16,6 +16,7 @@ uint8_t mic_record_id = 0;
 uint8_t audio_play_id = 0;
 uint8_t flag_mic_start = 0;
 uint8_t flagAudioPlay = 0;
+uint8_t flagHttpdServerAP = 0;
 
 extern void PlatformEasyLinkButtonClickedCallback(void);
 extern void PlatformEasyLinkButtonLongPressedCallback(void);
@@ -70,6 +71,10 @@ static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
     case ROBOT_EVENT_KEY_PLAY_PAUSE:
         if ((flagAudioPlay == 2) || (flagAudioPlay == 3))
             mico_rtos_set_semaphore(&urlPalyStreamStop_Sem);
+        break;
+    case ROBOT_EVENT_KEY_CHILD_LOCK:
+        if (flagHttpdServerAP == 1)
+            mico_rtos_set_semaphore(&httpServer_softAP_event_Sem);
         break;
     default:
         recordKeyStatus = KEY_RELEASE;

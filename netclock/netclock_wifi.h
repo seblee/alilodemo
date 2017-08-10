@@ -1,10 +1,3 @@
-/*
- * netclock_wifi.h
- *
- *  Created on: 2017年7月14日
- *      Author: ceeu
- */
-
 #ifndef _NETCLOCK_NETCLOCK_WIFI_H_
 #define _NETCLOCK_NETCLOCK_WIFI_H_
 #include "mico.h"
