@@ -131,7 +131,18 @@ static int web_send_Post_Request(httpd_request_t *req)
 
             context->micoSystemConfig.configured = allConfigured;
             mico_system_context_update(context);
-
+            if (strncmp(ota_url, "\0", 1) != 0)
+            {
+                if (strncmp(ota_md5, "\0", 1) != 0)
+                {
+                    start_ota_thread();
+                }
+                else
+                {
+                    memset(ota_url, 0, sizeof(ota_url));
+                    memset(ota_md5, 0, sizeof(ota_md5));
+                }
+            }
             app_httpd_log("system restart");
             mico_system_power_perform(context, eState_Software_Reset);
             Eland_httpd_stop(); //stop http server mode

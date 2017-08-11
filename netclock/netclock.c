@@ -277,7 +277,6 @@ void destory_upload_data(void)
 OSStatus ProcessPostJson(char *InputJson)
 {
     json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL;
-    Eland_log("ProcessPostJson");
     if (*InputJson != '{')
     {
         Eland_log("error:received err json format data");
@@ -346,13 +345,13 @@ OSStatus ProcessPostJson(char *InputJson)
         }
         else if (!strcmp(key, "firmware_update_download_url"))
         {
-            memset(netclock_des_g->firmware_update_download_url, 0, sizeof(netclock_des_g->firmware_update_download_url));
-            sprintf(netclock_des_g->firmware_update_download_url, "%s", json_object_get_string(val));
-            if (!strncmp(netclock_des_g->firmware_update_download_url, "\0", 1))
-            {
-                Eland_log("BackLightOffBeginTime not Available");
-                //goto exit;
-            }
+            memset(ota_url, 0, sizeof(ota_url));
+            sprintf(ota_url, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "firmware_md5"))
+        {
+            memset(ota_md5, 0, sizeof(ota_md5));
+            sprintf(ota_md5, "%s", json_object_get_string(val));
         }
     }
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以

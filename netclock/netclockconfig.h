@@ -31,12 +31,11 @@
 #define ip_address_Len 16      //Eland IP地址
 #define Time_Format_Len 9      //"HH:mm:ss"的形式
 #define DateTime_Len 19        //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
-#define Date_formate_len 11    //日期为"yyyy-MM-dd "的形式
+#define Date_formate_len 11    //日期为"yyyy-MM-dd"的形式
 #define URL_Len 128            //URL长度
 
 #define alarm_id_len 37   //闹钟唯一识别的ID。
 #define alarm_color_len 8 //闹钟颜色的RGB字符串。"#RRGGBB"的形式。
-#define
 
 typedef struct _TIME_FORMAT_
 {
@@ -95,6 +94,7 @@ typedef struct _ELAND_DES_S //设备状态结构
     char night_mode_begin_time[Time_Format_Len]; //设定背光的亮度调节的开始时刻
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
     char firmware_update_download_url[URL_Len];  //固件升级下载的URL
+    char firmware_md5[33];                       //固件MD5
 } ELAND_DES_S;
 
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

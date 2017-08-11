@@ -24,7 +24,7 @@ int application_start(void)
     app_log_trace();
     OSStatus err = kNoErr;
     mico_Context_t *mico_context;
-    app_netclock_log("app start\r\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+    app_netclock_log("app start\r\n>>>>>>>>>>>>>>>>>>  >>>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
     /*Register elandstate_queue: elandstate for uart*/
@@ -57,6 +57,7 @@ int application_start(void)
     /* Wait for wlan connection*/
     //app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
+    app_netclock_log("wifi connected successful");
     app_netclock_log("wifi connected successful");
     /*start sntp service*/
     start_sntp_service();
