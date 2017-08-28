@@ -6,6 +6,7 @@
 #include "netclock_wifi.h"
 #include "mico.h"
 #include "netclock_uart.h"
+#include "netclock_ota.h"
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
 ELAND_DES_S *netclock_des_g = NULL;
@@ -22,9 +23,7 @@ extern void PlatformEasyLinkButtonLongPressedCallback(void);
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
-    //    LinkStatusTypeDef *WifiStatus;
-    //    msg_wify_queue received;
-    //    msg_queue my_message;
+
     if (false == CheckNetclockDESSetting())
     {
         //结构体覆盖
@@ -238,6 +237,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
     json_object_object_add(DeviceJsonData, "firmware_update_download_url", json_object_new_string(netclock_des_g->firmware_update_download_url));
+    json_object_object_add(DeviceJsonData, "firmware_md5", json_object_new_string(netclock_des_g->firmware_update_download_url));
 
     json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 

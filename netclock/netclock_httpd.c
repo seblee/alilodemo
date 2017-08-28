@@ -39,6 +39,7 @@
 #include "httpd_priv.h"
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
+#include "netclock_ota.h"
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
 
 #define HTTPD_HDR_DEFORT (HTTPD_HDR_ADD_CONN_CLOSE)
@@ -101,8 +102,11 @@ static int web_send_Post_Request(httpd_request_t *req)
     {
         app_httpd_log("Json useful");
         /********清空消息隊列*************/
-        while (!mico_rtos_is_queue_empty(&wifistate_queue))
+        do
+        {
+            app_httpd_log("Json useful");
             mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+        } while (!mico_rtos_is_queue_empty(&wifistate_queue));
         /********驗證wifi  ssid password*************/
         Start_wifi_Station_SoftSP_Thread(Station);
         mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
@@ -114,7 +118,6 @@ static int web_send_Post_Request(httpd_request_t *req)
             mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
 
             app_httpd_log("Wifi parameter is correct");
-            flagHttpdServerAP = 1;
             netclock_des_g->IsActivate = true;
             app_httpd_log("save wifi para,update flash"); //save
             context = mico_system_context_get();
@@ -143,9 +146,10 @@ static int web_send_Post_Request(httpd_request_t *req)
                     memset(ota_md5, 0, sizeof(ota_md5));
                 }
             }
-            app_httpd_log("system restart");
-            mico_system_power_perform(context, eState_Software_Reset);
+            //app_httpd_log("system restart");
+            //mico_system_power_perform(context, eState_Software_Reset);
             Eland_httpd_stop(); //stop http server mode
+            flagHttpdServerAP = 1;
         }
         else
         {

@@ -28,6 +28,7 @@ static void ota_server_status_handler(OTA_STATE_E state, float progress)
 /***************啟動 OTA thread*****************************/
 void start_ota_thread(void)
 {
+    ota_log("ota Start!");
     mico_system_notify_remove_all(mico_notify_WIFI_STATUS_CHANGED);
     mico_system_notify_remove_all(mico_notify_WiFI_PARA_CHANGED);
     mico_system_notify_remove_all(mico_notify_DHCP_COMPLETED);

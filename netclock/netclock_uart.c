@@ -61,7 +61,6 @@ void netclock_uart_thread(mico_thread_arg_t args)
         uart_config.flags = UART_WAKEUP_ENABLE;
     else
         uart_config.flags = UART_WAKEUP_DISABLE;
-    MicoGpioOutputTrigger(MICO_SYS_LED);
     ring_buffer_init((ring_buffer_t *)&rx_buffer, (uint8_t *)rx_data, UART_BUFFER_LENGTH);
     MicoUartInitialize(MICO_UART_2, &uart_config, (ring_buffer_t *)&rx_buffer);
 

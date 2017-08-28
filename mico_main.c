@@ -58,7 +58,6 @@ int application_start(void)
     //app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
-    app_netclock_log("wifi connected successful");
     /*start sntp service*/
     start_sntp_service();
 
@@ -66,9 +65,9 @@ int application_start(void)
     require_noerr(err, exit);
 
 exit:
-    mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,
-                              (void *)micoNotify_WifiStatusHandler);
-    mico_rtos_deinit_semaphore(&wifi_netclock);
+    // mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,
+    //                           (void *)micoNotify_WifiStatusHandler);
+    // mico_rtos_deinit_semaphore(&wifi_netclock);
     mico_rtos_delete_thread(NULL);
 
     return err;

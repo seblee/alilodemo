@@ -1,7 +1,8 @@
 #ifndef _AUDIO_TEST_H
 #define _AUDIO_TEST_H
 
-#define URL_FILE_DNLD "http://www.cee0.com/Last_Ride_of_the_Day.mp3"
+#define URL_FILE_DNLD "http://xiaowine.cee0.com/music/greatwall.mp3"
+
 //"http://xiaowine.cee0.com/music/greatwall.mp3"
 //"http://xiaowine.cee0.com/music/Dabeizhou.mp3"
 //"http://xiaowine.cee0.com/music/DJedali.mp3"
