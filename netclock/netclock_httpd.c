@@ -102,11 +102,12 @@ static int web_send_Post_Request(httpd_request_t *req)
     {
         app_httpd_log("Json useful");
         /********清空消息隊列*************/
-        do
+        while (!mico_rtos_is_queue_empty(&wifistate_queue))
         {
-            app_httpd_log("Json useful");
+            app_httpd_log("clear wifistate_queue");
             mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-        } while (!mico_rtos_is_queue_empty(&wifistate_queue));
+        }
+        app_httpd_log("wifistate_queue is empty");
         /********驗證wifi  ssid password*************/
         Start_wifi_Station_SoftSP_Thread(Station);
         mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);

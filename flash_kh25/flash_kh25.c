@@ -16,9 +16,16 @@ Spi_t Spi_eland = {
 void flash_kh25_init(void)
 {
     v_SPIInitSimulate(&Spi_eland); //初始化IO
+
+    mico_thread_sleep(2);
     flash_kh25_log("check kh25");
     elandSPIBuffer = malloc(4);
     memset(elandSPIBuffer, 0, 4);
     *elandSPIBuffer = KH_CMD_RDID;
-    spiReadWirteOneData
+    flash_kh25_log("elandSPIBuffer1 = 0x%02X 0x%02X 0x%02X 0x%02X", *elandSPIBuffer, *(elandSPIBuffer + 1),
+                   *(elandSPIBuffer + 2), *(elandSPIBuffer + 3));
+    spiReadWirteOneData(&Spi_eland, elandSPIBuffer, 4);
+    flash_kh25_log("elandSPIBuffer2 = 0x%02X 0x%02X 0x%02X 0x%02X", *elandSPIBuffer, *(elandSPIBuffer + 1),
+                   *(elandSPIBuffer + 2), *(elandSPIBuffer + 3));
+    free(elandSPIBuffer);
 }

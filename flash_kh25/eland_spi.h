@@ -39,4 +39,4 @@ void v_CSIsEnableSimulate(Spi_t *p_Spi, int i_IsEnable);                        
 void v_SPIWriteSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength); //spi數據寫入
 void v_SPIReadSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength);  //spi數據讀取
 //數據讀取
-void spiReadWirteOneData(Spi_t *p_Spi, unsigned char *inbuff, unsigned char *outbuff, unsigned int datalength);
+void spiReadWirteOneData(Spi_t *p_Spi, unsigned char *tranferbuff, unsigned int datalength);

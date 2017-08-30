@@ -24,17 +24,19 @@ NAME := App_Audio_7100
 
 $(NAME)_SOURCES := mico_main.c \
 				   audio_test.c \
-				   hal_alilo_rabbit.c\
+				   hal_alilo_rabbit.c \
 				   netclock/netclock.c \
-				   netclock/netclock_httpd.c\
-				   netclock/netclock_wifi.c\
-				   netclock/sntp_client.c\
-				   netclock/netclock_uart.c\
-				   netclockota/netclock_ota.c
+				   netclock/netclock_httpd.c \
+				   netclock/netclock_wifi.c \
+				   netclock/sntp_client.c \
+				   netclock/netclock_uart.c \
+				   netclockota/netclock_ota.c \
+				   flash_kh25/eland_spi.c \
+				   flash_kh25/flash_kh25.c
 				   
 $(NAME)_COMPONENTS := utilities/url \
-					  utilities\
-					  daemons/http_server\
+					  utilities \
+					  daemons/http_server \
 				 	  protocols/SNTP
 				 	  
 $(NAME)_COMPONENTS += daemons/ota_server
@@ -45,6 +47,7 @@ GLOBAL_INCLUDES := .
 
 $(NAME)_INCLUDES := inc \
 					../mico-os/include \
-					../mico-os/template/includes\
-					netclock\
-					netclockota
+					netclock \
+					netclockota \
+					flash_kh25
+					#../mico-os/template/includes \

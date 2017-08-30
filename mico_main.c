@@ -7,7 +7,7 @@
 #include "netclock_uart.h"
 #include "sntp_client.h"
 #include "netclock_wifi.h"
-
+#include "flash_kh25.h"
 #define app_netclock_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
 
@@ -32,6 +32,8 @@ int application_start(void)
 
     /*start init uart & start service*/
     start_uart_service();
+    /*start init eland SPI*/
+    flash_kh25_init();
     /*start init system context*/
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
 

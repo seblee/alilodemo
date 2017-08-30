@@ -19,7 +19,8 @@
         "night_mode_enabled": 0,
         "night_mode_begin_time": "",
         "night_mode_end_time": "",
-        "firmware_update_download_url": ""
+        "firmware_update_download_url": "http://xiaowine.cee0.com/ota.bin",
+        "firmware_md5": "4294b96a29da439fc295601ac8ffe8b7"
     }
 }
 //ota_md5 4294b96a29da439fc295601ac8ffe8b7

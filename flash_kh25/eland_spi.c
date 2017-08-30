@@ -10,22 +10,21 @@ Author: Andy Lai
 */
 void v_SPIInitSimulate(Spi_t *p_Spi)
 {
-    assert(p_Spi != NULL);
+    //assert(p_Spi != NULL);
 
-    if (p_Spi->spiMode == SPIMaster)
+    if (p_Spi->spiType == SPIMaster)
     {
-        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_CS, OUTPUT_PUSH_PULL);
-        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_SCLK, OUTPUT_PUSH_PULL);
-        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MOSI, OUTPUT_PUSH_PULL);
-        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MISO, INPUT_HIGH_IMPEDANCE);
-        MicoGpioOutputHigh((mico_gpio_t)p_Spi->ui_CS);
+        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_CS, OUTPUT_OPEN_DRAIN_PULL_UP);
+        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_SCLK, OUTPUT_OPEN_DRAIN_PULL_UP);
+        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MOSI, OUTPUT_OPEN_DRAIN_PULL_UP);
+        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MISO, INPUT_PULL_UP);
     }
     else
     {
         MicoGpioInitialize((mico_gpio_t)p_Spi->ui_CS, INPUT_HIGH_IMPEDANCE);
         MicoGpioInitialize((mico_gpio_t)p_Spi->ui_SCLK, INPUT_HIGH_IMPEDANCE);
         MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MOSI, INPUT_HIGH_IMPEDANCE);
-        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MISO, OUTPUT_PUSH_PULL);
+        MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MISO, OUTPUT_OPEN_DRAIN_PULL_UP);
     }
     v_CSIsEnableSimulate(p_Spi, 0);
     switch (p_Spi->spiMode)
@@ -51,7 +50,7 @@ Author: Andy Lai
 */
 void v_CSIsEnableSimulate(Spi_t *p_Spi, int i_IsEnable)
 {
-    assert(p_Spi != NULL);
+    //    assert(p_Spi != NULL);
 
     if (i_IsEnable)
     {
@@ -74,7 +73,7 @@ Author: Andy Lai
 static void v_SPIWriteByte(Spi_t *p_Spi, unsigned char uc_Bt)
 {
     int i = 0;
-    assert(p_Spi != NULL);
+    //    assert(p_Spi != NULL);
     switch (p_Spi->spiMode)
     {
     case Mode0_0: /* Clock Polarity is 0 and Clock Phase is 0 */
@@ -111,9 +110,9 @@ static void v_SPIWriteByte(Spi_t *p_Spi, unsigned char uc_Bt)
             {
                 MicoGpioOutputLow(p_Spi->ui_MOSI);
             }
-            SPIDelay(1);
+            SPIDelaytCH;
             MicoGpioOutputLow(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCL;
         }
         MicoGpioOutputLow(p_Spi->ui_SCLK);
         break;
@@ -131,9 +130,9 @@ static void v_SPIWriteByte(Spi_t *p_Spi, unsigned char uc_Bt)
             {
                 MicoGpioOutputLow(p_Spi->ui_MOSI);
             }
-            SPIDelay(1);
+            SPIDelaytCH;
             MicoGpioOutputLow(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCL;
         }
         MicoGpioOutputHigh(p_Spi->ui_SCLK);
         break;
@@ -151,9 +150,9 @@ static void v_SPIWriteByte(Spi_t *p_Spi, unsigned char uc_Bt)
             {
                 MicoGpioOutputLow(p_Spi->ui_MOSI);
             }
-            SPIDelay(1);
+            SPIDelaytCL;
             MicoGpioOutputHigh(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCH;
         }
         MicoGpioOutputHigh(p_Spi->ui_SCLK);
         break;
@@ -176,12 +175,12 @@ void v_SPIWriteSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength)
 {
     int i = 0;
 
-    assert(p_Spi != NULL);
-    assert(puc_Data != NULL);
-    assert(i_DataLength > 0);
+    //    assert(p_Spi != NULL);
+    //    assert(puc_Data != NULL);
+    //    assert(i_DataLength > 0);
 
     v_CSIsEnableSimulate(p_Spi, 1);
-    delay_us(8);
+    SPIDelay(8);
 
     // Write data
     for (i = 0; i < i_DataLength; i++)
@@ -189,7 +188,7 @@ void v_SPIWriteSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength)
         v_SPIWriteByte(p_Spi, puc_Data[i]);
     }
 
-    delay_us(8);
+    SPIDelay(8);
     v_CSIsEnableSimulate(p_Spi, 0);
 }
 
@@ -205,7 +204,7 @@ static unsigned char uc_SPIReadByte(Spi_t *p_Spi)
     int i = 0;
     unsigned char uc_ReadData = 0;
 
-    assert(p_Spi != NULL);
+    //    assert(p_Spi != NULL);
 
     switch (p_Spi->spiMode)
     {
@@ -228,11 +227,11 @@ static unsigned char uc_SPIReadByte(Spi_t *p_Spi)
         for (i = 0; i < 8; i++)
         {
             MicoGpioOutputHigh(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCH;
             MicoGpioOutputLow(p_Spi->ui_SCLK);
             uc_ReadData = uc_ReadData << 1;
             uc_ReadData |= MicoGpioInputGet(p_Spi->ui_MISO);
-            SPIDelay(1);
+            SPIDelaytCL;
         }
         MicoGpioOutputLow(p_Spi->ui_SCLK);
         break;
@@ -242,11 +241,11 @@ static unsigned char uc_SPIReadByte(Spi_t *p_Spi)
         for (i = 0; i < 8; i++)
         {
             MicoGpioOutputHigh(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCH;
             MicoGpioOutputLow(p_Spi->ui_SCLK);
             uc_ReadData = uc_ReadData << 1;
             uc_ReadData |= MicoGpioInputGet(p_Spi->ui_MISO);
-            SPIDelay(1);
+            SPIDelaytCL;
         }
         MicoGpioOutputHigh(p_Spi->ui_SCLK);
         break;
@@ -256,11 +255,11 @@ static unsigned char uc_SPIReadByte(Spi_t *p_Spi)
         for (i = 0; i < 8; i++)
         {
             MicoGpioOutputLow(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCL;
             MicoGpioOutputHigh(p_Spi->ui_SCLK);
             uc_ReadData = uc_ReadData << 1;
             uc_ReadData |= MicoGpioInputGet(p_Spi->ui_MISO);
-            SPIDelay(1);
+            SPIDelaytCH;
         }
         MicoGpioOutputHigh(p_Spi->ui_SCLK);
         break;
@@ -283,11 +282,11 @@ void v_SPIReadSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength)
 {
     int i = 0;
 
-    assert(p_Spi != NULL);
-    assert(i_DataLength > 0);
+    //    assert(p_Spi != NULL);
+    //    assert(i_DataLength > 0);
 
     v_CSIsEnableSimulate(p_Spi, 1);
-    delay_us(8);
+    SPIDelay(8);
 
     // Read data
     for (i = 0; i < i_DataLength; i++)
@@ -295,7 +294,7 @@ void v_SPIReadSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength)
         puc_Data[i] = uc_SPIReadByte(p_Spi);
     }
 
-    delay_us(8);
+    SPIDelay(8);
     v_CSIsEnableSimulate(p_Spi, 0);
 }
 /*
@@ -309,11 +308,12 @@ Author: seblee
 static void spiReadWirteOneByte(Spi_t *p_Spi, unsigned char *tranferbuff)
 {
     int i = 0;
-    assert(p_Spi != NULL);
+    //    assert(p_Spi != NULL);
     switch (p_Spi->spiMode)
     {
     case Mode0_0: /* Clock Polarity is 0 and Clock Phase is 0 */
         MicoGpioOutputLow(p_Spi->ui_SCLK);
+
         for (i = 0; i < 8; i++)
         {
             MicoGpioOutputLow(p_Spi->ui_SCLK);
@@ -328,7 +328,8 @@ static void spiReadWirteOneByte(Spi_t *p_Spi, unsigned char *tranferbuff)
             SPIDelaytCL; //最少2ns
             MicoGpioOutputHigh(p_Spi->ui_SCLK);
             *tranferbuff <<= 1;
-            *tranferbuff |= MicoGpioInputGet(p_Spi->ui_MISO);
+            if (MicoGpioInputGet(p_Spi->ui_MISO))
+                *tranferbuff |= 1;
             SPIDelaytCH; //最少5ns
         }
         MicoGpioOutputLow(p_Spi->ui_SCLK);
@@ -347,9 +348,9 @@ static void spiReadWirteOneByte(Spi_t *p_Spi, unsigned char *tranferbuff)
             {
                 MicoGpioOutputLow(p_Spi->ui_MOSI);
             }
-            SPIDelay(1);
+            SPIDelaytCH;
             MicoGpioOutputLow(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCL;
         }
         MicoGpioOutputLow(p_Spi->ui_SCLK);
         break;
@@ -367,9 +368,9 @@ static void spiReadWirteOneByte(Spi_t *p_Spi, unsigned char *tranferbuff)
             {
                 MicoGpioOutputLow(p_Spi->ui_MOSI);
             }
-            SPIDelay(1);
+            SPIDelaytCH;
             MicoGpioOutputLow(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCL;
         }
         MicoGpioOutputHigh(p_Spi->ui_SCLK);
         break;
@@ -387,9 +388,9 @@ static void spiReadWirteOneByte(Spi_t *p_Spi, unsigned char *tranferbuff)
             {
                 MicoGpioOutputLow(p_Spi->ui_MOSI);
             }
-            SPIDelay(1);
+            SPIDelaytCL;
             MicoGpioOutputHigh(p_Spi->ui_SCLK);
-            SPIDelay(1);
+            SPIDelaytCH;
         }
         MicoGpioOutputHigh(p_Spi->ui_SCLK);
         break;
@@ -411,7 +412,7 @@ void spiReadWirteOneData(Spi_t *p_Spi, unsigned char *tranferbuff, unsigned int 
     unsigned int i;
     v_CSIsEnableSimulate(p_Spi, 1);
     SPIDelay(8);
-    for (i = 0; i < DataLength; i++)
+    for (i = 0; i < datalength; i++)
     {
         spiReadWirteOneByte(p_Spi, tranferbuff + i);
     }

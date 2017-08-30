@@ -1,29 +1,50 @@
 #include "mico.h"
 #include "eland_spi.h"
-
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
 #define Eland_SCLK MICO_GPIO_12
-#define Eland_MOSI MICO_GPIO_14
-#define Eland_MISO MICO_GPIO_4
+#define Eland_MOSI MICO_GPIO_22
+#define Eland_MISO MICO_GPIO_14
+/* Command definitions */
+typedef enum {
 
-#define KH_CMD_WREN (uint8_t)0X06
-#define KH_CMD_WRDI (uint8_t)0X04
-#define KH_CMD_RDSR (uint8_t)0X05
-#define KH_CMD_WRSR (uint8_t)0X01
-#define KH_CMD_READ (uint8_t)0X03
-#define KH_CMD_FAST_READ (uint8_t)0X0B
-#define KH_CMD_DREAD (uint8_t)0X3B
-#define KH_CMD_SE (uint8_t)0X20
-#define KH_CMD_BE (uint8_t)0XD8
-#define KH_CMD_CE (uint8_t)0XC7
-#define KH_CMD_pp (uint8_t)0X02
-#define KH_CMD_DP (uint8_t)0XB9
-#define KH_CMD_RDP (uint8_t)0XAB
-#define KH_CMD_RES (uint8_t)0XAB
-#define KH_CMD_RDID (uint8_t)0X9F
-#define KH_CMD_REMS (uint8_t)0X90
-#define KH_CMD_ENSO (uint8_t)0XB1
-#define KH_CMD_EXSO (uint8_t)0XC1
-#define KH_CMD_RESCUR (uint8_t)0X2B
-#define KH_CMD_WRSCUR (uint8_t)0X2F
+    KH_CMD_pp = 0X02,
+    KH_CMD_DP = 0XB9,
+    KH_CMD_RDP = 0XAB,
+    KH_CMD_RES = 0XAB,
+    KH_CMD_RDID = 0X9F,
+    KH_CMD_REMS = 0X90,
+    KH_CMD_ENSO = 0XB1,
+    KH_CMD_EXSO = 0XC1,
+    KH_CMD_RESCUR = 0X2B,
+    KH_CMD_WRSCUR = 0X2F,
+
+    ElandFlash_WRITE_ENABLE = 0x06,            /* WREN write enable */
+    ElandFlash_WRITE_DISABLE = 0x04,           /* WRDI write disenable */
+    ElandFlash_READ_STATUS_REGISTER = 0x05,    /* RDSR read status register */
+    ElandFlash_WRITE_STATUS_REGISTER = 0x01,   /* WRSR write status register*/
+    ElandFlash_READ = 0x03,                    /* READ read data */
+    ElandFlash_FAST_READ = 0x0B,               /* FAST READ fast read data */
+    ElandFlash_DREAD = 0X3B,                   /* DREAD Double Output Mode command */
+    ElandFlash_SECTOR_ERASE = 0x20,            /* SE sector erase*/
+    ElandFlash_BLOCK_ERASE_MID = 0x52,         /* BE block erase */
+    ElandFlash_BLOCK_ERASE_LARGE = 0xD8,       /* BE block erase */
+    ElandFlash_CHIP_ERASE1 = 0x60,             /* CE   chip erase */
+    ElandFlash_CHIP_ERASE2 = 0xC7,             /* CE   chip erase */
+    ElandFlash_WRITE = 0x02,                   /* PP page progran */
+    ElandFlash_DEEP_POWER_DOWN = 0xB9,         /* DP Deep power down */
+    ElandFlash_RELEASE_DEEP_POWER_DOWN = 0xAB, /* RDP Release from deep power down */
+    ElandFlash_READ_JEDEC_ID = 0x9F,           /* RDID read indentification */
+    ElandFlash_READ_ID1 = 0x90,                /* REMS read electronic manufacturer & device ID*/
+    ElandFlash_READ_ID2 = 0xAB,                /* RES read electronic ID */
+    ElandFlash_ENTER_SECURED_OTP = 0xB1,       /* ENSO enter secured OPT */
+    ElandFlash_EXIT_SECURED_OTP = 0xC1,        /* EXSO exit secured OPT */
+    ElandFlash_READ_SECURITY_REGISTER = 0x2B,  /* RDSCUR  read security register */
+    ElandFlash_WRITE_SECURITY_REGISTER = 0x2F, /* WRSCUR  write security register */
+
+    ElandFlash_QUAD_WRITE = 0x38,                   /* WRSR                  */
+    ElandFlash_QUAD_READ = 0xEB,                    /* WRSR                  */
+    ElandFlash_ENABLE_WRITE_STATUS_REGISTER = 0x50, /* EWSR   - SST only      */
+} sflash_command_t;
+
+void flash_kh25_init(void);
