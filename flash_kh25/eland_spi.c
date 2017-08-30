@@ -407,7 +407,7 @@ Output: outbuff,the data of slaver to master
 Return: None
 Author: seblee
 */
-void spiReadWirteOneData(Spi_t *p_Spi, unsigned char *tranferbuff, unsigned int datalength)
+void spiReadWirteOneData(Spi_t *p_Spi, uint8_t *tranferbuff, uint16_t datalength)
 {
     unsigned int i;
     v_CSIsEnableSimulate(p_Spi, 1);

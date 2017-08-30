@@ -34,9 +34,8 @@ typedef struct SpiStruct
 } Spi_t;
 
 // Function prototypes
-void v_SPIInitSimulate(Spi_t *p_Spi);                                             //IO口初始化
-void v_CSIsEnableSimulate(Spi_t *p_Spi, int i_IsEnable);                          //片選使能
-void v_SPIWriteSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength); //spi數據寫入
-void v_SPIReadSimulate(Spi_t *p_Spi, unsigned char *puc_Data, int i_DataLength);  //spi數據讀取
-//數據讀取
-void spiReadWirteOneData(Spi_t *p_Spi, unsigned char *tranferbuff, unsigned int datalength);
+void v_SPIInitSimulate(Spi_t *p_Spi);                                              //IO口初始化
+void v_CSIsEnableSimulate(Spi_t *p_Spi, int i_IsEnable);                           //片選使能
+void v_SPIWriteSimulate(Spi_t *p_Spi, uint8_t *puc_Data, int i_DataLength);        //spi數據寫入
+void v_SPIReadSimulate(Spi_t *p_Spi, uint8_t *puc_Data, int i_DataLength);         //spi數據讀取
+void spiReadWirteOneData(Spi_t *p_Spi, uint8_t *tranferbuff, uint16_t datalength); //數據讀取

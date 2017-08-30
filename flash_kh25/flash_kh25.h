@@ -8,17 +8,6 @@
 /* Command definitions */
 typedef enum {
 
-    KH_CMD_pp = 0X02,
-    KH_CMD_DP = 0XB9,
-    KH_CMD_RDP = 0XAB,
-    KH_CMD_RES = 0XAB,
-    KH_CMD_RDID = 0X9F,
-    KH_CMD_REMS = 0X90,
-    KH_CMD_ENSO = 0XB1,
-    KH_CMD_EXSO = 0XC1,
-    KH_CMD_RESCUR = 0X2B,
-    KH_CMD_WRSCUR = 0X2F,
-
     ElandFlash_WRITE_ENABLE = 0x06,            /* WREN write enable */
     ElandFlash_WRITE_DISABLE = 0x04,           /* WRDI write disenable */
     ElandFlash_READ_STATUS_REGISTER = 0x05,    /* RDSR read status register */
@@ -42,9 +31,8 @@ typedef enum {
     ElandFlash_READ_SECURITY_REGISTER = 0x2B,  /* RDSCUR  read security register */
     ElandFlash_WRITE_SECURITY_REGISTER = 0x2F, /* WRSCUR  write security register */
 
-    ElandFlash_QUAD_WRITE = 0x38,                   /* WRSR                  */
-    ElandFlash_QUAD_READ = 0xEB,                    /* WRSR                  */
-    ElandFlash_ENABLE_WRITE_STATUS_REGISTER = 0x50, /* EWSR   - SST only      */
-} sflash_command_t;
+} ElandFlash_command_t;
 
-void flash_kh25_init(void);
+OSStatus flash_kh25_init(void);
+void flash_kh25_read(uint32_t address, uint8_t *spireadbuffer, uint32_t length);
+void flash_kh25_write(uint32_t address, uint8_t *spireadbuffer, uint32_t length);
