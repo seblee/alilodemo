@@ -5,6 +5,10 @@
 #define Eland_SCLK MICO_GPIO_12
 #define Eland_MOSI MICO_GPIO_22
 #define Eland_MISO MICO_GPIO_14
+
+#define KH25L8006_PAGE_SIZE 256
+#define DUMMY_BYTE (uint8_t)0xA5
+
 /* Command definitions */
 typedef enum {
 
@@ -32,7 +36,11 @@ typedef enum {
     ElandFlash_WRITE_SECURITY_REGISTER = 0x2F, /* WRSCUR  write security register */
 
 } ElandFlash_command_t;
-
+void start_spi_test_service(void);
+void KH25_TEST_Thread(mico_thread_arg_t arts);
 OSStatus flash_kh25_init(void);
-void flash_kh25_read(uint32_t address, uint8_t *spireadbuffer, uint32_t length);
-void flash_kh25_write(uint32_t address, uint8_t *spireadbuffer, uint32_t length);
+void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
+//void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
+void flash_kh25_sector_erase(uint32_t address);
+void flash_kh25_block_erase(uint32_t address);
+void flash_kh25_chip_erase(void);

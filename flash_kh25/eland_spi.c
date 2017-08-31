@@ -409,13 +409,9 @@ Author: seblee
 */
 void spiReadWirteOneData(Spi_t *p_Spi, uint8_t *tranferbuff, uint16_t datalength)
 {
-    unsigned int i;
-    v_CSIsEnableSimulate(p_Spi, 1);
-    SPIDelay(8);
+    uint16_t i;
     for (i = 0; i < datalength; i++)
     {
         spiReadWirteOneByte(p_Spi, tranferbuff + i);
     }
-    SPIDelay(8);
-    v_CSIsEnableSimulate(p_Spi, 0);
 }
