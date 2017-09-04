@@ -32,8 +32,7 @@ int application_start(void)
 
     /*start init uart & start service*/
     start_uart_service();
-    /*start init eland SPI*/
-    start_spi_test_service();
+
     /*start init system context*/
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
 
@@ -62,6 +61,9 @@ int application_start(void)
     app_netclock_log("wifi connected successful");
     /*start sntp service*/
     //start_sntp_service();
+
+    /*start init eland SPI*/
+    start_spi_test_service();
 
     err = start_test_thread();
     require_noerr(err, exit);

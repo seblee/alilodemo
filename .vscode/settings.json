@@ -6,6 +6,7 @@
         "vcruntime.h": "c",
         "minwindef.h": "c",
         "corecrt.h": "c",
-        "audio_test.h": "c"
+        "audio_test.h": "c",
+        "iosfwd": "c"
     }
 }
