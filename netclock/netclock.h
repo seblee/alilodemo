@@ -31,5 +31,9 @@ void destory_upload_data(void);
 
 OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
-OSStatus wifiConnectADV(void);
+
+//????
+#define ELAND_SYNC_STATUS_METHOD HTTP_POST
+#define ELAND_SYNC_STATUS_URI ("/")
+
 #endif /* NETCLOCK_NETCLOCK_H_ */

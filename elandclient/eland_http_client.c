@@ -39,31 +39,79 @@
 static char *eland_http_requeset = NULL;
 static bool is_https_connect = false; //HTTPS 是否连接
 
-static OSStatus onReceivedData(struct _HTTPHeader_t *httpHeader,
-                               uint32_t pos,
-                               uint8_t *data,
-                               size_t len,
-                               void *userContext);
+static bool http_get_wifi_status(void);
+static OSStatus http_queue_init(void);
+static OSStatus http_queue_deinit(void);
+static void eland_client_serrvice(mico_thread_arg_t arg);
 static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext);
+static OSStatus onReceivedData(struct _HTTPHeader_t *httpHeader, uint32_t pos, uint8_t *data, size_t len, void *userContext);
 
-static mico_semaphore_t wait_sem = NULL;
-
-typedef struct _http_context_t
+//啟動eland_client 線程，
+OSStatus start_client_serrvice(void)
 {
-    char *content;
-    uint64_t content_length;
-} http_context_t;
+    OSStatus err = kGeneralErr;
 
-void simple_http_get(char *host, char *query);
-void simple_https_get(char *host, char *query);
+    err = http_queue_init();
+    require_noerr(err, exit);
 
-#define SIMPLE_GET_REQUEST    \
-    "GET / HTTP/1.1\r\n"      \
-    "Host: www.baidu.com\r\n" \
-    "Connection: close\r\n"   \
-    "Content-length:17\r\n"   \
-    "\r\n"                    \
-    "<html.....</html>"
+    if (http_get_wifi_status() == false)
+    {
+        err = kGeneralErr;
+        client_log("[ERROR]wifi is not connect!");
+        goto exit;
+    }
+
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "client_serrvice", eland_client_serrvice, 0x2800, 0);
+    require_noerr(err, exit);
+
+exit:
+    if (err != kNoErr)
+    {
+        http_queue_deinit();
+    }
+    return err;
+}
+static OSStatus http_queue_init(void)
+{
+    OSStatus err = kGeneralErr;
+
+    //初始化eland http 發送 request 消息
+    err = mico_rtos_init_queue(&eland_http_request_queue, "eland_http_request_queue", sizeof(ELAND_HTTP_REQUEST_SETTING_S *), 1); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
+
+    //初始化eland http 接收到 response 消息
+    err = mico_rtos_init_queue(&eland_http_response_queue, "eland_http_response_queue", sizeof(ELAND_HTTP_RESPONSE_SETTING_S *), 1); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
+
+exit:
+    return err;
+}
+
+static OSStatus http_queue_deinit(void)
+{
+    if (eland_http_request_queue != NULL)
+    {
+        mico_rtos_deinit_queue(&eland_http_request_queue);
+    }
+
+    if (eland_http_response_queue != NULL)
+    {
+        mico_rtos_deinit_queue(&eland_http_response_queue);
+    }
+    return kNoErr;
+}
+
+//获取网络连接状态
+static bool http_get_wifi_status(void)
+{
+    LinkStatusTypeDef link_status;
+
+    memset(&link_status, 0, sizeof(link_status));
+
+    micoWlanGetLinkStatus(&link_status);
+
+    return (bool)(link_status.is_connected);
+}
 
 //设置https连接状态
 void set_https_connect_status(bool status)
@@ -76,7 +124,16 @@ bool get_https_connect_status(void)
 {
     return is_https_connect;
 }
-//域名DNS解析
+
+//生成一个http回话id
+static uint32_t generate_http_session_id(void)
+{
+    static uint32_t id = 1;
+
+    return id++;
+}
+
+//域名域名DNS解析
 static OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
 {
     struct hostent *host = NULL;
@@ -116,7 +173,7 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
     eland_http_requeset = malloc(http_req_all_len);
     if (eland_http_requeset == NULL)
     {
-        app_log("[ERROR]malloc error!!! malloc len is %ld", http_req_all_len);
+        client_log("[ERROR]malloc error!!! malloc len is %ld", http_req_all_len);
         return kGeneralErr;
     }
 
@@ -124,7 +181,7 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
 
     if (eland_http_req->method != HTTP_POST && eland_http_req->method != HTTP_GET)
     {
-        app_log("http method error!");
+        client_log("http method error!");
         err = kGeneralErr;
         goto exit;
     }
@@ -143,11 +200,6 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Keepalive\r\n"); //增加Content-Type和Connection设置
     //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\n"); //增加Content-Type和Connection设置
     //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Close\r\n"); //增加Content-Type和Connection设置
-
-    if (eland_http_req->is_jwt == true)
-    {
-        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Authorization: JWT %s\r\n", eland_http_req->jwt);
-    }
 
     //增加http body部分
     if (eland_http_req->http_body != NULL)
@@ -170,9 +222,9 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
     err = kNoErr;
 
 #if (HTTP_REQ_LOG == 1)
-    app_log("--------------------------------------");
-    app_log("\r\n%s", eland_http_requeset);
-    app_log("--------------------------------------");
+    client_log("--------------------------------------");
+    client_log("\r\n%s", eland_http_requeset);
+    client_log("--------------------------------------");
 #endif
 
 exit:
@@ -188,11 +240,45 @@ exit:
     return err;
 }
 
-void start_client_serrvice(void)
+//设置tcp keep_alive 参数
+static int user_set_tcp_keepalive(int socket, int send_timeout, int recv_timeout, int idle, int interval, int count)
 {
-    mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "client_serrvice", eland_client_serrvice, 0x2800, 0);
+    int retVal = 0, opt = 0;
+
+    retVal = setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&send_timeout, sizeof(int));
+    require_string(retVal >= 0, exit, "SO_SNDTIMEO setsockopt error!");
+
+    client_log("setsockopt SO_SNDTIMEO=%d ms ok.", send_timeout);
+
+    // retVal = setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&recv_timeout, sizeof(int));
+    // require_string(retVal >= 0, exit, "SO_RCVTIMEO setsockopt error!");
+
+    // client_log("setsockopt SO_RCVTIMEO=%d ms ok.", recv_timeout);
+
+    // set keepalive
+    opt = 1;
+    retVal = setsockopt(socket, SOL_SOCKET, SO_KEEPALIVE, (void *)&opt, sizeof(opt)); // 开启socket的Keepalive功能
+    require_string(retVal >= 0, exit, "SO_KEEPALIVE setsockopt error!");
+
+    opt = idle;
+    retVal = setsockopt(socket, IPPROTO_TCP, TCP_KEEPIDLE, (void *)&opt, sizeof(opt)); // TCP IDLE idle秒以后开始发送第一个Keepalive包
+    require_string(retVal >= 0, exit, "TCP_KEEPIDLE setsockopt error!");
+
+    opt = interval;
+    retVal = setsockopt(socket, IPPROTO_TCP, TCP_KEEPINTVL, (void *)&opt, sizeof(opt)); // TCP后面的Keepalive包的间隔时间是interval秒
+    require_string(retVal >= 0, exit, "TCP_KEEPINTVL setsockopt error!");
+
+    opt = count;
+    retVal = setsockopt(socket, IPPROTO_TCP, TCP_KEEPCNT, (void *)&opt, sizeof(opt)); // Keepalive 数量为count次
+    require_string(retVal >= 0, exit, "TCP_KEEPCNT setsockopt error!");
+
+    client_log("set tcp keepalive: idle=%d, interval=%d, cnt=%d.", idle, interval, count);
+
+exit:
+    return retVal;
 }
-static void _serrvice(mico_thread_arg_t arg)
+
+static void eland_client_serrvice(mico_thread_arg_t arg)
 {
     OSStatus err = kGeneralErr;
     int http_fd = -1;
@@ -201,54 +287,25 @@ static void _serrvice(mico_thread_arg_t arg)
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
     char ipstr[20] = {0};
-
-HTTP_SSL_START:
-
-SSL_SEND:
-    goto SSL_SEND;
-
-exit:
-    goto HTTP_SSL_START;
-    if (eland_http_requeset != NULL)
-    {
-        free(eland_http_requeset);
-        eland_http_requeset = NULL;
-    }
-
-    /* Read http data from server */
-    simple_http_get("www.baidu.com", SIMPLE_GET_REQUEST);
-    simple_https_get("www.baidu.com", SIMPLE_GET_REQUEST);
-
-    return err;
-}
-
-static void eland_client_serrvice(mico_thread_arg_t arg)
-{
-    OSStatus err;
-    int http_fd = -1;
-    int ssl_errno = 0;
-    mico_ssl_t client_ssl = NULL;
-    fd_set readfds;
-    char ipstr[16];
     struct sockaddr_in addr;
     HTTPHeader_t *httpHeader = NULL;
     http_context_t context = {NULL, 0};
-    char *fog_host = ELAND_HTTP_DOMAIN_NAME;
-    struct hostent *hostent_content = NULL;
-    char **pptr = NULL;
-    struct in_addr in_addr;
+    char *eland_host = ELAND_HTTP_DOMAIN_NAME;
+    struct timeval t = {0, HTTP_YIELD_TMIE * 1000};
+    uint32_t req_id = 0;
+    ELAND_HTTP_REQUEST_SETTING_S *eland_http_req = NULL; //http 请求
 
 HTTP_SSL_START:
     set_https_connect_status(false);
-    client_log("start dns annlysis, domain:%s", fog_host);
-    err = usergethostbyname(fog_host, (uint8_t *)ipstr, sizeof(ipstr));
+    client_log("start dns annlysis, domain:%s", eland_host);
+    err = usergethostbyname(eland_host, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
     {
-        client_log("dns error!!! doamin:%s", fog_host);
+        client_log("dns error!!! doamin:%s", eland_host);
         mico_thread_msleep(200);
         goto HTTP_SSL_START;
     }
-    client_log("HTTP server address: host:%s, ip: %s", fog_host, ipstr);
+    client_log("HTTP server address: host:%s, ip: %s", eland_host, ipstr);
 
     /*HTTPHeaderCreateWithCallback set some callback functions */
     httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData, onClearData, &context);
@@ -265,23 +322,28 @@ HTTP_SSL_START:
     addr.sin_addr.s_addr = inet_addr(ipstr);
     addr.sin_port = htons(ELAND_HTTP_PORT_SSL); //HTTP SSL端口 443
 
-    /**
-    *   add  设置tcp keep_alive 参数
-    */
-    app_log("start connect");
+    //设置tcp keep_alive 参数
+    ret = user_set_tcp_keepalive(http_fd, HTTP_SEND_TIME_OUT, HTTP_RECV_TIME_OUT, HTTP_KEEP_IDLE_TIME, HTTP_KEEP_INTVL_TIME, HTTP_KEEP_COUNT);
+    if (ret < 0)
+    {
+        client_log("user_set_tcp_keepalive() error");
+        goto exit;
+    }
+
+    client_log("start connect");
     err = connect(http_fd, (struct sockaddr *)&addr, sizeof(addr));
     require_noerr_string(err, exit, "connect https server failed");
 
     //ssl_version_set(TLS_V1_2_MODE);    //设置SSL版本
     ssl_set_client_version(TLS_V1_2_MODE);
 
-    app_log("start ssl_connect");
+    client_log("start ssl_connect");
 
     client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     //client_ssl = ssl_connect( http_fd, strlen(http_server_ssl_cert_str), http_server_ssl_cert_str, &ssl_errno );
-    require_action(client_ssl != NULL, exit, {err = kGeneralErr; app_log("https ssl_connnect error, errno = %d", ssl_errno); });
+    require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
 
-    app_log("#####https connect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    client_log("#####https connect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
 SSL_SEND:
     set_https_connect_status(true);
@@ -299,12 +361,36 @@ SSL_SEND:
     }
 
     /* Send HTTP Request */
-    ssl_send(client_ssl, query, strlen(query));
-
+    /* Send HTTP Request */
+    /* Send HTTP Request */
+    ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset)); /* Send HTTP Request */
+    if (eland_http_requeset != NULL)                                                            //释放发送缓冲区
+    {
+        free(eland_http_requeset);
+        eland_http_requeset = NULL;
+    }
+    if (ret > 0)
+    {
+        //client_log("ssl_send success [%d] [%d]", strlen((const char *)eland_http_requeset) ,ret);
+        //client_log("%s", eland_http_requeset);
+    }
+    else
+    {
+        client_log("-----------------ssl_send error, ret = %d", ret);
+        err = kGeneralErr;
+        goto exit;
+    }
     FD_ZERO(&readfds);
     FD_SET(http_fd, &readfds);
 
-    select(http_fd + 1, &readfds, NULL, NULL, NULL);
+    ret = select(http_fd + 1, &readfds, NULL, NULL, &t);
+    if (ret == -1 || ret == 0)
+    {
+        client_log("-----------------select error, ret = %d", ret);
+        err = kGeneralErr;
+        goto exit;
+    }
+
     if (FD_ISSET(http_fd, &readfds))
     {
         /*parse header*/
@@ -312,21 +398,58 @@ SSL_SEND:
         switch (err)
         {
         case kNoErr:
-            PrintHTTPHeader(httpHeader);
-            err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
-            require_noerr(err, exit);
-            /*get data and print*/
-            client_log("Content Data: %s", context.content);
+        {
+            if ((httpHeader->statusCode == -1) || (httpHeader->statusCode >= 500))
+            {
+                client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
+                goto exit; //断开重新连接
+            }
+            if (httpHeader->statusCode == 403) //認證錯誤
+            {
+                client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
+                goto exit; //断开重新连接
+            }
+
+            if (httpHeader->statusCode == 404) //沒找到文件
+            {
+                client_log("[FAILURE]eland http response fail, code:%d", httpHeader->statusCode);
+                send_response_to_queue(HTTP_RESPONSE_FAILURE, req_id, httpHeader->statusCode, NULL);
+                break;
+            }
+
+            //只有code正确才解析返回数据,错误情况下解析容易造成内存溢出
+            if (httpHeader->statusCode == 200) //正常應答
+            {
+                //PrintHTTPHeader( httpHeader );
+                err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
+                require_noerr(err, exit);
+#if (HTTP_REQ_LOG == 1)
+                client_log("Content Data:[%ld]%s", context.content_length, context.content); /*get data and print*/
+#endif
+                send_response_to_queue(HTTP_RESPONSE_SUCCESS, req_id, httpHeader->statusCode, context.content);
+            }
             break;
+        }
         case EWOULDBLOCK:
+            break;
+
         case kNoSpaceErr:
+            client_log("SocketReadHTTPSHeader kNoSpaceErr");
+            goto exit; //断开重新连接
+            break;
         case kConnectionErr:
+            client_log("SocketReadHTTPSHeader kConnectionErr");
+            goto exit; //断开重新连接
+            break;
         default:
             client_log("ERROR: HTTP Header parse error: %d", err);
+            goto exit; //断开重新连接
             break;
         }
     }
-
+    HTTPHeaderClear(httpHeader);
+    client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    goto SSL_SEND;
 exit:
     client_log("Exit: Client exit with err = %d, fd: %d", err, http_fd);
     if (client_ssl)
