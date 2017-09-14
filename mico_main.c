@@ -65,7 +65,10 @@ int application_start(void)
     /*start init eland SPI*/
     start_spi_test_service();
 
-    err = start_test_thread();
+    /*start eland HTTP service */
+    start_eland_service();
+
+    //err = start_test_thread();
     require_noerr(err, exit);
 
 exit:

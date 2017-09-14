@@ -1,25 +1,17 @@
 #ifndef __ELAND_HTTP_CLIENT_H_
 #define __ELAND_HTTP_CLIENT_H_
 
-#define SIMPLE_GET_REQUEST    \
-    "GET / HTTP/1.1\r\n"      \
-    "Host: www.baidu.com\r\n" \
-    "Connection: close\r\n"   \
-    "Content-length:17\r\n"   \
-    "\r\n"                    \
-    "<html.....</html>"
-
-#define HTTP_SEND_TIME_OUT (3000)
-#define HTTP_RECV_TIME_OUT (3000)
-#define HTTP_KEEP_IDLE_TIME (60)
-#define HTTP_KEEP_INTVL_TIME (5)
-#define HTTP_KEEP_COUNT (3)
+#define ELAND_HTTP_SEND_TIME_OUT (3000)
+#define ELAND_HTTP_RECV_TIME_OUT (3000)
+#define ELAND_HTTP_KEEP_IDLE_TIME (60)
+#define ELAND_HTTP_KEEP_INTVL_TIME (5)
+#define ELAND_HTTP_KEEP_COUNT (3)
 
 #define HTTP_YIELD_TMIE (2000) //http超时时间
 
-#define ELAND_HTTP_DOMAIN_NAME ("") //HTTP服务器地址
-#define ELAND_HTTP_PORT_SSL (443)   //fog v2 http SSL端口
-#define HTTP_REQ_LOG (0)            //log 打印信息開關 1:enable 0:disable
+#define ELAND_HTTP_DOMAIN_NAME ("160.16.237.210") //HTTP服务器地址
+#define ELAND_HTTP_PORT_SSL (443)                 //fog v2 http SSL端口
+#define HTTP_REQ_LOG (0)                          //log 打印信息開關 1:enable 0:disable
 
 #define HTTP_REQUEST_BODY_MAX_LEN (2048)
 #define HTTP_REQUEST_HOST_NAME_MAX_LEN (64)
@@ -61,5 +53,28 @@ typedef struct _ELAND_HTTP_REQUEST_SETTING
     char host_name[HTTP_REQUEST_HOST_NAME_MAX_LEN];
     char *http_body;
 } ELAND_HTTP_REQUEST_SETTING_S;
+
+typedef struct _http_context_t
+{
+    char *content;
+    uint64_t content_length;
+} http_context_t;
+typedef enum __SOUND_DOWNLOAD_STATUS {
+    SOUND_DOWNLOAD_IDLE,
+    SOUND_DOWNLOAD_START,
+    SOUND_DOWNLOAD_PAUSE,
+    SOUND_DOWNLOAD_CONTINUE,
+    SOUND_DOWNLOAD_STOP,
+} SOUND_DOWNLOAD_STATUS;
+/********************************************/
+
+extern mico_queue_t eland_http_request_queue;  //eland HTTP的发送请求队列
+extern mico_queue_t eland_http_response_queue; //eland HTTP的接收响应队列
+
+extern char *certificate;
+extern char *private_key;
+extern char *capem;
+
+OSStatus start_client_serrvice(void);
 
 #endif

@@ -1,8 +1,8 @@
 #include "flash_kh25.h"
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 
-uint8_t *elandSPIBuffer;
-
+uint8_t *elandSPIBuffer = NULL;
+static mico_semaphore_t kh25_InitCompleteSem = NULL;
 // Define SPI pins
 Spi_t Spi_eland = {
     .ui_CS = Eland_CS,
@@ -12,21 +12,66 @@ Spi_t Spi_eland = {
     .spiMode = Mode0_0,
     .spiType = SPIMaster,
 };
-/*************************/
-void start_spi_test_service(void)
-{
-    mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "KH25_TEST_Thread", KH25_TEST_Thread, 0x1000, 0);
 
-    return;
+/****************************/
+static uint8_t flash_kh25_read_status_register(void)
+{
+    uint8_t cache[2];
+    v_CSIsEnableSimulate(&Spi_eland, 1);
+    SPIDelay(1);
+    //the write  enable
+    cache[0] = (uint8_t)ElandFlash_READ_STATUS_REGISTER;
+    spiReadWirteOneData(&Spi_eland, cache, 2);
+    SPIDelay(1);
+    v_CSIsEnableSimulate(&Spi_eland, 0);
+    return cache[1];
+}
+static void flash_kh25_wait_for_WIP(uint32_t time)
+{
+    uint32_t count = 0;
+    uint8_t cache = 0;
+    SPIDelay(1);
+    do
+    {
+        cache = flash_kh25_read_status_register();
+        if (cache & 1)
+        {
+            mico_rtos_thread_msleep(1);
+            count++;
+            continue;
+        }
+        else
+            break;
+    } while (count < time);
+}
+/*************************/
+OSStatus
+start_spi_test_service(void)
+{
+    OSStatus err = kGeneralErr;
+    err = mico_rtos_init_semaphore(&kh25_InitCompleteSem, 1);
+    require_noerr_string(err, exit, "kh25_InitCompleteSem init err");
+
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "KH25_TEST_Thread", KH25_TEST_Thread, 0x1000, 0);
+    require_noerr_string(err, exit, "KH25_TEST_Thread err");
+
+    err = mico_rtos_get_semaphore(&kh25_InitCompleteSem, MICO_WAIT_FOREVER);
+    require_noerr_string(err, exit, "kh25_InitCompleteSem get err");
+
+    err = mico_rtos_deinit_semaphore(&kh25_InitCompleteSem);
+    require_noerr_string(err, exit, "kh25_InitCompleteSem deinit err");
+
+exit:
+    return err;
 }
 void KH25_TEST_Thread(mico_thread_arg_t arts)
 {
     flash_kh25_init();
-
+    mico_rtos_set_semaphore(&kh25_InitCompleteSem); //wait until get semaphore
     mico_rtos_delete_thread(NULL);
 }
 
-static void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length)
+void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length)
 {
     uint8_t cache[5];
     v_CSIsEnableSimulate(&Spi_eland, 1);
@@ -130,9 +175,9 @@ static OSStatus flash_kh25_check_device(void)
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
     flash_kh25_log("status register = 0x%02X", cache[2]);
-    return kGeneralErr;
-exit:
     return kNoErr;
+exit:
+    return kGeneralErr;
 }
 
 void flash_kh25_sector_erase(uint32_t address)
@@ -150,7 +195,8 @@ void flash_kh25_sector_erase(uint32_t address)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 4);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    mico_rtos_thread_msleep(300);
+    flash_kh25_wait_for_WIP(KH25L8006_SECTOR_ERASE_CYCLE_TIME_MAX); //最長等待300ms
+    flash_kh25_log("sector_erase");
     flash_kh25_write_disable();
     free(spireadbuffer);
 }
@@ -169,13 +215,15 @@ void flash_kh25_block_erase(uint32_t address)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 4);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    //mico_rtos_thread_sleep(2);
+    flash_kh25_wait_for_WIP(KH25L8006_BLOCK_ERASE_CYCLE_TIME_MAX); //最長等待2000ms
+    flash_kh25_log("block_erase");
     flash_kh25_write_disable();
     free(spireadbuffer);
 }
 void flash_kh25_chip_erase(void)
 {
     uint8_t *spireadbuffer = NULL;
+
     spireadbuffer = malloc(4);
     flash_kh25_write_enable();
     v_CSIsEnableSimulate(&Spi_eland, 1);
@@ -185,19 +233,17 @@ void flash_kh25_chip_erase(void)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 1);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    //mico_rtos_thread_sleep(2);
+    flash_kh25_wait_for_WIP(KH25L8006_CHIP_ERASE_CYCLE_TIME_MAX); //最長等待15000ms
     flash_kh25_write_disable();
     free(spireadbuffer);
 }
 /* flash 按頁寫入數據*/
-void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
+void flash_kh25_write_page(const uint8_t *scr, uint32_t address, uint32_t length)
 {
     uint8_t NumOfPage = 0, NumOfSingle = 0, Addr = 0, count = 0, temp = 0;
     uint32_t writeaddr, NumByteToWrite;
-    uint8_t *pBuffer;
     writeaddr = address;
     NumByteToWrite = length;
-    pBuffer = scr;
 
     Addr = writeaddr % KH25L8006_PAGE_SIZE;
     count = KH25L8006_PAGE_SIZE - Addr;
@@ -207,19 +253,20 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
     {
         if (NumOfPage == 0) /* NumByteToWrite < KH25L8006_PAGE_SIZE */
         {
-            flash_kh25_write(pBuffer, writeaddr, NumByteToWrite);
+            flash_kh25_write(scr, writeaddr, NumByteToWrite);
+            flash_kh25_wait_for_WIP(2);
         }
         else
         {
             while (NumOfPage--)
             {
-                flash_kh25_write(pBuffer, writeaddr, KH25L8006_PAGE_SIZE);
+                flash_kh25_write(scr, writeaddr, KH25L8006_PAGE_SIZE);
                 writeaddr += KH25L8006_PAGE_SIZE;
-                pBuffer += KH25L8006_PAGE_SIZE;
-                mico_rtos_thread_msleep(2);
+                scr += KH25L8006_PAGE_SIZE;
+                flash_kh25_wait_for_WIP(2);
             }
-            flash_kh25_write(pBuffer, writeaddr, NumOfSingle);
-            mico_rtos_thread_msleep(2);
+            flash_kh25_write(scr, writeaddr, NumOfSingle);
+            flash_kh25_wait_for_WIP(2);
         }
     }
     else //WriteAddr is not KH25L8006_PAGE_SIZE aligned
@@ -229,16 +276,16 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
             if (NumOfSingle > count) /* (NumByteToWrite + WriteAddr) > KH25L8006_PAGE_SIZE */
             {
                 temp = NumOfSingle - count;
-                flash_kh25_write(pBuffer, writeaddr, count);
-                pBuffer += count;
+                flash_kh25_write(scr, writeaddr, count);
+                scr += count;
                 writeaddr += count;
-                mico_rtos_thread_msleep(2);
-                flash_kh25_write(pBuffer, writeaddr, temp);
-                mico_rtos_thread_msleep(2);
+                flash_kh25_wait_for_WIP(2);
+                flash_kh25_write(scr, writeaddr, temp);
+                flash_kh25_wait_for_WIP(2);
             }
             else
             {
-                flash_kh25_write(pBuffer, writeaddr, NumOfSingle);
+                flash_kh25_write(scr, writeaddr, NumOfSingle);
                 mico_rtos_thread_msleep(2);
             }
         }
@@ -247,59 +294,59 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
             NumByteToWrite -= count;
             NumOfPage = NumByteToWrite / KH25L8006_PAGE_SIZE;
             NumOfSingle = NumByteToWrite % KH25L8006_PAGE_SIZE;
-            flash_kh25_write(pBuffer, writeaddr, count);
-            mico_rtos_thread_msleep(2);
-            pBuffer += count;
+            flash_kh25_write(scr, writeaddr, count);
+            flash_kh25_wait_for_WIP(2);
+            scr += count;
             writeaddr += count;
             while (NumOfPage--)
             {
-                flash_kh25_write(pBuffer, writeaddr, KH25L8006_PAGE_SIZE);
+                flash_kh25_write(scr, writeaddr, KH25L8006_PAGE_SIZE);
                 writeaddr += KH25L8006_PAGE_SIZE;
-                pBuffer += KH25L8006_PAGE_SIZE;
-                mico_rtos_thread_msleep(2);
+                scr += KH25L8006_PAGE_SIZE;
+                flash_kh25_wait_for_WIP(2);
             }
             if (NumOfSingle != 0)
             {
-                flash_kh25_write(pBuffer, writeaddr, KH25L8006_PAGE_SIZE);
-                mico_rtos_thread_msleep(2);
+                flash_kh25_write(scr, writeaddr, KH25L8006_PAGE_SIZE);
+                flash_kh25_wait_for_WIP(2);
             }
         }
     }
 }
 OSStatus flash_kh25_init(void)
 {
-
+    OSStatus err = kGeneralErr;
     v_SPIInitSimulate(&Spi_eland); //初始化IO
     mico_thread_sleep(1);
     /*****check flash******/
-    flash_kh25_check_device();
+    err = flash_kh25_check_device();
+    require_noerr_string(err, exit, "check kh25 flash failed");
 
-    elandSPIBuffer = malloc(strlen(flash_kh25_test_string) + 2);
-    flash_kh25_log("flash_kh25_test_string length = %d", strlen(flash_kh25_test_string));
-    memset(elandSPIBuffer, 0, strlen(flash_kh25_test_string) + 2);
-    sprintf((char *)(elandSPIBuffer), "%s", flash_kh25_test_string);
-
-    flash_kh25_write_page(elandSPIBuffer, flash_kh25_test_address, strlen(flash_kh25_test_string));
-    memset(elandSPIBuffer, 0, strlen(flash_kh25_test_string));
-    mico_thread_msleep(2);
-    flash_kh25_read(elandSPIBuffer, flash_kh25_test_address, strlen(flash_kh25_test_string));
-    flash_kh25_log("read 0x%06X:%s", flash_kh25_test_address, elandSPIBuffer);
-
-    memset(elandSPIBuffer, 0, strlen(flash_kh25_test_string) + 2);
+    elandSPIBuffer = malloc(strlen(flash_kh25_check_string) + 2);
+    memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
     flash_kh25_read(elandSPIBuffer, 0, strlen(flash_kh25_check_string));
     if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
-        flash_kh25_log("read 0 out:%s", elandSPIBuffer);
+        flash_kh25_log("read out:%s", elandSPIBuffer);
     else
     {
-        flash_kh25_log("check 0 out:%s", elandSPIBuffer);
+        flash_kh25_log("first read:%s", elandSPIBuffer);
         memset(elandSPIBuffer, 0, 60);
         flash_kh25_sector_erase(0);
         sprintf((char *)(elandSPIBuffer), "%s", flash_kh25_check_string);
         flash_kh25_write_page(elandSPIBuffer, 0, strlen(flash_kh25_check_string));
         memset(elandSPIBuffer, 0, 60);
         flash_kh25_read(elandSPIBuffer, 0, strlen(flash_kh25_check_string));
-        flash_kh25_log("check 0 again:%s", elandSPIBuffer);
+        if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
+            flash_kh25_log("check again:%s", elandSPIBuffer);
+        else
+            err = kGeneralErr;
     }
-    free(elandSPIBuffer);
-    return kNoErr;
+    flash_kh25_chip_erase();
+exit:
+    if (elandSPIBuffer != NULL)
+    {
+        free(elandSPIBuffer);
+        elandSPIBuffer = NULL;
+    }
+    return err;
 }

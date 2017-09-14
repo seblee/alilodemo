@@ -1,10 +1,3 @@
-/*
- * neckclock.h
- *
- *  Created on: 2017年7月10日
- *      Author: ceeu
- */
-
 #ifndef NETCLOCK_NETCLOCK_H_
 #define NETCLOCK_NETCLOCK_H_
 #include "../../alilodemo/netclock/netclockconfig.h"
@@ -15,6 +8,7 @@ extern json_object *ElandJsonData;
 extern ELAND_DES_S *netclock_des_g;
 //extern static mico_semaphore_t WifiConnectSem;
 
+OSStatus start_eland_service(void);
 OSStatus netclock_desInit(void);
 
 OSStatus InitNetclockService(void);
@@ -32,8 +26,18 @@ void destory_upload_data(void);
 OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
 
-//????
+//device sync
 #define ELAND_SYNC_STATUS_METHOD HTTP_POST
 #define ELAND_SYNC_STATUS_URI ("/")
+
+//eland sound down load
+#define ELAND_DOWN_LOAD_METHOD HTTP_GET
+#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_024kbps")
+
+#define ELAND_DOWN_LOAD_REQUEST                                \
+    "GET /api/download.php?vid=taichi_16_024kbps HTTP/1.1\r\n" \
+    "Host: 160.16.237.210\r\n"                                 \
+    "\r\n"                                                     \
+    ""
 
 #endif /* NETCLOCK_NETCLOCK_H_ */

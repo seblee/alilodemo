@@ -1,3 +1,5 @@
+#ifndef __FLASH_KH25_H__
+#define __FLASH_KH25_H__
 #include "mico.h"
 #include "eland_spi.h"
 // Define 4 SPI pins
@@ -7,6 +9,11 @@
 #define Eland_MISO MICO_GPIO_14
 
 #define KH25L8006_PAGE_SIZE 256
+
+#define KH25L8006_PAGE_PROGRAM_CYCLE_TIME_MAX 5
+#define KH25L8006_SECTOR_ERASE_CYCLE_TIME_MAX 300
+#define KH25L8006_BLOCK_ERASE_CYCLE_TIME_MAX 2000
+#define KH25L8006_CHIP_ERASE_CYCLE_TIME_MAX 15000
 
 /* Command definitions */
 typedef enum {
@@ -35,36 +42,19 @@ typedef enum {
     ElandFlash_WRITE_SECURITY_REGISTER = 0x2F, /* WRSCUR  write security register */
     ElandFlash_DUMMY_BYTE = 0xA5,
 } ElandFlash_command_t;
-void start_spi_test_service(void);
+
+extern uint8_t *elandSPIBuffer;
+
+OSStatus start_spi_test_service(void);
 void KH25_TEST_Thread(mico_thread_arg_t arts);
 OSStatus flash_kh25_init(void);
-//void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
+void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
 //void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
 void flash_kh25_sector_erase(uint32_t address);
 void flash_kh25_block_erase(uint32_t address);
 void flash_kh25_chip_erase(void);
+void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
 
 #define flash_kh25_check_string "flash_kh25_check_string"
-#define flash_kh25_test_address 0x801c
-#define flash_kh25_test_string "\
------BEGIN CERTIFICATE-----\r\n\
-MIIDWTCCAkGgAwIBAgIUVtsDRUEJ8Hb8OqE35C4GKr9MQCQwDQYJKoZIhvcNAQEL\r\n\
-BQAwTTFLMEkGA1UECwxCQW1hem9uIFdlYiBTZXJ2aWNlcyBPPUFtYXpvbi5jb20g\r\n\
-SW5jLiBMPVNlYXR0bGUgU1Q9V2FzaGluZ3RvbiBDPVVTMB4XDTE3MDMyMjAzNDg0\r\n\
-M1oXDTQ5MTIzMTIzNTk1OVowHjEcMBoGA1UEAwwTQVdTIElvVCBDZXJ0aWZpY2F0\r\n\
-ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKpKGTwnVu+40zto4nHN\r\n\
-XlH8yWJswrv3YS4FeYYBKTleHzOx7exjdXMd/L019cmUExPinKKc9wlPIjg5YlYT\r\n\
-0qTgNIqoN0KSwr2lNxfrl7BhlGwNjv1n78JhNgq3JSHXXwbjx4TpSvDVi1Xk2gOQ\r\n\
-8WQAJyf7PwcArHtVWJf3S/nbxsdywT9GxK7otF6i59fWe2gvCrMUgJ0sN48sm9d3\r\n\
-kvQba+P5urWGOZoIi7VkGucQxogvIp7pu8tWtKwfF3qfLERGhhTMHEfnU6NlJaVn\r\n\
-I5gRUQzo2ZD25ly2nsSyaYVaPjzCykDAk/VR4HlmXhl9LlP5nJLZeFR7wz369qAY\r\n\
-ml8CAwEAAaNgMF4wHwYDVR0jBBgwFoAUnx5icteUC/r3yxIPHFJE9+4SH5wwHQYD\r\n\
-VR0OBBYEFJQkP39VqmzrH4aKLQex8ERFzvTQMAwGA1UdEwEB/wQCMAAwDgYDVR0P\r\n\
-AQH/BAQDAgeAMA0GCSqGSIb3DQEBCwUAA4IBAQAgqp2O3YhDcROr5pAto/rpAhtP\r\n\
-SQIsst8W2SMaeimt9w9j8VEhUvWVDaVEjYCDdqYM6eZqzPXSXSkOsX0hT6Sj+VKt\r\n\
-Sqn7POVZYaeJOopSZFid5NQPUcZnDW8HSNUo58Ow3n3WLgNrucNwrCVMf8hsUHNc\r\n\
-5XIEZ+7X04JsXQkQCqHIP5jJOOsi6TFsB03eiyYeFGAYG/UX9TL73+3QGt9ABUn/\r\n\
-PhLtql6vN87LOApQQ8P4SudFXUQ5h1pkYK4dLhhrP1cdIT7F/w8RgEILgMsb2/nI\r\n\
-Nmgha2YDDMMJrZivg982f6gmv4hI/k/FDv+f294H+JOk3coIF2b5CDSWoqJr\r\n\
------END CERTIFICATE-----\r\n\
-"
+
+#endif

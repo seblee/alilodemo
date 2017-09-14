@@ -7,18 +7,56 @@
 #include "mico.h"
 #include "netclock_uart.h"
 #include "netclock_ota.h"
+#include "eland_http_client.h"
+#include "SocketUtils.h"
+#include "flash_kh25.h"
+
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
 ELAND_DES_S *netclock_des_g = NULL;
 static bool NetclockInitSuccess = false;
 
-static mico_semaphore_t NetclockInitCompleteSem = NULL;
+static mico_semaphore_t elandservicestart = NULL;
 static mico_mutex_t http_send_setting_mutex = NULL; //http client mutex
+static OSStatus eland_device_sync_status(void);
 
 json_object *ElandJsonData = NULL;
 json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
 
+//发送http请求
+OSStatus eland_push_http_req_mutex(ELAND_HTTP_METHOD method,                           //POST 或者 GET
+                                   char *request_uri,                                  //uri
+                                   char *host_name,                                    //host
+                                   char *http_body,                                    //BODY
+                                   ELAND_HTTP_RESPONSE_SETTING_S *user_http_response); //response 指針
+
+//设置请求参数
+OSStatus set_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *http_req, //request 指針
+                                ELAND_HTTP_METHOD method,               //請求方式 POST/GET
+                                char *request_uri,                      //URI 路徑
+                                char *host_name,                        //host 主機
+                                char *http_body,                        //數據 body
+                                uint32_t http_req_id);                  //請求 id
+
+//發送 http請求信號量
+static OSStatus push_http_req_to_queue(ELAND_HTTP_REQUEST_SETTING_S *http_req);
+//从队列中获取请求
+OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32_t id);
+//eland init 線程
+static void NetclockInit(mico_thread_arg_t arg);
+//eland 下載數據
+static OSStatus eland_device_download_sound(void);
+//eland down load sound call back function
+
+//生成一个http回话id
+static uint32_t
+generate_http_session_id(void)
+{
+    static uint32_t id = 1;
+
+    return id++;
+}
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
@@ -57,6 +95,35 @@ OSStatus InitNetclockService(void)
 exit:
     return err;
 }
+//啟動Netclock net work
+OSStatus start_eland_service(void)
+{
+    OSStatus err = kGeneralErr;
+    NetclockInitSuccess = false;
+    err = mico_rtos_init_semaphore(&elandservicestart, 1);
+    require_noerr(err, exit);
+
+    /* create eland init thread */
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "eland_init", NetclockInit, 0x800, (uint32_t)NULL);
+    require_noerr_string(err, exit, "ERROR: Unable to start the eland_init thread");
+
+    mico_rtos_get_semaphore(&elandservicestart, MICO_WAIT_FOREVER); //wait until get semaphore
+
+exit:
+    mico_rtos_deinit_semaphore(&elandservicestart); //銷毀 不再使用的信號量
+
+    if (NetclockInitSuccess == true)
+    {
+        Eland_log("eland init success!");
+        err = kNoErr;
+    }
+    else
+    {
+        Eland_log("eland init failure!");
+        err = kGeneralErr;
+    }
+    return err;
+}
 //闹钟初始化
 static void NetclockInit(mico_thread_arg_t arg)
 {
@@ -75,13 +142,18 @@ static void NetclockInit(mico_thread_arg_t arg)
     //startsNetclockinit:
 
     //1.eland 情报同步到雲端(同步设备版本、硬件型号到云端)
-    err = eland_device_sync_status();
+    //err = eland_device_sync_status();
+    // require_noerr(err, exit);
+
+    //2.eland test  下載音頻到flash
+    err = eland_device_download_sound();
     require_noerr(err, exit);
 
     NetclockInitSuccess = true;
 
 exit:
-    mico_rtos_set_semaphore(&NetclockInitCompleteSem); //wait until get semaphore
+    if (NetclockInitSuccess == true)
+        mico_rtos_set_semaphore(&elandservicestart); //wait until get semaphore
 
     // if (err != kNoErr)
     // {
@@ -91,21 +163,7 @@ exit:
     mico_rtos_delete_thread(NULL);
     return;
 }
-OSStatus StartNetclockService(void)
-{
-    OSStatus err = kGeneralErr;
-    NetclockInitSuccess = false;
 
-    err = mico_rtos_init_semaphore(&NetclockInitCompleteSem, 1);
-    require(err, exit);
-
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "NetclockInit", NetclockInit, 0x1000, (uint32_t)NULL);
-    require(err, exit);
-
-    mico_rtos_get_semaphore(&NetclockInitCompleteSem, MICO_WAIT_FOREVER);
-exit:
-    return err;
-}
 //检查从flash读出的数据是否正确，不正确就恢复出厂设置
 bool CheckNetclockDESSetting(void)
 {
@@ -170,7 +228,7 @@ void start_HttpServer_softAP_thread(void)
 {
 
     mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Para_config",
-                            ElandParameterConfiguration, 0x2000, (uint32_t)NULL);
+                            ElandParameterConfiguration, 0x1000, (uint32_t)NULL);
 }
 
 void ElandParameterConfiguration(mico_thread_arg_t args)
@@ -367,14 +425,14 @@ exit:
 static OSStatus eland_device_sync_status(void)
 {
     OSStatus err = kGeneralErr;
-    int32_t code = -1;
+    //int32_t code = -1;
     char *device_sync_status_body = NULL;
 
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     uint8_t retry = 0;
 
     memset(&user_http_res, 0, sizeof(user_http_res));
-    app_httpd_log("web_send_Get_Request");
+    Eland_log("web_send_Get_Request");
     device_sync_status_body = malloc(1024);
     memset(device_sync_status_body, 0, 1024);
     InitUpLoadData(device_sync_status_body);
@@ -389,7 +447,7 @@ start_sync_status:
 
     Eland_log("=====> device_sync_status send ======>");
 
-    err = eland_push_http_req_mutex(true, ELAND_SYNC_STATUS_METHOD, ELAND_SYNC_STATUS_URI,
+    err = eland_push_http_req_mutex(ELAND_SYNC_STATUS_METHOD, ELAND_SYNC_STATUS_URI,
                                     ELAND_HTTP_DOMAIN_NAME, device_sync_status_body, &user_http_res);
     require_noerr(err, exit);
 
@@ -399,7 +457,7 @@ start_sync_status:
     else if (user_http_res.status_code == 403)
         Eland_log("eland Authenticate successed 403");
     else
-        Eland_log("eland login error %d", user_http_res.status_code);
+        Eland_log("eland login error %ld", user_http_res.status_code);
 
     Eland_log("<===== device_sync_status success <======");
 
@@ -424,6 +482,21 @@ exit:
 
         goto start_sync_status;
     }
+
+    return err;
+}
+
+//eland 下載數據
+static OSStatus eland_device_download_sound(void)
+{
+    OSStatus err = kGeneralErr;
+    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
+    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
+
+    eland_push_http_req_mutex(HTTP_GET, ELAND_DOWN_LOAD_URI, ELAND_HTTP_DOMAIN_NAME, "", &user_http_res);
+
+    if (user_http_res.status_code == 200)
+        Eland_log("download done");
 
     return err;
 }
@@ -566,12 +639,12 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32
 
     memset(http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
 
-    err = mico_rtos_pop_from_queue(&eland_http_response_queue, &eland_http_res_p, WAIT_HTTP_RES_MAX_TIME);
+    err = mico_rtos_pop_from_queue(&eland_http_response_queue, &eland_http_res_p, MICO_WAIT_FOREVER); // WAIT_HTTP_RES_MAX_TIME);
     if (err != kNoErr)
     {
         http_res->send_status = HTTP_CONNECT_ERROR;
 
-        app_log("mico_rtos_pop_from_queue() timeout!!!");
+        Eland_log("mico_rtos_pop_from_queue() timeout!!!");
 
         if (mico_rtos_is_queue_full(&eland_http_request_queue) == true)
         {
@@ -583,7 +656,7 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32
                     free(eland_http_req->http_body);
                     eland_http_req->http_body = NULL;
                 }
-                app_log("push one req from queue!");
+                Eland_log("push one req from queue!");
             }
         }
 
@@ -598,14 +671,14 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32
 
     if (res_body_len == 0)
     {
-        app_log("[error]get data is len is 0");
+        Eland_log("[error]get data is len is 0");
         err = kGeneralErr;
         goto exit;
     }
 
     if ((eland_http_res_p->eland_response_body[0] != '{') || eland_http_res_p->eland_response_body[res_body_len - 1] != '}') //JSON格式检查
     {
-        app_log("[error]get data is not JSON format!");
+        Eland_log("[error]get data is not JSON format!");
         err = kGeneralErr;
         goto exit;
     }
@@ -621,12 +694,53 @@ exit:
 
     if (err == kIDErr)
     {
-        app_log("requese id:%ld, rseponse id:%ld", id, eland_http_res_p->http_res_id);
+        Eland_log("requese id:%ld, rseponse id:%ld", id, eland_http_res_p->http_res_id);
     }
     else if (err == kStateErr)
     {
-        app_log("send_state:%d, state_code:%ld", eland_http_res_p->send_status, eland_http_res_p->status_code);
+        Eland_log("send_state:%d, state_code:%ld", eland_http_res_p->send_status, eland_http_res_p->status_code);
     }
 
     return err;
 }
+//eland down load sound call back function
+//static OSStatus eland_down_load_call_back(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
+//                                          size_t inLen, void *inUserContext)
+//{
+//    OSStatus err = kNoErr;
+//    http_context_t *context = inUserContext;
+//    //static uint32_t sound_flash_address = 0x001000;
+//    Eland_log("inPos = %ld,inLen = %d", inPos, inLen);
+//    //eland_sound_download_pos += inLen;
+//
+//    // Extra data with a content length value
+//    if (inPos == 0 && context->content == NULL)
+//    {
+//        if (elandSPIBuffer != NULL)
+//            free(elandSPIBuffer);
+//        elandSPIBuffer = calloc(1500 + 1, sizeof(uint8_t));
+//        require_action(elandSPIBuffer, exit, err = kNoMemoryErr);
+//    }
+//    memcpy(elandSPIBuffer, inData, inLen);
+//
+//    flash_kh25_write_page(elandSPIBuffer, sound_flash_address, inLen);
+//    sound_flash_address += inLen;
+//exit:
+//    return err;
+//}
+/* Called when HTTPHeaderClear is called */
+//static void eland_down_load_onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext)
+//{
+//    UNUSED_PARAMETER(inHeader);
+//    http_context_t *context = inUserContext;
+//    if (context->content)
+//    {
+//        free(context->content);
+//        context->content = NULL;
+//    }
+//    if (elandSPIBuffer != NULL)
+//    {
+//        free(elandSPIBuffer);
+//        elandSPIBuffer = NULL;
+//    }
+//}

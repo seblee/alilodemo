@@ -33,23 +33,140 @@
 #include "SocketUtils.h"
 #include "StringUtils.h"
 #include "eland_http_client.h"
+#include "flash_kh25.h"
 
 #define client_log(M, ...) custom_log("eland_http_clent", M, ##__VA_ARGS__)
 
-static char *eland_http_requeset = NULL;
 static bool is_https_connect = false; //HTTPS 是否连接
+
+static ELAND_HTTP_RESPONSE_SETTING_S eland_http_res; //全局变量 http响应的全局设置
+static char *eland_http_requeset = NULL;
+
+mico_queue_t eland_http_request_queue = NULL;  //eland HTTP的发送请求队列
+mico_queue_t eland_http_response_queue = NULL; //eland HTTP的接收响应队列
+
+static mico_semaphore_t eland_http_client_InitCompleteSem = NULL;
+uint32_t eland_sound_download_pos = 0;
+uint32_t eland_sound_download_len = 0;
+SOUND_DOWNLOAD_STATUS sound_download_status = SOUND_DOWNLOAD_IDLE;
+/**********************************************************/
+
+/**********************************************/
 
 static bool http_get_wifi_status(void);
 static OSStatus http_queue_init(void);
 static OSStatus http_queue_deinit(void);
 static void eland_client_serrvice(mico_thread_arg_t arg);
 static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext);
-static OSStatus onReceivedData(struct _HTTPHeader_t *httpHeader, uint32_t pos, uint8_t *data, size_t len, void *userContext);
+static OSStatus onReceivedData(struct _HTTPHeader_t *httpHeader,
+                               uint32_t pos,
+                               uint8_t *data,
+                               size_t len,
+                               void *userContext);
+//给response的消息队列发送消息
+void send_response_to_queue(ELAND_HTTP_RESPONSE_E status,
+                            uint32_t http_id,
+                            int32_t status_code,
+                            const char *response_body);
+
+/*************certificate********************************/
+
+char *certificate =
+    "-----BEGIN CERTIFICATE-----\n\
+MIIESzCCAzOgAwIBAgIJAMuHDGTAVpi1MA0GCSqGSIb3DQEBCwUAMIGTMQswCQYD\n\
+VQQGEwJKUDEOMAwGA1UECAwFVG9reW8xGjAYBgNVBAoMEUtJTkcgSklNIENPLixM\n\
+VEQuMRcwFQYDVQQLDA5SJkQgRGVwYXJ0bWVudDEZMBcGA1UEAwwQRUxBTkQgUHJp\n\
+dmF0ZSBDQTEkMCIGCSqGSIb3DQEJARYVd2VibWFzdGVyQGV4YW1wbGUuY29tMCAX\n\
+DTE3MDkwNjExNDIxNloYDzIxMTcwODEzMTE0MjE2WjCBoTELMAkGA1UEBhMCSlAx\n\
+DjAMBgNVBAgMBVRva3lvMRMwEQYDVQQHDApDaGl5b2RhLWt1MRowGAYDVQQKDBFL\n\
+SU5HIEpJTSBDTy4sTFRELjEXMBUGA1UECwwOUiZEIERlcGFydG1lbnQxEjAQBgNV\n\
+BAMMCWVsYW5kLmNvbTEkMCIGCSqGSIb3DQEJARYVd2VibWFzdGVyQGV4YW1wbGUu\n\
+Y29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnqwIBQSjPrp3HRvi\n\
+O0h9+qWcKEkBNrhxhSiKzRN33cad/EdSwSv4ZQWBy0TggbMPDt5DPfw24BzvmQwW\n\
+sl/FCUcQ70Xr+65pmdnp06Jobe90zH8YsSPyeSXta23zmvHJ2W1+7au9fRJQazRl\n\
+4jBar6KCmoqFgg/Bw7qnEhI3fwRRly8LddVMj/emEmFEoiIJq5J09ZUo7fOmfCKr\n\
+R0BVx8iKz6n1Cgt1/kpYJfnIkAYhTe0Ed4T2dJIVQkKjcSdW3dPFx86aJhFPcPa9\n\
+3Mqv9aLSDh8A0YD0k0ohYCwvCe0g8FOMny66+Jdxbp0ybyDPZ4wvMP2sHOf7sTrg\n\
+jv43iwIDAQABo4GPMIGMMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQDAgSwMCwG\n\
+CWCGSAGG+EIBDQQfFh1PcGVuU1NMIEdlbmVyYXRlZCBDZXJ0aWZpY2F0ZTAdBgNV\n\
+HQ4EFgQUHCxe533Sc0pFzudFwDZjpPfe6FkwHwYDVR0jBBgwFoAUWcY/DuhU0R7S\n\
+cdwSiBFkabVvvKowDQYJKoZIhvcNAQELBQADggEBAGQKScFpkqqshnzMNEUVieP/\n\
+CVjOIMxE2uxmhDeeQsWFR7odKnetFvHW9p2Lp2mXEGO6E0du5SKCryzD2ZTXiMsW\n\
+SLdSau0G9591ROQok4F/6jn1zYkiL9GdsZBsxBdOGVl7JgO3eqYHsDkYA7vUHVoE\n\
+WPt/Id+U2bmjuB+GHINNAL68+OZf+0BPt3w5UaGlaMhJRlO/f+PMJ97ZvrXnmRDj\n\
+sa8GJLhffe4SpyHR168UGrrce26SJjlIzVsWB9uqK5bWG2WpqmMcz8Susn8EQFvH\n\
+yQyH15iLII+5FwBQCDBjrKm3VzI7/2BD1rbbkqxv20fPTkYOAoh6vYd78aUYIBE=\n\
+-----END CERTIFICATE-----";
+char *private_key =
+    "-----BEGIN PRIVATE KEY-----\n\
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCerAgFBKM+uncd\n\
+G+I7SH36pZwoSQE2uHGFKIrNE3fdxp38R1LBK/hlBYHLROCBsw8O3kM9/DbgHO+Z\n\
+DBayX8UJRxDvRev7rmmZ2enTomht73TMfxixI/J5Je1rbfOa8cnZbX7tq719ElBr\n\
+NGXiMFqvooKaioWCD8HDuqcSEjd/BFGXLwt11UyP96YSYUSiIgmrknT1lSjt86Z8\n\
+IqtHQFXHyIrPqfUKC3X+Slgl+ciQBiFN7QR3hPZ0khVCQqNxJ1bd08XHzpomEU9w\n\
+9r3cyq/1otIOHwDRgPSTSiFgLC8J7SDwU4yfLrr4l3FunTJvIM9njC8w/awc5/ux\n\
+OuCO/jeLAgMBAAECggEABi76GQf3PKiTn8TIajsG/c+aaE+ABpvlgKT108wgbboh\n\
+ygUVioWmJnmydzN19FgADDpJMI81rEI0bCh2cfkdeqEUXd7BtYs0flRpsl+v5ijg\n\
+yl9hnPWjq2j4+ajNR4qIrTqBKc35kng2PhdKqSftQM76e/9N+KWYjYImpKOlGgQH\n\
+WSkPEBmTo7sIzNPwuye88bYY6oGh62nCIfvuwyfoTnlCQ3Gz8gDMFlqJgm/0J6Vb\n\
+JYM8r1UCJyd2hKHuB0quuBEoRbNKm0agzx9Xe0KZ455GextTkm2JXvZlb957UrO/\n\
+mzHs/G2MjrmmVJ8b/iusXSa9CKxQGdKXPmzwAq314QKBgQDR9wILEtJFNYmmtlv5\n\
+cI9GQdPOtpMwpcPC13IdQ8KIuuTqblvy10BJLqMKXlDkhr8ZDqJR32Nhtl4pn5Kl\n\
+61ZoEytjUpvb85Uv8Wvtyg/+/Lb9y/eUcSN5NI5kT+iJPTJOksDCd/6M/U16ZdMm\n\
+cD0R4p32d+n3CjEZ+F8bKVRc2QKBgQDBdglLpbRFKtnMDZAQJUwwH3drcqyG6WWp\n\
+Ica7aUNRUn7qrxckG3b3+ONCDhQVMQT/ijqj5yWkXQNwiZV2SJoAwkAbNH18yYPu\n\
+zx0YYegVL26527uz+AJ9H88k4VzJkK6P6lmjOfqOLfytopsTSOV9r+vMIJW8E3Jq\n\
+I+QlqTmJAwKBgQCPeit7RbFKeftGYPcYzUIa0IDckQakB6JuUqs4NEWLCavERwWu\n\
+PElBuQzQ2QKOJ0YO6WEicXSIIQbXiqO7ncW9+Nt9U8YN17XqvR7zr1Ce/jJN3EOi\n\
+vG1xNejXw4MzxQ3Lg50VRso7rhxzt4FCkxAoWKN4+Rh4KA7FoGPdO7DagQKBgB7M\n\
+7hnvHc5NTjOgjSkk5wZaXCbtMO6hxh+xUvSPg7o0yiQPED4daUl9hKEFoMjm7wbI\n\
+OSHTMTkD3gJSxUr5sBsi0hYCu1/crXad3uH85HhK/vP0OeQjPjIxmEck4iLtN/2N\n\
+sAu+tVdhlvMGCm59kpv6IC51maFB71tar34XfSOFAoGAWoMPyUkwvlstoj8jYW1i\n\
+5GDSj3MnwcYDkMsVZKVMQRMIgZCFHHIHDvtOS5pDcap41OdYMoLZjGzC7+Cp4kF1\n\
+xzBtqSA0mrUr91R/KUi+Fg2pfssocYurFzgee/206/UrnLJ2a1uOTezt9p5vFBr+\n\
+j1RnT/plaAAX6tMYz7zLsWY=\n\
+-----END PRIVATE KEY-----";
+char *capem =
+    "-----BEGIN CERTIFICATE-----\n\
+MIIEEDCCAvigAwIBAgIJAMuHDGTAVpizMA0GCSqGSIb3DQEBCwUAMIGTMQswCQYD\n\
+VQQGEwJKUDEOMAwGA1UECAwFVG9reW8xGjAYBgNVBAoMEUtJTkcgSklNIENPLixM\n\
+VEQuMRcwFQYDVQQLDA5SJkQgRGVwYXJ0bWVudDEZMBcGA1UEAwwQRUxBTkQgUHJp\n\
+dmF0ZSBDQTEkMCIGCSqGSIb3DQEJARYVd2VibWFzdGVyQGV4YW1wbGUuY29tMCAX\n\
+DTE3MDkwNjEwNDIyNVoYDzIxMTcwODEzMTA0MjI1WjCBkzELMAkGA1UEBhMCSlAx\n\
+DjAMBgNVBAgMBVRva3lvMRowGAYDVQQKDBFLSU5HIEpJTSBDTy4sTFRELjEXMBUG\n\
+A1UECwwOUiZEIERlcGFydG1lbnQxGTAXBgNVBAMMEEVMQU5EIFByaXZhdGUgQ0Ex\n\
+JDAiBgkqhkiG9w0BCQEWFXdlYm1hc3RlckBleGFtcGxlLmNvbTCCASIwDQYJKoZI\n\
+hvcNAQEBBQADggEPADCCAQoCggEBAKlA3QRVel3OEF7ZuNPQjkKfByOR1kTNp3bh\n\
+2nmq7vvBUPC4OeBZIAr9Jb9I801fi5IuHpcbjcCBrhBVo+m5QKAKEtLaRPzD1vHS\n\
+s3znxwQ/1q0Zkb9fFfuN7pYCi/DHkjMPuh5NGFoB4k1jzJNizA1pKw+eBMvrHhYD\n\
+a9b2bh9XjdZsoT5p8muGdm7XMKvb81YxOkp5Z8q16Ql1YWLUTEKoVyLMjvx7bI/j\n\
+JVB3Qb1zm+xBwxOTfCAmf4vHUtalM4Gk5NWU67REsmqxlLcpuIVWHh6IO3c9rH5E\n\
+UVHGUdlFAbNJ71KvikdzvXRs9g0OgRKw3C/y4Hkga66ybZ0Lb58CAwEAAaNjMGEw\n\
+HQYDVR0OBBYEFFnGPw7oVNEe0nHcEogRZGm1b7yqMB8GA1UdIwQYMBaAFFnGPw7o\n\
+VNEe0nHcEogRZGm1b7yqMAwGA1UdEwQFMAMBAf8wEQYJYIZIAYb4QgEBBAQDAgEG\n\
+MA0GCSqGSIb3DQEBCwUAA4IBAQAwkfmYqKC0Ky6Y3di8E3Fvqhm6MsvvXTSSlbIz\n\
+4NGGS864IFODqZCAPZmVGDskViRpx37J9YKq7Gnvji8hRUWSb6S7hqgr7kOEz1zE\n\
+82/xXw7RKDi0Vb96je9cPOMgThLbZ1diVyI3RTfY57xu+lEtgCrki9wkauCROacF\n\
+STUCuV0muX6umL05hwov5+1mjzAfMoonRSW+qltTFAzZPXuQfg4YkskTmSBsjqUo\n\
+SdE0WebPo0V0j6bBvtiPEt2q7SLlNk6oCvra2b8tRvZQZC6hIfkk1PtDBgavL87k\n\
+9r7mdVFee0dLXDjGfsxQ9tm59xTacuOKYE0Zrw5OUkNn7OrS\n\
+-----END CERTIFICATE-----";
+
+#define SIMPLE_GET_REQUEST                                     \
+    "GET /api/download.php?vid=taichi_16_024kbps HTTP/1.1\r\n" \
+    "Host: 160.16.237.210\r\n"                                 \
+    "Content-Type: audio/ x-mp3\r\n"                           \
+    "\r\n"                                                     \
+    ""
+/*******************************************************/
 
 //啟動eland_client 線程，
 OSStatus start_client_serrvice(void)
 {
     OSStatus err = kGeneralErr;
+
+    err = mico_rtos_init_semaphore(&eland_http_client_InitCompleteSem, 1);
+    require_noerr_string(err, exit, "eland_http_client_InitCompleteSem init err");
 
     err = http_queue_init();
     require_noerr(err, exit);
@@ -64,11 +181,16 @@ OSStatus start_client_serrvice(void)
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "client_serrvice", eland_client_serrvice, 0x2800, 0);
     require_noerr(err, exit);
 
+    err = mico_rtos_get_semaphore(&eland_http_client_InitCompleteSem, MICO_WAIT_FOREVER);
+    require_noerr_string(err, exit, "eland_http_client_InitCompleteSem get err");
+
 exit:
     if (err != kNoErr)
     {
         http_queue_deinit();
     }
+    err = mico_rtos_deinit_semaphore(&eland_http_client_InitCompleteSem);
+    require_noerr_string(err, exit, "eland_http_client_InitCompleteSem deinit err");
     return err;
 }
 static OSStatus http_queue_init(void)
@@ -123,14 +245,6 @@ void set_https_connect_status(bool status)
 bool get_https_connect_status(void)
 {
     return is_https_connect;
-}
-
-//生成一个http回话id
-static uint32_t generate_http_session_id(void)
-{
-    static uint32_t id = 1;
-
-    return id++;
 }
 
 //域名域名DNS解析
@@ -323,7 +437,12 @@ HTTP_SSL_START:
     addr.sin_port = htons(ELAND_HTTP_PORT_SSL); //HTTP SSL端口 443
 
     //设置tcp keep_alive 参数
-    ret = user_set_tcp_keepalive(http_fd, HTTP_SEND_TIME_OUT, HTTP_RECV_TIME_OUT, HTTP_KEEP_IDLE_TIME, HTTP_KEEP_INTVL_TIME, HTTP_KEEP_COUNT);
+    ret = user_set_tcp_keepalive(http_fd,
+                                 ELAND_HTTP_SEND_TIME_OUT,
+                                 ELAND_HTTP_RECV_TIME_OUT,
+                                 ELAND_HTTP_KEEP_IDLE_TIME,
+                                 ELAND_HTTP_KEEP_INTVL_TIME,
+                                 ELAND_HTTP_KEEP_COUNT);
     if (ret < 0)
     {
         client_log("user_set_tcp_keepalive() error");
@@ -334,17 +453,18 @@ HTTP_SSL_START:
     err = connect(http_fd, (struct sockaddr *)&addr, sizeof(addr));
     require_noerr_string(err, exit, "connect https server failed");
 
+    // 設置 證書
+    ssl_set_client_cert(certificate, private_key);
     //ssl_version_set(TLS_V1_2_MODE);    //设置SSL版本
     ssl_set_client_version(TLS_V1_2_MODE);
 
     client_log("start ssl_connect");
 
-    client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
-    //client_ssl = ssl_connect( http_fd, strlen(http_server_ssl_cert_str), http_server_ssl_cert_str, &ssl_errno );
+    client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
-
     client_log("#####https connect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-
+    if (eland_http_client_InitCompleteSem != NULL)
+        mico_rtos_set_semaphore(&eland_http_client_InitCompleteSem);
 SSL_SEND:
     set_https_connect_status(true);
     //1.从消息队列中取一条信息
@@ -361,10 +481,9 @@ SSL_SEND:
     }
 
     /* Send HTTP Request */
-    /* Send HTTP Request */
-    /* Send HTTP Request */
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset)); /* Send HTTP Request */
-    if (eland_http_requeset != NULL)                                                            //释放发送缓冲区
+
+    if (eland_http_requeset != NULL) //释放发送缓冲区
     {
         free(eland_http_requeset);
         eland_http_requeset = NULL;
@@ -395,6 +514,11 @@ SSL_SEND:
     {
         /*parse header*/
         err = SocketReadHTTPSHeader(client_ssl, httpHeader);
+        if (sound_download_status == SOUND_DOWNLOAD_START)
+        {
+            eland_sound_download_len = httpHeader->contentLength;
+            sound_download_status = SOUND_DOWNLOAD_CONTINUE;
+        }
         switch (err)
         {
         case kNoErr:
@@ -420,7 +544,7 @@ SSL_SEND:
             //只有code正确才解析返回数据,错误情况下解析容易造成内存溢出
             if (httpHeader->statusCode == 200) //正常應答
             {
-                //PrintHTTPHeader( httpHeader );
+                PrintHTTPHeader(httpHeader);
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
                 require_noerr(err, exit);
 #if (HTTP_REQ_LOG == 1)
@@ -447,15 +571,42 @@ SSL_SEND:
             break;
         }
     }
+    if (eland_sound_download_pos == eland_sound_download_pos)
+    {
+        sound_download_status = SOUND_DOWNLOAD_IDLE;
+    }
+
     HTTPHeaderClear(httpHeader);
     client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     goto SSL_SEND;
 exit:
-    client_log("Exit: Client exit with err = %d, fd: %d", err, http_fd);
+    set_https_connect_status(false);
+    send_response_to_queue(HTTP_CONNECT_ERROR, req_id, 0, NULL); //只有发生连接发生错误的时候才会进入exit中
+
     if (client_ssl)
+    {
         ssl_close(client_ssl);
+        client_ssl = NULL;
+    }
+
     SocketClose(&http_fd);
     HTTPHeaderDestory(&httpHeader);
+
+    mico_thread_msleep(200);
+    client_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    goto HTTP_SSL_START;
+
+    if (eland_http_requeset != NULL)
+    {
+        free(eland_http_requeset);
+        eland_http_requeset = NULL;
+    }
+
+    http_queue_deinit();
+
+    client_log("Exit: Client exit with err = %d, fd:%d", err, http_fd);
+    mico_rtos_delete_thread(NULL);
+    return;
 }
 
 /*one request may receive multi reply*/
@@ -464,15 +615,21 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
 {
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
+    static uint32_t sound_flash_address = 0x001000;
+    client_log("inPos = %ld,inLen = %d,flash_address = %ld", inPos, inLen, sound_flash_address);
     if (inHeader->chunkedData == false)
     { //Extra data with a content length value
         if (inPos == 0 && context->content == NULL)
         {
-            context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+            //context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+            context->content = calloc(1501, sizeof(uint8_t));
             require_action(context->content, exit, err = kNoMemoryErr);
             context->content_length = inHeader->contentLength;
         }
-        memcpy(context->content + inPos, inData, inLen);
+        //memcpy(context->content + inPos, inData, inLen);
+        memcpy(context->content, inData, inLen);
+        flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
+        sound_flash_address += inLen;
     }
     else
     { //extra data use a chunked data protocol
@@ -506,4 +663,69 @@ static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext)
         free(context->content);
         context->content = NULL;
     }
+    eland_sound_download_pos = 0;
+}
+
+//给response的消息队列发送消息
+void send_response_to_queue(ELAND_HTTP_RESPONSE_E status, uint32_t http_id, int32_t status_code, const char *response_body)
+{
+    OSStatus err = kGeneralErr;
+    ELAND_HTTP_RESPONSE_SETTING_S *eland_http_response_temp = NULL, *eland_http_res_p = NULL;
+    static uint32_t local_id = 0;
+
+    if (local_id == http_id) //过滤重复id   理论上id是递增的
+    {
+        return;
+    }
+
+    eland_http_res.send_status = status;
+    eland_http_res.http_res_id = http_id;
+    eland_http_res.status_code = status_code;
+
+    if (response_body != NULL)
+    {
+        eland_http_res.eland_response_body = malloc(strlen(response_body) + 2);
+        require_action_string(eland_http_res.eland_response_body != NULL, exit, err = kNoMemoryErr, "[ERROR]malloc() error!");
+
+        memset(eland_http_res.eland_response_body, 0, strlen(response_body) + 2); //清0
+
+        memcpy(eland_http_res.eland_response_body, response_body, strlen(response_body));
+    }
+    else
+    {
+        eland_http_res.eland_response_body = NULL;
+    }
+    if (false == mico_rtos_is_queue_empty(&eland_http_response_queue))
+    {
+        client_log("[error]eland_http_response_queue is full");
+
+        err = mico_rtos_pop_from_queue(&eland_http_response_queue, &eland_http_response_temp, 10); //如果满先弹出一个
+        require_noerr_action(err, exit, client_log("[error]mico_rtos_pop_from_queue err"));
+
+        if (eland_http_response_temp->eland_response_body != NULL)
+        {
+            free(eland_http_response_temp->eland_response_body);
+            eland_http_response_temp->eland_response_body = NULL;
+        }
+
+        eland_http_response_temp = NULL;
+    }
+
+    eland_http_res_p = &eland_http_res;
+    err = mico_rtos_push_to_queue(&eland_http_response_queue, &eland_http_res_p, 10);
+    require_noerr_action(err, exit, client_log("[error]mico_rtos_push_to_queue err"));
+
+    local_id = http_id;
+
+exit:
+    if (err != kNoErr)
+    {
+        if (eland_http_res.eland_response_body != NULL)
+        {
+            free(eland_http_res.eland_response_body);
+            eland_http_res.eland_response_body = NULL;
+        }
+    }
+
+    return;
 }

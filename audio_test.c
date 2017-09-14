@@ -26,13 +26,70 @@
  */
 
 #include "../alilodemo/audio_test.h"
-
 #include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/inc/http_file_download.h"
 #include "mico.h"
 #include "netclock_uart.h"
+#include "flash_kh25.h"
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
+
+static void player_flash_thread(mico_thread_arg_t arg)
+{
+    AUDIO_STREAM_PALY_S flash_read_stream;
+    OSStatus err = kGeneralErr;
+    mscp_result_t result = MSCP_RST_ERROR;
+    audio_play_id = audio_service_system_generate_stream_id();
+    uint32_t data_pos = 0;
+    uint8_t *flashdata = NULL;
+    test_log("player_flash_thread");
+    flashdata = malloc(1501);
+    audio_play_id = audio_service_system_generate_stream_id();
+    flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
+    flash_read_stream.pdata = flashdata;
+    flash_read_stream.stream_id = audio_play_id;
+    flash_read_stream.total_len = 164601;
+    flash_read_stream.stream_len = 1500;
+
+    flash_kh25_read(flashdata, 0x001000, 3);
+    test_log("first data = %02x %02x %02x", *flashdata, *(flashdata + 1), *(flashdata + 2));
+
+falsh_read_start:
+    if (flash_read_stream.total_len > data_pos)
+    {
+        flash_read_stream.stream_len = ((flash_read_stream.total_len - data_pos) > 1500) ? 1500 : (flash_read_stream.total_len - data_pos);
+    }
+    test_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
+             (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
+             (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
+
+    flash_kh25_read(flashdata, data_pos + 0x001000, flash_read_stream.stream_len);
+    data_pos += flash_read_stream.stream_len;
+
+audio_transfer:
+    err = audio_service_stream_play(&result, &flash_read_stream);
+    if (err != kNoErr)
+    {
+        test_log("audio_stream_play() error!!!!");
+    }
+    else
+    {
+        if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
+        {
+            test_log("new slave set pause!!!");
+            mico_rtos_thread_msleep(1000); //time set 1000ms!!!
+            goto audio_transfer;
+        }
+        else
+        {
+            err = kNoErr;
+        }
+    }
+    if (data_pos < flash_read_stream.total_len)
+        goto falsh_read_start;
+    free(flashdata);
+    mico_rtos_delete_thread(NULL);
+}
 
 static void player_test_thread(mico_thread_arg_t arg)
 {
@@ -174,7 +231,7 @@ static void url_paly_stop_thread(mico_thread_arg_t arg)
 OSStatus start_test_thread(void)
 {
     OSStatus err = kNoErr;
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_test_thread, 0x900, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_flash_thread, 0x900, 0);
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread, 0x1500, 0);
