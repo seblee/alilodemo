@@ -87,6 +87,8 @@ audio_transfer:
     }
     if (data_pos < flash_read_stream.total_len)
         goto falsh_read_start;
+    test_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS !");
+
     free(flashdata);
     mico_rtos_delete_thread(NULL);
 }

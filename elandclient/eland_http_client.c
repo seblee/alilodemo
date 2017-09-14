@@ -58,11 +58,14 @@ static OSStatus http_queue_init(void);
 static OSStatus http_queue_deinit(void);
 static void eland_client_serrvice(mico_thread_arg_t arg);
 static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext);
-static OSStatus onReceivedData(struct _HTTPHeader_t *httpHeader,
-                               uint32_t pos,
-                               uint8_t *data,
-                               size_t len,
-                               void *userContext);
+
+/*one request may receive multi reply*/
+static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader,
+                               uint32_t inPos,
+                               uint8_t *inData,
+                               size_t inLen,
+                               void *inUserContext);
+
 //给response的消息队列发送消息
 void send_response_to_queue(ELAND_HTTP_RESPONSE_E status,
                             uint32_t http_id,
@@ -311,8 +314,11 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
 
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", eland_http_req->host_name); //增加hostname
 
-    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Keepalive\r\n"); //增加Content-Type和Connection设置
-    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\n"); //增加Content-Type和Connection设置
+    if ((eland_http_req->eland_request_type == ELAND_DEVICE_INFO_LOGIN) ||
+        (eland_http_req->eland_request_type == ELAND_DEVICE_INFO_UPDATE) ||
+        (eland_http_req->eland_request_type == ELAND_ALARM_OFF_RECORD_ENTRY))
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\n"); //增加Content-Type和Connection设置
+    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Keepalive\r\n"); //增加Content-Type和Connection设置
     //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Close\r\n"); //增加Content-Type和Connection设置
 
     //增加http body部分
@@ -438,11 +444,11 @@ HTTP_SSL_START:
 
     //设置tcp keep_alive 参数
     ret = user_set_tcp_keepalive(http_fd,
-                                 ELAND_HTTP_SEND_TIME_OUT,
-                                 ELAND_HTTP_RECV_TIME_OUT,
-                                 ELAND_HTTP_KEEP_IDLE_TIME,
-                                 ELAND_HTTP_KEEP_INTVL_TIME,
-                                 ELAND_HTTP_KEEP_COUNT);
+                                 ELAND_HTTP_SEND_TIME_OUT,   //http tcp 發送超時
+                                 ELAND_HTTP_RECV_TIME_OUT,   //http tcp 接收超時
+                                 ELAND_HTTP_KEEP_IDLE_TIME,  //http tcp 如该连接在xx秒内没有任何数据往来,则进行此TCP层的探测
+                                 ELAND_HTTP_KEEP_INTVL_TIME, // 探测发包间隔为x秒
+                                 ELAND_HTTP_KEEP_COUNT);     // 尝试探测的次数.如果第1次探测包就收到响应了,则后2次的不再发
     if (ret < 0)
     {
         client_log("user_set_tcp_keepalive() error");
@@ -459,7 +465,6 @@ HTTP_SSL_START:
     ssl_set_client_version(TLS_V1_2_MODE);
 
     client_log("start ssl_connect");
-
     client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
     client_log("#####https connect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
@@ -528,7 +533,7 @@ SSL_SEND:
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
                 goto exit; //断开重新连接
             }
-            if (httpHeader->statusCode == 403) //認證錯誤
+            if (httpHeader->statusCode == 400) //認證錯誤
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
                 goto exit; //断开重新连接
@@ -608,8 +613,7 @@ exit:
     mico_rtos_delete_thread(NULL);
     return;
 }
-
-/*one request may receive multi reply*/
+/*one request may receive multi reply */
 static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
                                size_t inLen, void *inUserContext)
 {

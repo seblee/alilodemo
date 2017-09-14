@@ -2,6 +2,7 @@
 #define __FLASH_KH25_H__
 #include "mico.h"
 #include "eland_spi.h"
+
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
 #define Eland_SCLK MICO_GPIO_12
@@ -9,11 +10,11 @@
 #define Eland_MISO MICO_GPIO_14
 
 #define KH25L8006_PAGE_SIZE 256
+#define KH25L8006_SECTOR_SIZE 4096
+#define KH25L8006_BLOCK_SIZE 65536
 
-#define KH25L8006_PAGE_PROGRAM_CYCLE_TIME_MAX 5
-#define KH25L8006_SECTOR_ERASE_CYCLE_TIME_MAX 300
-#define KH25L8006_BLOCK_ERASE_CYCLE_TIME_MAX 2000
-#define KH25L8006_CHIP_ERASE_CYCLE_TIME_MAX 15000
+#define KH25L8006_WIP_WAIT_TIME_MAX (uint32_t)0X006ACFC0 //最大等待 7000000us
+#define KH25L1606_WIP_WAIT_TIME_MAX (uint32_t)0X00D59F80 //最大等待 14000000us
 
 /* Command definitions */
 typedef enum {

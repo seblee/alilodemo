@@ -3,7 +3,7 @@
 
 #define ELAND_HTTP_SEND_TIME_OUT (3000)
 #define ELAND_HTTP_RECV_TIME_OUT (3000)
-#define ELAND_HTTP_KEEP_IDLE_TIME (60)
+#define ELAND_HTTP_KEEP_IDLE_TIME (61)
 #define ELAND_HTTP_KEEP_INTVL_TIME (5)
 #define ELAND_HTTP_KEEP_COUNT (3)
 
@@ -36,6 +36,15 @@ typedef enum {
     HTTP_RESPONSE_SUCCESS = 3, //成功
     HTTP_RESPONSE_FAILURE = 4  //失败
 } ELAND_HTTP_RESPONSE_E;
+typedef enum {
+    ELAND_DEVICE_INFO_LOGIN,      //eland 情報登錄
+    ELAND_DEVICE_INFO_UPDATE,     //eland 情報更新
+    ELAND_DEVICE_INFO_GET,        //eland 情報取得
+    ELAND_ALARM_GET,              //eland 鬧鐘聲音取得
+    ELAND_ALARM_START_NOTICE,     //eland 鬧鐘開始通知
+    ELAND_ALARM_OFF_RECORD_ENTRY, //eland 鬧鐘OFF履歷登錄
+    ELAND_OTA_START_NOTICE,       //eland 固件升級開始通知
+} ELAND_HTTP_REQUEST_TYPE;
 
 typedef struct _ELAND_HTTP_RESPONSE_SETTING
 {
@@ -49,6 +58,7 @@ typedef struct _ELAND_HTTP_REQUEST_SETTING
 {
     uint32_t http_req_id;
     ELAND_HTTP_METHOD method;
+    ELAND_HTTP_REQUEST_TYPE eland_request_type;
     char request_uri[HTTP_REQUEST_REQ_URI_MAX_LEN];
     char host_name[HTTP_REQUEST_HOST_NAME_MAX_LEN];
     char *http_body;

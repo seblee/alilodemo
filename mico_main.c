@@ -64,17 +64,17 @@ int application_start(void)
 
     /*start init eland SPI*/
     start_spi_test_service();
+    require_noerr(err, exit);
 
     /*start eland HTTP service */
-    start_eland_service();
+    //err = start_eland_service();
+    require_noerr(err, exit);
 
-    //err = start_test_thread();
+    err = start_test_thread();
     require_noerr(err, exit);
 
 exit:
-    // mico_system_notify_remove(mico_notify_WIFI_STATUS_CHANGED,
-    //                           (void *)micoNotify_WifiStatusHandler);
-    // mico_rtos_deinit_semaphore(&wifi_netclock);
+
     mico_rtos_delete_thread(NULL);
 
     return err;

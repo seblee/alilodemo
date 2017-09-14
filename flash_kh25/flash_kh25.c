@@ -14,35 +14,31 @@ Spi_t Spi_eland = {
 };
 
 /****************************/
-static uint8_t flash_kh25_read_status_register(void)
-{
-    uint8_t cache[2];
-    v_CSIsEnableSimulate(&Spi_eland, 1);
-    SPIDelay(1);
-    //the write  enable
-    cache[0] = (uint8_t)ElandFlash_READ_STATUS_REGISTER;
-    spiReadWirteOneData(&Spi_eland, cache, 2);
-    SPIDelay(1);
-    v_CSIsEnableSimulate(&Spi_eland, 0);
-    return cache[1];
-}
 static void flash_kh25_wait_for_WIP(uint32_t time)
 {
     uint32_t count = 0;
     uint8_t cache = 0;
     SPIDelay(1);
+    v_CSIsEnableSimulate(&Spi_eland, 1);
+    SPIDelay(1);
+    //the write  enable
+    cache = (uint8_t)ElandFlash_READ_STATUS_REGISTER;
+    spiReadWirteOneData(&Spi_eland, &cache, 1);
     do
     {
-        cache = flash_kh25_read_status_register();
+        spiReadWirteOneData(&Spi_eland, &cache, 1);
         if (cache & 1)
         {
-            mico_rtos_thread_msleep(1);
+            //flash_kh25_log("%02X", cache);
+            SPIDelay(10);
             count++;
             continue;
         }
         else
             break;
     } while (count < time);
+    SPIDelay(1);
+    v_CSIsEnableSimulate(&Spi_eland, 0);
 }
 /*************************/
 OSStatus
@@ -113,6 +109,7 @@ static void flash_kh25_write_disable(void)
 static void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t length)
 {
     uint8_t cache[5];
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX);
     flash_kh25_write_enable();
     //the page program
     v_CSIsEnableSimulate(&Spi_eland, 1);
@@ -184,6 +181,7 @@ void flash_kh25_sector_erase(uint32_t address)
 {
     uint8_t *spireadbuffer = NULL;
     spireadbuffer = malloc(4);
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待300ms
     flash_kh25_write_enable();
     //the sector erase
     v_CSIsEnableSimulate(&Spi_eland, 1);
@@ -195,7 +193,6 @@ void flash_kh25_sector_erase(uint32_t address)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 4);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_wait_for_WIP(KH25L8006_SECTOR_ERASE_CYCLE_TIME_MAX); //最長等待300ms
     flash_kh25_log("sector_erase");
     flash_kh25_write_disable();
     free(spireadbuffer);
@@ -204,6 +201,7 @@ void flash_kh25_block_erase(uint32_t address)
 {
     uint8_t *spireadbuffer = NULL;
     spireadbuffer = malloc(4);
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
     flash_kh25_write_enable();
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -215,7 +213,6 @@ void flash_kh25_block_erase(uint32_t address)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 4);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_wait_for_WIP(KH25L8006_BLOCK_ERASE_CYCLE_TIME_MAX); //最長等待2000ms
     flash_kh25_log("block_erase");
     flash_kh25_write_disable();
     free(spireadbuffer);
@@ -223,8 +220,9 @@ void flash_kh25_block_erase(uint32_t address)
 void flash_kh25_chip_erase(void)
 {
     uint8_t *spireadbuffer = NULL;
-
+    flash_kh25_log("chip_erase start");
     spireadbuffer = malloc(4);
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
     flash_kh25_write_enable();
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -233,15 +231,18 @@ void flash_kh25_chip_erase(void)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 1);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_wait_for_WIP(KH25L8006_CHIP_ERASE_CYCLE_TIME_MAX); //最長等待15000ms
+
+    flash_kh25_log("chip_erase end");
     flash_kh25_write_disable();
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
     free(spireadbuffer);
 }
 /* flash 按頁寫入數據*/
-void flash_kh25_write_page(const uint8_t *scr, uint32_t address, uint32_t length)
+void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
 {
     uint8_t NumOfPage = 0, NumOfSingle = 0, Addr = 0, count = 0, temp = 0;
     uint32_t writeaddr, NumByteToWrite;
+    uint32_t dataAlreadyWrite = 0;
     writeaddr = address;
     NumByteToWrite = length;
 
@@ -254,19 +255,16 @@ void flash_kh25_write_page(const uint8_t *scr, uint32_t address, uint32_t length
         if (NumOfPage == 0) /* NumByteToWrite < KH25L8006_PAGE_SIZE */
         {
             flash_kh25_write(scr, writeaddr, NumByteToWrite);
-            flash_kh25_wait_for_WIP(2);
         }
         else
         {
             while (NumOfPage--)
             {
-                flash_kh25_write(scr, writeaddr, KH25L8006_PAGE_SIZE);
+                flash_kh25_write(scr + dataAlreadyWrite, writeaddr, KH25L8006_PAGE_SIZE);
                 writeaddr += KH25L8006_PAGE_SIZE;
-                scr += KH25L8006_PAGE_SIZE;
-                flash_kh25_wait_for_WIP(2);
+                dataAlreadyWrite += KH25L8006_PAGE_SIZE;
             }
-            flash_kh25_write(scr, writeaddr, NumOfSingle);
-            flash_kh25_wait_for_WIP(2);
+            flash_kh25_write(scr + dataAlreadyWrite, writeaddr, NumOfSingle);
         }
     }
     else //WriteAddr is not KH25L8006_PAGE_SIZE aligned
@@ -276,17 +274,14 @@ void flash_kh25_write_page(const uint8_t *scr, uint32_t address, uint32_t length
             if (NumOfSingle > count) /* (NumByteToWrite + WriteAddr) > KH25L8006_PAGE_SIZE */
             {
                 temp = NumOfSingle - count;
-                flash_kh25_write(scr, writeaddr, count);
-                scr += count;
+                flash_kh25_write(scr + dataAlreadyWrite, writeaddr, count);
+                dataAlreadyWrite += count;
                 writeaddr += count;
-                flash_kh25_wait_for_WIP(2);
-                flash_kh25_write(scr, writeaddr, temp);
-                flash_kh25_wait_for_WIP(2);
+                flash_kh25_write(scr + dataAlreadyWrite, writeaddr, temp);
             }
             else
             {
-                flash_kh25_write(scr, writeaddr, NumOfSingle);
-                mico_rtos_thread_msleep(2);
+                flash_kh25_write(scr + dataAlreadyWrite, writeaddr, NumOfSingle);
             }
         }
         else
@@ -294,21 +289,18 @@ void flash_kh25_write_page(const uint8_t *scr, uint32_t address, uint32_t length
             NumByteToWrite -= count;
             NumOfPage = NumByteToWrite / KH25L8006_PAGE_SIZE;
             NumOfSingle = NumByteToWrite % KH25L8006_PAGE_SIZE;
-            flash_kh25_write(scr, writeaddr, count);
-            flash_kh25_wait_for_WIP(2);
-            scr += count;
+            flash_kh25_write(scr + dataAlreadyWrite, writeaddr, count);
+            dataAlreadyWrite += count;
             writeaddr += count;
             while (NumOfPage--)
             {
-                flash_kh25_write(scr, writeaddr, KH25L8006_PAGE_SIZE);
+                flash_kh25_write(scr + dataAlreadyWrite, writeaddr, KH25L8006_PAGE_SIZE);
                 writeaddr += KH25L8006_PAGE_SIZE;
-                scr += KH25L8006_PAGE_SIZE;
-                flash_kh25_wait_for_WIP(2);
+                dataAlreadyWrite += KH25L8006_PAGE_SIZE;
             }
             if (NumOfSingle != 0)
             {
-                flash_kh25_write(scr, writeaddr, KH25L8006_PAGE_SIZE);
-                flash_kh25_wait_for_WIP(2);
+                flash_kh25_write(scr + dataAlreadyWrite, writeaddr, NumOfSingle);
             }
         }
     }
@@ -341,7 +333,7 @@ OSStatus flash_kh25_init(void)
         else
             err = kGeneralErr;
     }
-    flash_kh25_chip_erase();
+//flash_kh25_chip_erase();
 exit:
     if (elandSPIBuffer != NULL)
     {
