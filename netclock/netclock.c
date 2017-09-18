@@ -160,15 +160,15 @@ static void NetclockInit(mico_thread_arg_t arg)
     //err = eland_device_info_get(); //暫時做測試用
     require_noerr(err, exit);
 
-    //2.eland test  下載音頻到flash
+    //3.eland test  下載音頻到flash
     //err = eland_device_download_sound();
     require_noerr(err, exit);
 
-    //3.eland 鬧鐘開始通知
+    //4.eland 鬧鐘開始通知
     // err = eland_alarm_start_notice(); //暫時做測試用
     require_noerr(err, exit);
 
-    //4.eland 鬧鐘OFF履歷登錄
+    //5.eland 鬧鐘OFF履歷登錄
     err = alarm_off_record_entry(); //暫時做測試用
     require_noerr(err, exit);
 
