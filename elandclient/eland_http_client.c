@@ -313,14 +313,16 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
     }
 
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", eland_http_req->host_name); //增加hostname
+    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n");              //增加Connection设置
 
     if ((eland_http_req->eland_request_type == ELAND_DEVICE_INFO_LOGIN) ||
         (eland_http_req->eland_request_type == ELAND_DEVICE_INFO_UPDATE) ||
         (eland_http_req->eland_request_type == ELAND_ALARM_OFF_RECORD_ENTRY))
+    {
         sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\n"); //增加Content-Type和Connection设置
-    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Keepalive\r\n"); //增加Content-Type和Connection设置
-    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Close\r\n"); //增加Content-Type和Connection设置
-
+        //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Keepalive\r\n"); //增加Content-Type和Connection设置
+        //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Close\r\n"); //增加Content-Type和Connection设置
+    }
     //增加http body部分
     if (eland_http_req->http_body != NULL)
     {
@@ -426,7 +428,6 @@ HTTP_SSL_START:
         goto HTTP_SSL_START;
     }
     client_log("HTTP server address: host:%s, ip: %s", eland_host, ipstr);
-
     /*HTTPHeaderCreateWithCallback set some callback functions */
     httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData, onClearData, &context);
     if (httpHeader == NULL)
@@ -528,10 +529,11 @@ SSL_SEND:
         {
         case kNoErr:
         {
-            if ((httpHeader->statusCode == -1) || (httpHeader->statusCode >= 500))
+            if (httpHeader->statusCode >= 500)
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
-                goto exit; //断开重新连接
+                send_response_to_queue(HTTP_REQUEST_ERROR, req_id, httpHeader->statusCode, NULL);
+                goto SSL_SEND; //断开重新连接
             }
             if (httpHeader->statusCode == 400) //認證錯誤
             {
@@ -549,11 +551,13 @@ SSL_SEND:
             //只有code正确才解析返回数据,错误情况下解析容易造成内存溢出
             if (httpHeader->statusCode == 200) //正常應答
             {
-                PrintHTTPHeader(httpHeader);
+                //PrintHTTPHeader(httpHeader);
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
                 require_noerr(err, exit);
 #if (HTTP_REQ_LOG == 1)
-                client_log("Content Data:[%ld]%s", context.content_length, context.content); /*get data and print*/
+                client_log("Content %s0x%08x:[%ld]", context.content, context.content, context.content_length); /*get data and print*/
+                client_log("context.content          0x%08x", context.content);
+
 #endif
                 send_response_to_queue(HTTP_RESPONSE_SUCCESS, req_id, httpHeader->statusCode, context.content);
             }
@@ -619,25 +623,19 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
 {
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
-    static uint32_t sound_flash_address = 0x001000;
-    client_log("inPos = %ld,inLen = %d,flash_address = %ld", inPos, inLen, sound_flash_address);
     if (inHeader->chunkedData == false)
     { //Extra data with a content length value
         if (inPos == 0 && context->content == NULL)
         {
-            //context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
-            context->content = calloc(1501, sizeof(uint8_t));
+            context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
             require_action(context->content, exit, err = kNoMemoryErr);
             context->content_length = inHeader->contentLength;
         }
-        //memcpy(context->content + inPos, inData, inLen);
-        memcpy(context->content, inData, inLen);
-        flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
-        sound_flash_address += inLen;
+        memcpy(context->content + inPos, inData, inLen);
     }
     else
     { //extra data use a chunked data protocol
-        client_log("This is a chunked data, %d", inLen);
+        client_log("This is a chunked data%ld, %d", inPos, inLen);
         if (inPos == 0)
         {
             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
@@ -648,13 +646,54 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         {
             context->content_length += inLen;
             context->content = realloc(context->content, context->content_length + 1);
-            require_action(context->content, exit, err = kNoMemoryErr);
+            require_action_string(context->content, exit, err = kNoMemoryErr, "mem ex err");
         }
         memcpy(context->content + inPos, inData, inLen);
+        //client_log("context->content %s,0x%08x", context->content, context->content);
+        // client_log("Content 0x%08x:[%ld]%s", context->content, context->content_length, context->content); /*get data and print*/
     }
 
 exit:
     return err;
+    //     OSStatus err = kNoErr;
+    //     http_context_t *context = inUserContext;
+    //     if (inHeader->chunkedData == false)
+    //     { //Extra data with a content length value
+    //         client_log("This is not a chunked data, %d", inLen);
+    //         if (inPos == 0 && context->content == NULL)
+    //         {
+    //             if (inHeader->contentLength < 1500)
+    //                 context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+    //             else
+    //                 context->content = calloc(1501, sizeof(uint8_t));
+    //             require_action(context->content, exit, err = kNoMemoryErr);
+    //             context->content_length = inHeader->contentLength;
+    //         }
+    //         memcpy(context->content + inPos, inData, inLen);
+    //         //memcpy(context->content, inData, inLen);
+    //         // flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
+    //         //sound_flash_address += inLen;
+    //     }
+    //     else
+    //     { //extra data use a chunked data protocol
+    //         client_log("This is a chunked data, %d", inLen);
+    //         if (inPos == 0)
+    //         {
+    //             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+    //             require_action(context->content, exit, err = kNoMemoryErr);
+    //             context->content_length = inHeader->contentLength;
+    //         }
+    //         else
+    //         {
+    //             context->content_length += inLen;
+    //             context->content = realloc(context->content, context->content_length + 1);
+    //             require_action(context->content, exit, err = kNoMemoryErr);
+    //         }
+    //         memcpy(context->content + inPos, inData, inLen);
+    //     }
+
+    // exit:
+    //     return err;
 }
 
 /* Called when HTTPHeaderClear is called */

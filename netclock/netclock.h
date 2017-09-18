@@ -36,7 +36,7 @@ OSStatus ProcessPostJson(char *InputJson);
 
 //eland 情報登錄
 #define ELAND_DEVICE_LOGIN_METHOD HTTP_POST
-#define ELAND_DEVICE_LOGIN_URI ("/")
+#define ELAND_DEVICE_LOGIN_URI ("/api/device/regist")
 
 //eland 情報更新
 #define ELAND_DEVICE_INFO_UPDATE_METHOD HTTP_POST
@@ -44,7 +44,7 @@ OSStatus ProcessPostJson(char *InputJson);
 
 //eland 情報取得
 #define ELAND_DEVICE_INFO_GET_METHOD HTTP_GET
-#define ELAND_DEVICE_INFO_GET_URI ("/?eid=%s&mod=&s")
+#define ELAND_DEVICE_INFO_GET_URI ("/api/device/latest?eid=%s&mod=%s")
 
 //eland 鬧鐘聲音取得
 #define ELAND_ALARM_GET_METHOD HTTP_GET
@@ -52,15 +52,15 @@ OSStatus ProcessPostJson(char *InputJson);
 
 //eland 鬧鐘開始通知
 #define ELAND_ALARM_START_NOTICE_METHOD HTTP_POST
-#define ELAND_ALARM_START_NOTICE_URI ("/?eid=%s&aid=%s")
+#define ELAND_ALARM_START_NOTICE_URI ("/api/alarm/start?eid=%s&aid=%s")
 
 //eland 鬧鐘OFF履歷登錄
 #define ELAND_ALARM_OFF_RECORD_ENTRY_METHOD HTTP_POST
-#define ELAND_ALARM_OFF_RECORD_ENTRY_URI ("/")
+#define ELAND_ALARM_OFF_RECORD_ENTRY_URI ("/api/alarm/history")
 
 //eland 固件升級開始通知
 #define ELAND_OTA_START_NOTICE_METHOD HTTP_POST
-#define ELAND_OTA_START_NOTICE_URI ("/")
+#define ELAND_OTA_START_NOTICE_URI ("/api/device/firmware/update?eid=5")
 
 #define ELAND_DOWN_LOAD_REQUEST                                \
     "GET /api/download.php?vid=taichi_16_024kbps HTTP/1.1\r\n" \

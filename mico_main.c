@@ -67,10 +67,10 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start eland HTTP service */
-    //err = start_eland_service();
+    err = start_eland_service();
     require_noerr(err, exit);
 
-    err = start_test_thread();
+    //err = start_test_thread();
     require_noerr(err, exit);
 
 exit:

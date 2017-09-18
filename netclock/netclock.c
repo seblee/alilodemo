@@ -18,8 +18,6 @@ static bool NetclockInitSuccess = false;
 
 static mico_semaphore_t elandservicestart = NULL;
 static mico_mutex_t http_send_setting_mutex = NULL; //http client mutex
-static OSStatus eland_device_info_login(void);
-
 json_object *ElandJsonData = NULL;
 json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
@@ -45,11 +43,21 @@ OSStatus set_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *http_req, //reques
 //發送 http請求信號量
 static OSStatus push_http_req_to_queue(ELAND_HTTP_REQUEST_SETTING_S *http_req);
 //从队列中获取请求
-OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32_t id);
+OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
+                                 ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
+                                 uint32_t id);
 //eland init 線程
 static void NetclockInit(mico_thread_arg_t arg);
+//eland 情報登錄
+static OSStatus eland_device_info_login(void);
+//eland 情報取得
+static OSStatus eland_device_info_get(void);
 //eland 下載數據
 static OSStatus eland_device_download_sound(void);
+//eland 鬧鐘開始通知
+static OSStatus eland_alarm_start_notice(void);
+//eland 鬧鐘OFF履歷登錄
+static OSStatus alarm_off_record_entry(void);
 //eland down load sound call back function
 
 //生成一个http回话id
@@ -145,11 +153,23 @@ static void NetclockInit(mico_thread_arg_t arg)
     //startsNetclockinit:
 
     //1.eland 情报同步到雲端(同步设备版本、硬件型号到云端)
-    //err = eland_device_info_login();
-    // require_noerr(err, exit);
+    //err = eland_device_info_login(); //暫時做測試用
+    require_noerr(err, exit);
+
+    //2.eland 情報從雲端獲取
+    //err = eland_device_info_get(); //暫時做測試用
+    require_noerr(err, exit);
 
     //2.eland test  下載音頻到flash
-    err = eland_device_download_sound();
+    //err = eland_device_download_sound();
+    require_noerr(err, exit);
+
+    //3.eland 鬧鐘開始通知
+    // err = eland_alarm_start_notice(); //暫時做測試用
+    require_noerr(err, exit);
+
+    //4.eland 鬧鐘OFF履歷登錄
+    err = alarm_off_record_entry(); //暫時做測試用
     require_noerr(err, exit);
 
     NetclockInitSuccess = true;
@@ -317,6 +337,38 @@ exit:
     free_json_obj(&DeviceJsonData);
     return err;
 }
+OSStatus init_alarm_off_record_json(char *OutputJsonstring)
+{
+    OSStatus err = kNoErr;
+    const char *generate_data = NULL;
+    uint32_t generate_data_len = 0;
+    json_object *alarm_off_record_json = NULL;
+    json_object *alarmhistory = NULL;
+
+    alarm_off_record_json = json_object_new_object();
+    require_action_string(alarm_off_record_json, exit, err = kNoMemoryErr, "create alarm_off_record_json object error!");
+    alarmhistory = json_object_new_object();
+    require_action_string(alarmhistory, exit, err = kNoMemoryErr, "create alarmhistory object error!");
+
+    Eland_log("Begin add alarmhistory object");
+    json_object_object_add(alarmhistory, "alarm_id", json_object_new_string("0"));
+    json_object_object_add(alarmhistory, "alarm_on_datetime", json_object_new_string("2017-9-18 14:43:00"));
+    json_object_object_add(alarmhistory, "alarm_off_datetime", json_object_new_string("2017-9-18 14:43:44"));
+    json_object_object_add(alarmhistory, "alarm_off_reason", json_object_new_int(3));
+    json_object_object_add(alarmhistory, "snooze_datetime", json_object_new_string("2017-9-18 14:53:00"));
+
+    json_object_object_add(alarm_off_record_json, "history", alarmhistory);
+
+    generate_data = json_object_to_json_string(alarm_off_record_json);
+    require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
+    generate_data_len = strlen(generate_data);
+    memcpy(OutputJsonstring, generate_data, generate_data_len);
+
+exit:
+    free_json_obj(&alarm_off_record_json);
+    free_json_obj(&alarmhistory);
+    return err;
+}
 
 //释放JSON对象
 void free_json_obj(json_object **json_obj)
@@ -461,6 +513,14 @@ start_sync_status:
         goto exit;
     }
     Eland_log("<===== eland_device_info_login success <======");
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    mico_rtos_thread_sleep(2);
+    goto start_sync_status; //兩秒重複一次
+
 exit:
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -486,7 +546,75 @@ exit:
     return err;
 }
 
-//eland 下載數據
+//eland 情報取得
+static OSStatus eland_device_info_get(void)
+{
+    uint8_t retry = 0;
+    OSStatus err = kGeneralErr;
+    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
+    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
+    char *request_uri_cache;
+    request_uri_cache = malloc(strlen(ELAND_DEVICE_INFO_GET_URI) + strlen("52017-09-14+19%3A45%3A47.289") + 1);
+
+    sprintf(request_uri_cache, ELAND_DEVICE_INFO_GET_URI, "5", "2017-09-14+19%3A45%3A47.289");
+
+DEVICE_INFO_GET_START:
+    while (get_wifi_status() == false)
+    {
+        Eland_log("https disconnect, eland_device_info_login is waitting...");
+        err = kGeneralErr;
+        goto exit;
+    }
+    Eland_log("=====> eland_device_info_get start ======>");
+    err = eland_push_http_req_mutex(ELAND_DEVICE_INFO_GET_METHOD, //請求方式
+                                    ELAND_DEVICE_INFO_GET,        //請求類型
+                                    request_uri_cache,            //URI參數
+                                    ELAND_HTTP_DOMAIN_NAME,       //主機域名
+                                    "",                           //request body
+                                    &user_http_res);              //response 接收緩存
+    require_noerr(err, exit);
+    //处理返回结果
+    if (user_http_res.status_code == 200)
+    {
+        Eland_log("<===== eland_device_info_get end <======");
+    }
+    else
+    {
+        Eland_log("eland login error %ld", user_http_res.status_code);
+        err = kGeneralErr;
+        goto exit;
+    }
+
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    mico_rtos_thread_sleep(2);
+    goto DEVICE_INFO_GET_START; //兩秒重複一次
+
+exit:
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    if (err != kNoErr)
+    {
+        Eland_log("<===== device_sync_status error <======");
+        mico_thread_msleep(200);
+        retry++;
+        if (retry >= HTTP_MAX_RETRY_TIMES)
+            err = kGeneralErr;
+        else
+            goto DEVICE_INFO_GET_START;
+    }
+
+    free(request_uri_cache);
+    return err;
+}
+
+//eland 鬧鐘聲音取得
 static OSStatus eland_device_download_sound(void)
 {
     OSStatus err = kGeneralErr;
@@ -500,6 +628,140 @@ static OSStatus eland_device_download_sound(void)
         Eland_log("download done");
         mico_rtos_set_semaphore(&elandservicestart); //wait until get semaphore
     }
+    return err;
+}
+//eland 鬧鐘開始通知
+static OSStatus eland_alarm_start_notice(void)
+{
+    uint8_t retry = 0;
+    OSStatus err = kGeneralErr;
+    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
+    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
+    char *request_uri_cache;
+    request_uri_cache = malloc(strlen(ELAND_ALARM_START_NOTICE_URI) + strlen("50a259f14-f7c5-4128-8dd2-7f8a5cdc4702") + 1);
+    sprintf(request_uri_cache, ELAND_ALARM_START_NOTICE_URI, "5", "0a259f14-f7c5-4128-8dd2-7f8a5cdc4702");
+
+ALARM_START_NOTICE_START:
+    while (get_wifi_status() == false)
+    {
+        Eland_log("https disconnect, eland_device_info_login is waitting...");
+        err = kGeneralErr;
+        goto exit;
+    }
+    Eland_log("=====> eland_alarm_start_notice start ======>");
+    err = eland_push_http_req_mutex(ELAND_ALARM_START_NOTICE_METHOD, //請求方式
+                                    ELAND_ALARM_START_NOTICE,        //請求類型
+                                    request_uri_cache,               //URI參數
+                                    ELAND_HTTP_DOMAIN_NAME,          //主機域名
+                                    "",                              //request body
+                                    &user_http_res);                 //response 接收緩存
+    require_noerr(err, exit);
+    //处理返回结果
+    if (user_http_res.status_code == 200)
+    {
+        Eland_log("<===== eland_alarm_start_notice successed <======");
+    }
+    else
+    {
+        Eland_log("alarm_start_notice error %ld", user_http_res.status_code);
+        err = kGeneralErr;
+        goto exit;
+    }
+
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    mico_rtos_thread_sleep(2); //兩秒重複一次
+    goto ALARM_START_NOTICE_START;
+
+exit:
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    if (err != kNoErr)
+    {
+        Eland_log("<===== alarm_start_notice error <======");
+        mico_thread_msleep(200);
+        retry++;
+        if (retry >= HTTP_MAX_RETRY_TIMES)
+            err = kGeneralErr;
+        else
+            goto ALARM_START_NOTICE_START;
+    }
+    free(request_uri_cache);
+    return err;
+}
+
+//eland 鬧鐘OFF履歷登錄
+static OSStatus alarm_off_record_entry(void)
+{
+    uint8_t retry = 0;
+    OSStatus err = kGeneralErr;
+    char *eland_request_body_cache = NULL;
+    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
+    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
+
+    eland_request_body_cache = malloc(400);
+    memset(eland_request_body_cache, 0, 400);
+    init_alarm_off_record_json(eland_request_body_cache);
+
+ALARM_OFF_RECORD_ENTRY_START:
+    while (get_wifi_status() == false)
+    {
+        Eland_log("https disconnect, eland_device_info_login is waitting...");
+        err = kGeneralErr;
+        goto exit;
+    }
+    Eland_log("=====> alarm_off_record_entry start ======>");
+    err = eland_push_http_req_mutex(ELAND_ALARM_OFF_RECORD_ENTRY_METHOD, //請求方式
+                                    ELAND_ALARM_OFF_RECORD_ENTRY,        //請求類型
+                                    ELAND_ALARM_OFF_RECORD_ENTRY_URI,    //URI參數
+                                    ELAND_HTTP_DOMAIN_NAME,              //主機域名
+                                    eland_request_body_cache,            //request body
+                                    &user_http_res);                     //response 接收緩存
+    require_noerr(err, exit);
+    //处理返回结果
+    if (user_http_res.status_code == 200)
+    {
+        Eland_log("<===== alarm_off_record_entry successe <======");
+    }
+    else
+    {
+        Eland_log("alarm_off_record_entry error %ld", user_http_res.status_code);
+        err = kGeneralErr;
+        goto exit;
+    }
+
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    mico_rtos_thread_sleep(2); //兩秒重複一次
+    goto ALARM_OFF_RECORD_ENTRY_START;
+
+exit:
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    if (err != kNoErr)
+    {
+        Eland_log("<===== alarm_off_record_entry error <======");
+        mico_thread_msleep(200);
+        retry++;
+        if (retry >= HTTP_MAX_RETRY_TIMES)
+            err = kGeneralErr;
+        else
+            goto ALARM_OFF_RECORD_ENTRY_START;
+    }
+
+    free(eland_request_body_cache);
     return err;
 }
 
@@ -542,7 +804,7 @@ OSStatus eland_push_http_req_mutex(ELAND_HTTP_METHOD method,                    
     err = push_http_req_to_queue(&user_http_req); //发送请求
     require_noerr(err, exit);
 
-    err = get_http_res_from_queue(user_http_response, id); //等待返回结果
+    err = get_http_res_from_queue(user_http_response, request_type, id); //等待返回结果
     require_noerr(err, exit);
 
 exit:
@@ -635,7 +897,9 @@ static OSStatus push_http_req_to_queue(ELAND_HTTP_REQUEST_SETTING_S *http_req)
 }
 
 //从队列中获取请求
-OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32_t id)
+OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
+                                 ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
+                                 uint32_t id)
 {
     OSStatus err = kGeneralErr;
     uint32_t res_body_len = 0;
@@ -648,9 +912,7 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32
     if (err != kNoErr)
     {
         http_res->send_status = HTTP_CONNECT_ERROR;
-
         Eland_log("mico_rtos_pop_from_queue() timeout!!!");
-
         if (mico_rtos_is_queue_full(&eland_http_request_queue) == true)
         {
             err = mico_rtos_pop_from_queue(&eland_http_request_queue, &eland_http_req, 10);
@@ -664,7 +926,6 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32
                 Eland_log("push one req from queue!");
             }
         }
-
         return kGeneralErr;
     }
 
@@ -680,8 +941,12 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res, uint32
         err = kGeneralErr;
         goto exit;
     }
-
-    if ((eland_http_res_p->eland_response_body[0] != '{') || eland_http_res_p->eland_response_body[res_body_len - 1] != '}') //JSON格式检查
+    // Eland_log("--------------------------------------------------------");
+    // Eland_log("eland_response_body:%s", eland_http_res_p->eland_response_body);
+    // Eland_log("--------------------------------------------------------");
+    if ((request_type == ELAND_DEVICE_INFO_GET) && //只在login時候 做JSON格式检查
+        ((eland_http_res_p->eland_response_body[0] != '{') ||
+         eland_http_res_p->eland_response_body[res_body_len - 1] != '}'))
     {
         Eland_log("[error]get data is not JSON format!");
         err = kGeneralErr;

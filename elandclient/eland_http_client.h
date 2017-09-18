@@ -36,7 +36,9 @@ typedef enum {
     HTTP_RESPONSE_SUCCESS = 3, //成功
     HTTP_RESPONSE_FAILURE = 4  //失败
 } ELAND_HTTP_RESPONSE_E;
+
 typedef enum {
+    ELAND_REQUEST_NONE,           //eland NONE
     ELAND_DEVICE_INFO_LOGIN,      //eland 情報登錄
     ELAND_DEVICE_INFO_UPDATE,     //eland 情報更新
     ELAND_DEVICE_INFO_GET,        //eland 情報取得
