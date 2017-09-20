@@ -313,8 +313,8 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
     }
 
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", eland_http_req->host_name); //增加hostname
-    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n");              //增加Connection设置
-
+    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
+    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n"); //增加Connection设置
     if ((eland_http_req->eland_request_type == ELAND_DEVICE_INFO_LOGIN) ||
         (eland_http_req->eland_request_type == ELAND_DEVICE_INFO_UPDATE) ||
         (eland_http_req->eland_request_type == ELAND_ALARM_OFF_RECORD_ENTRY))
@@ -415,6 +415,7 @@ static void eland_client_serrvice(mico_thread_arg_t arg)
     char *eland_host = ELAND_HTTP_DOMAIN_NAME;
     struct timeval t = {0, HTTP_YIELD_TMIE * 1000};
     uint32_t req_id = 0;
+    static uint8_t connect_count = 0;
     ELAND_HTTP_REQUEST_SETTING_S *eland_http_req = NULL; //http 请求
 
 HTTP_SSL_START:
@@ -466,7 +467,8 @@ HTTP_SSL_START:
     ssl_set_client_version(TLS_V1_2_MODE);
 
     client_log("start ssl_connect");
-    client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    //client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
     client_log("#####https connect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     if (eland_http_client_InitCompleteSem != NULL)
@@ -476,7 +478,7 @@ SSL_SEND:
     //1.从消息队列中取一条信息
     err = mico_rtos_pop_from_queue(&eland_http_request_queue, &eland_http_req, MICO_WAIT_FOREVER);
     require_noerr(err, SSL_SEND);
-
+    connect_count++;
     req_id = eland_http_req->http_req_id;
 
     err = generate_eland_http_request(eland_http_req); //生成http请求
@@ -515,7 +517,6 @@ SSL_SEND:
         err = kGeneralErr;
         goto exit;
     }
-
     if (FD_ISSET(http_fd, &readfds))
     {
         /*parse header*/
@@ -532,8 +533,7 @@ SSL_SEND:
             if (httpHeader->statusCode >= 500)
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
-                send_response_to_queue(HTTP_REQUEST_ERROR, req_id, httpHeader->statusCode, NULL);
-                goto SSL_SEND; //断开重新连接
+                goto exit; //断开重新连接
             }
             if (httpHeader->statusCode == 400) //認證錯誤
             {
@@ -557,7 +557,6 @@ SSL_SEND:
 #if (HTTP_REQ_LOG == 1)
                 client_log("Content %s0x%08x:[%ld]", context.content, context.content, context.content_length); /*get data and print*/
                 client_log("context.content          0x%08x", context.content);
-
 #endif
                 send_response_to_queue(HTTP_RESPONSE_SUCCESS, req_id, httpHeader->statusCode, context.content);
             }
@@ -586,12 +585,15 @@ SSL_SEND:
     }
 
     HTTPHeaderClear(httpHeader);
-    client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    //client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    if (connect_count > 90) //測試190次以後重新連接
+        goto exit_2;        //
     goto SSL_SEND;
 exit:
-    set_https_connect_status(false);
     send_response_to_queue(HTTP_CONNECT_ERROR, req_id, 0, NULL); //只有发生连接发生错误的时候才会进入exit中
-
+exit_2:
+    set_https_connect_status(false);
+    connect_count = 0;
     if (client_ssl)
     {
         ssl_close(client_ssl);
@@ -669,7 +671,7 @@ exit:
     //             require_action(context->content, exit, err = kNoMemoryErr);
     //             context->content_length = inHeader->contentLength;
     //         }
-    //         memcpy(context->content + inPos, inData, inLen);
+    //         //memcpy(context->content + inPos, inData, inLen);
     //         //memcpy(context->content, inData, inLen);
     //         // flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
     //         //sound_flash_address += inLen;

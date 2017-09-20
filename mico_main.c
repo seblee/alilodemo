@@ -63,7 +63,7 @@ int application_start(void)
     //start_sntp_service();
 
     /*start init eland SPI*/
-    start_spi_test_service();
+    //start_spi_test_service();
     require_noerr(err, exit);
 
     /*start eland HTTP service */

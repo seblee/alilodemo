@@ -3,8 +3,8 @@
 
 #define ELAND_HTTP_SEND_TIME_OUT (3000)
 #define ELAND_HTTP_RECV_TIME_OUT (3000)
-#define ELAND_HTTP_KEEP_IDLE_TIME (61)
-#define ELAND_HTTP_KEEP_INTVL_TIME (5)
+#define ELAND_HTTP_KEEP_IDLE_TIME (6)
+#define ELAND_HTTP_KEEP_INTVL_TIME (3)
 #define ELAND_HTTP_KEEP_COUNT (3)
 
 #define HTTP_YIELD_TMIE (2000) //http超时时间
@@ -88,5 +88,6 @@ extern char *private_key;
 extern char *capem;
 
 OSStatus start_client_serrvice(void);
+bool get_https_connect_status(void);
 
 #endif
