@@ -624,62 +624,21 @@ exit_2:
 static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
                                size_t inLen, void *inUserContext)
 {
-    //     OSStatus err = kNoErr;
-    //     http_context_t *context = inUserContext;
-    //     if (inHeader->chunkedData == false)
-    //     { //Extra data with a content length value
-    //         if (inPos == 0 && context->content == NULL)
-    //         {
-    //             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
-    //             require_action(context->content, exit, err = kNoMemoryErr);
-    //             context->content_length = inHeader->contentLength;
-    //         }
-    //         memcpy(context->content + inPos, inData, inLen);
-    //     }
-    //     else
-    //     { //extra data use a chunked data protocol
-    //         client_log("This is a chunked data%ld, %d", inPos, inLen);
-    //         if (inPos == 0)
-    //         {
-    //             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
-    //             require_action(context->content, exit, err = kNoMemoryErr);
-    //             context->content_length = inHeader->contentLength;
-    //         }
-    //         else
-    //         {
-    //             context->content_length += inLen;
-    //             context->content = realloc(context->content, context->content_length + 1);
-    //             require_action_string(context->content, exit, err = kNoMemoryErr, "mem ex err");
-    //         }
-    //         memcpy(context->content + inPos, inData, inLen);
-    //         //client_log("context->content %s,0x%08x", context->content, context->content);
-    //         // client_log("Content 0x%08x:[%ld]%s", context->content, context->content_length, context->content); /*get data and print*/
-    //     }
-
-    // exit:
-    //     return err;
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
     if (inHeader->chunkedData == false)
     { //Extra data with a content length value
         if (inPos == 0 && context->content == NULL)
         {
-            client_log("This is not a chunked data");
-            if (inHeader->contentLength < 1500)
-                context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
-            else
-                context->content = calloc(1501, sizeof(uint8_t));
+            context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
             require_action(context->content, exit, err = kNoMemoryErr);
             context->content_length = inHeader->contentLength;
         }
-        //memcpy(context->content + inPos, inData, inLen);
-        //memcpy(context->content, inData, inLen);
-        // flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
-        //sound_flash_address += inLen;
+        memcpy(context->content + inPos, inData, inLen);
     }
     else
     { //extra data use a chunked data protocol
-        client_log("This is a chunked data, %d", inLen);
+        //client_log("This is a chunked data%ld, %d", inPos, inLen);
         if (inPos == 0)
         {
             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
@@ -690,13 +649,52 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         {
             context->content_length += inLen;
             context->content = realloc(context->content, context->content_length + 1);
-            require_action(context->content, exit, err = kNoMemoryErr);
+            require_action_string(context->content, exit, err = kNoMemoryErr, "mem ex err");
         }
         memcpy(context->content + inPos, inData, inLen);
+        //client_log("context->content %s,0x%08x", context->content, context->content);
+        // client_log("Content 0x%08x:[%ld]%s", context->content, context->content_length, context->content); /*get data and print*/
     }
-
 exit:
     return err;
+    // OSStatus err = kNoErr;
+    // http_context_t *context = inUserContext;
+    // if (inHeader->chunkedData == false)
+    // { //Extra data with a content length value
+    //     if (inPos == 0 && context->content == NULL)
+    //     {
+    //         client_log("This is not a chunked data");
+    //         if (inHeader->contentLength < 1500)
+    //             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+    //         else
+    //             context->content = calloc(1501, sizeof(uint8_t));
+    //         require_action(context->content, exit, err = kNoMemoryErr);
+    //         context->content_length = inHeader->contentLength;
+    //     }
+    //     //memcpy(context->content + inPos, inData, inLen);
+    //     //memcpy(context->content, inData, inLen);
+    //     // flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
+    //     //sound_flash_address += inLen;
+    // }
+    // else
+    // { //extra data use a chunked data protocol
+    //     client_log("This is a chunked data, %d", inLen);
+    //     if (inPos == 0)
+    //     {
+    //         context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+    //         require_action(context->content, exit, err = kNoMemoryErr);
+    //         context->content_length = inHeader->contentLength;
+    //     }
+    //     else
+    //     {
+    //         context->content_length += inLen;
+    //         context->content = realloc(context->content, context->content_length + 1);
+    //         require_action(context->content, exit, err = kNoMemoryErr);
+    //     }
+    //     memcpy(context->content + inPos, inData, inLen);
+    // }
+    // exit:
+    //     return err;
 }
 
 /* Called when HTTPHeaderClear is called */

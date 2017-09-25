@@ -58,6 +58,8 @@ static OSStatus alarm_sound_download(void);
 static OSStatus eland_alarm_start_notice(void);
 //eland 鬧鐘OFF履歷登錄
 static OSStatus alarm_off_record_entry(void);
+//eland OTA 固件升級開始通知
+static OSStatus ota_update_start_notice(void);
 
 //eland 測試使用RTC
 char cur_time_print[20];
@@ -123,7 +125,7 @@ OSStatus start_eland_service(void)
 
     cur_time.year = 17; //设置时间
     cur_time.month = 9;
-    cur_time.date = 22;
+    cur_time.date = 23;
     cur_time.weekday = 2;
     cur_time.hr = 18;
     cur_time.min = 10;
@@ -182,7 +184,7 @@ static void NetclockInit(mico_thread_arg_t arg)
     require_noerr(err, exit);
 
     //3.eland test  下載音頻到flash
-    err = alarm_sound_download(); //暫時做測試用
+    //err = alarm_sound_download(); //暫時做測試用
     require_noerr(err, exit);
 
     //4.eland 鬧鐘開始通知
@@ -191,6 +193,10 @@ static void NetclockInit(mico_thread_arg_t arg)
 
     //5.eland 鬧鐘OFF履歷登錄
     //err = alarm_off_record_entry(); //暫時做測試用
+    require_noerr(err, exit);
+
+    //6.eland OTA開始通知
+    err = ota_update_start_notice(); //暫時做測試用
     require_noerr(err, exit);
 
     NetclockInitSuccess = true;
@@ -873,6 +879,77 @@ exit:
     }
 
     free(eland_request_body_cache);
+    return err;
+}
+//eland OTA 固件升級開始通知
+static OSStatus ota_update_start_notice(void)
+{
+    OSStatus err = kGeneralErr;
+    mico_rtc_time_t cur_time = {0};
+    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
+    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
+
+OTA_UPDATE_NOTICE_START:
+    while (get_wifi_status() == false)
+    {
+        Eland_log("https disconnect, eland_device_info_login is waitting...");
+        mico_rtos_thread_sleep(2);
+        err = kGeneralErr;
+        goto exit;
+    }
+    if (get_https_connect_status() == false)
+    {
+        Eland_log("https_connect_status is not true");
+        mico_rtos_thread_sleep(2);
+        goto OTA_UPDATE_NOTICE_START;
+    }
+
+    Eland_log("=====> eland_alarm_start_notice start ======>");
+    eland_http_request_count++;
+    err = eland_push_http_req_mutex(ELAND_OTA_START_NOTICE_METHOD, //請求方式
+                                    ELAND_OTA_START_NOTICE,        //請求類型
+                                    ELAND_OTA_START_NOTICE_URI,    //URI參數
+                                    ELAND_HTTP_DOMAIN_NAME,        //主機域名
+                                    "",                            //request body
+                                    &user_http_res);               //response 接收緩存
+    require_noerr(err, exit);
+    //处理返回结果
+    if (user_http_res.status_code == 200)
+    {
+        eland_http_success_count++;
+        Eland_log("<===== eland_alarm_start_notice successed <======");
+    }
+    else
+    {
+        Eland_log("alarm_start_notice error %ld", user_http_res.status_code);
+        err = kGeneralErr;
+        goto exit;
+    }
+    MicoRtcGetTime(&cur_time); //返回新的时间值
+    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
+    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
+              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    //Eland_log("<===== eland_device_info_login success <======");
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    mico_rtos_thread_sleep(1); //兩秒重複一次
+    goto OTA_UPDATE_NOTICE_START;
+
+exit:
+    if (user_http_res.eland_response_body != NULL) //释放资源
+    {
+        free(user_http_res.eland_response_body);
+        user_http_res.eland_response_body = NULL;
+    }
+    if (err != kNoErr)
+    {
+        Eland_log("<===== alarm_start_notice error <======");
+        mico_thread_msleep(200);
+        goto OTA_UPDATE_NOTICE_START;
+    }
     return err;
 }
 
