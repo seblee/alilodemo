@@ -3,6 +3,9 @@
 #include "mico.h"
 #include "eland_spi.h"
 
+#define KH25L8006
+//#define KH25L1606
+
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
 #define Eland_SCLK MICO_GPIO_12
@@ -12,13 +15,20 @@
 #define KH25L8006_PAGE_SIZE 256
 #define KH25L8006_SECTOR_SIZE 4096
 #define KH25L8006_BLOCK_SIZE 65536
+/************8M flash***********************/
+#ifdef KH25L8006
+#define KH25_BLOCKCOUNT 16
+#endif
+/***********16M flash***********************/
+#ifdef KH25L8006
+#define KH25_BLOCKCOUNT 32
+#endif
 
 #define KH25L8006_WIP_WAIT_TIME_MAX (uint32_t)0X006ACFC0 //最大等待 7000000us
 #define KH25L1606_WIP_WAIT_TIME_MAX (uint32_t)0X00D59F80 //最大等待 14000000us
 
 /* Command definitions */
 typedef enum {
-
     ElandFlash_WRITE_ENABLE = 0x06,            /* WREN write enable */
     ElandFlash_WRITE_DISABLE = 0x04,           /* WRDI write disenable */
     ElandFlash_READ_STATUS_REGISTER = 0x05,    /* RDSR read status register */

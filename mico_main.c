@@ -59,18 +59,18 @@ int application_start(void)
     //app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
+
     /*start sntp service*/
     //start_sntp_service();
 
     /*start init eland SPI*/
-    //start_spi_test_service();
-    require_noerr(err, exit);
+    start_spi_test_service();
 
     /*start eland HTTP service */
-    err = start_eland_service();
+    //err = start_eland_service();
     require_noerr(err, exit);
 
-    //err = start_test_thread();
+    err = start_test_thread();
     require_noerr(err, exit);
 
 exit:

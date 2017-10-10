@@ -587,7 +587,7 @@ SSL_SEND:
 
     HTTPHeaderClear(httpHeader);
     //client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-    if (connect_count > 90) //測試190次以後重新連接
+    if (connect_count > 90) //測試90次以後重新連接
         goto exit_2;        //
     goto SSL_SEND;
 exit:

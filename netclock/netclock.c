@@ -17,7 +17,8 @@ ELAND_DES_S *netclock_des_g = NULL;
 static bool NetclockInitSuccess = false;
 
 static mico_semaphore_t elandservicestart = NULL;
-static mico_mutex_t http_send_setting_mutex = NULL; //http client mutex
+//http client mutex
+static mico_mutex_t http_send_setting_mutex = NULL;
 json_object *ElandJsonData = NULL;
 json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
@@ -78,7 +79,6 @@ generate_http_session_id(void)
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
-
     if (false == CheckNetclockDESSetting())
     {
         //结构体覆盖
@@ -95,7 +95,6 @@ exit:
         memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
         mico_system_context_update(mico_system_context_get());
     }
-
     return kGeneralErr;
 }
 /**/
@@ -196,7 +195,7 @@ static void NetclockInit(mico_thread_arg_t arg)
     require_noerr(err, exit);
 
     //6.eland OTA開始通知
-    err = ota_update_start_notice(); //暫時做測試用
+    //err = ota_update_start_notice(); //暫時做測試用
     require_noerr(err, exit);
 
     NetclockInitSuccess = true;
