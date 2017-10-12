@@ -183,7 +183,7 @@ static void NetclockInit(mico_thread_arg_t arg)
     require_noerr(err, exit);
 
     //3.eland test  下載音頻到flash
-    //err = alarm_sound_download(); //暫時做測試用
+    err = alarm_sound_download(); //暫時做測試用
     require_noerr(err, exit);
 
     //4.eland 鬧鐘開始通知
@@ -711,6 +711,7 @@ ALARM_SOUND_DOWNLOAD_START:
         user_http_res.eland_response_body = NULL;
     }
     mico_rtos_thread_sleep(1);
+    return err;
     goto ALARM_SOUND_DOWNLOAD_START; //兩秒重複一次
 exit:
     if (user_http_res.eland_response_body != NULL) //释放资源

@@ -8,6 +8,8 @@
 #include "sntp_client.h"
 #include "netclock_wifi.h"
 #include "flash_kh25.h"
+#include "eland_sound.h"
+
 #define app_netclock_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
 
@@ -64,13 +66,13 @@ int application_start(void)
     //start_sntp_service();
 
     /*start init eland SPI*/
-    start_spi_test_service();
+    start_eland_flash_service();
 
     /*start eland HTTP service */
-    //err = start_eland_service();
+    err = start_eland_service();
     require_noerr(err, exit);
 
-    err = start_test_thread();
+    //err = start_test_thread();
     require_noerr(err, exit);
 
 exit:

@@ -29,7 +29,6 @@ static void flash_kh25_wait_for_WIP(uint32_t time)
         spiReadWirteOneData(&Spi_eland, &cache, 1);
         if (cache & 1)
         {
-            //flash_kh25_log("%02X", cache);
             SPIDelay(10);
             count++;
             continue;
@@ -316,24 +315,24 @@ OSStatus flash_kh25_init(void)
 
     elandSPIBuffer = malloc(strlen(flash_kh25_check_string) + 2);
     memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
-    flash_kh25_read(elandSPIBuffer, 0, strlen(flash_kh25_check_string));
+    flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
     if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
         flash_kh25_log("read out:%s", elandSPIBuffer);
     else
     {
         flash_kh25_log("first read:%s", elandSPIBuffer);
         memset(elandSPIBuffer, 0, 60);
-        flash_kh25_sector_erase(0);
+        //flash_kh25_sector_erase(KH25_CHECK_ADDRESS);
+        flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
         sprintf((char *)(elandSPIBuffer), "%s", flash_kh25_check_string);
-        flash_kh25_write_page(elandSPIBuffer, 0, strlen(flash_kh25_check_string));
+        flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
         memset(elandSPIBuffer, 0, 60);
-        flash_kh25_read(elandSPIBuffer, 0, strlen(flash_kh25_check_string));
+        flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
         if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
             flash_kh25_log("check again:%s", elandSPIBuffer);
         else
             err = kGeneralErr;
     }
-//flash_kh25_chip_erase();
 exit:
     if (elandSPIBuffer != NULL)
     {

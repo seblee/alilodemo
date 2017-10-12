@@ -18,11 +18,16 @@
 /************8M flash***********************/
 #ifdef KH25L8006
 #define KH25_BLOCKCOUNT 16
+#define KH25_SECTORCOUNT 256
 #endif
 /***********16M flash***********************/
-#ifdef KH25L8006
+#ifdef KH25L1606
 #define KH25_BLOCKCOUNT 32
+#define KH25_SECTORCOUNT 512
 #endif
+
+#define KH25_CHECK_ADDRESS ((KH25_SECTORCOUNT - 1) * KH25L8006_SECTOR_SIZE)
+#define KH25_FLASH_FILE_COUNT (KH25_SECTORCOUNT - 1)
 
 #define KH25L8006_WIP_WAIT_TIME_MAX (uint32_t)0X006ACFC0 //最大等待 7000000us
 #define KH25L1606_WIP_WAIT_TIME_MAX (uint32_t)0X00D59F80 //最大等待 14000000us
