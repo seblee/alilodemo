@@ -680,7 +680,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
 
         alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-        memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_024kbps", 19);
+        memcpy(alarm_w_r_queue->alarm_ID, "Alarm01", 17);
         alarm_w_r_queue->is_read = false;
         alarm_w_r_queue->total_len = inHeader->contentLength;
         //memcpy(context->content + inPos, inData, inLen);

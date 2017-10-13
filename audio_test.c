@@ -47,7 +47,7 @@ static void player_flash_thread(mico_thread_arg_t arg)
     _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
 
     test_log("player_flash_thread");
-    flashdata = malloc(1501);
+    flashdata = malloc(2001);
     audio_play_id = audio_service_system_generate_stream_id();
     flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
     flash_read_stream.pdata = flashdata;
@@ -55,7 +55,7 @@ static void player_flash_thread(mico_thread_arg_t arg)
 
     alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
     memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_024kbps", 19);
+    memcpy(alarm_w_r_queue->alarm_ID, "Alarm01", 17);
     alarm_w_r_queue->is_read = true;
     alarm_w_r_queue->sound_data = flashdata;
 
@@ -70,16 +70,21 @@ falsh_read_start:
 
     if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
     {
+        test_log("ERRNONE");
         if (data_pos == 0)
         {
             flash_read_stream.total_len = alarm_w_r_queue->total_len;
         }
         flash_read_stream.stream_len = alarm_w_r_queue->len;
     }
-    else if (alarm_r_w_callbcke_queue->read_write_err == NOFILE)
+    else if (alarm_r_w_callbcke_queue->read_write_err == FILE_NOT_FIND)
     {
-        test_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
+        test_log("FILE_NOT_FIND");
         goto exit;
+    }
+    else
+    {
+        test_log("ELSE %d", (uint8_t)alarm_r_w_callbcke_queue->read_write_err);
     }
     test_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
              (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
@@ -93,6 +98,7 @@ audio_transfer:
     if (err != kNoErr)
     {
         test_log("audio_stream_play() error!!!!");
+        goto exit;
     }
     else
     {

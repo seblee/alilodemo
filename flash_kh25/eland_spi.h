@@ -1,12 +1,12 @@
 #include "mico.h"
 
-#define SPIDelay(n) MicoNanosendDelay(1000 * n)
+#define SPIDelay(n) MicoNanosendDelay(1 * n)
 #define SPIDelaytDVCH MicoNanosendDelay(5)  //至少2ns
 #define SPIDelaytCHDX MicoNanosendDelay(10) //至少5ns
 #define SPIDelaytCLQV MicoNanosendDelay(10) //最大8/6ns
 
-#define SPIDelaytCH MicoNanosendDelay(100) //MIN fc8/6ns
-#define SPIDelaytCL MicoNanosendDelay(100) //MIN fc8/6ns
+#define SPIDelaytCH // MicoNanosendDelay(1) //MIN fc8/6ns
+#define SPIDelaytCL //MicoNanosendDelay(1) //MIN fc8/6ns
 
 // Define SPI communication mode
 typedef enum SPIMode {

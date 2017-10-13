@@ -145,23 +145,22 @@ static void eland_flash_service(mico_thread_arg_t arg)
                         alarm_w_r_queue->total_len = alarm_file_cache->file_len;
                         alarm_w_r_queue->file_address = alarm_file_cache->file_address;
                         sound_log("total_len = %ld,sound_flash_pos = %ld", alarm_w_r_queue->total_len, alarm_w_r_queue->pos);
-                        break;
+                        goto start_read_sound;
                     }
                     else
                     {
                         alarm_file_cache++;
-                        if ((uint8_t *)alarm_file_cache >= (uint8_t *)eland_sound_point + sizeof(*eland_sound_point)) //沒找到文件
-                        {
-                            memcpy(alarm_r_w_callbcke_queue->alarm_ID, alarm_w_r_queue->alarm_ID, ALARM_ID_LEN);
-                            alarm_r_w_callbcke_queue->read_write_err = NOFILE;
-
-                            err = mico_rtos_push_to_queue(&eland_sound_reback_queue, alarm_r_w_callbcke_queue, 10);
-                            //require_noerr_action(err, exit, sound_log("[error]mico_rtos_push_to_queue err"));
-                            goto waitfor_w_r_queue;
-                        }
+                        sound_log("no_file");
                     }
                 } while ((uint8_t *)alarm_file_cache < (uint8_t *)eland_sound_point + sizeof(*eland_sound_point));
+                memcpy(alarm_r_w_callbcke_queue->alarm_ID, alarm_w_r_queue->alarm_ID, ALARM_ID_LEN);
+                alarm_r_w_callbcke_queue->read_write_err = FILE_NOT_FIND;
+                err = mico_rtos_push_to_queue(&eland_sound_reback_queue, alarm_r_w_callbcke_queue, 10);
+                sound_log("no_file");
+                //require_noerr_action(err, exit, sound_log("[error]mico_rtos_push_to_queue err"));
+                goto waitfor_w_r_queue;
             }
+        start_read_sound:
             if ((alarm_w_r_queue->pos + SOUND_STREAM_DEFAULT_LENGTH) < alarm_w_r_queue->total_len)
                 alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
             else

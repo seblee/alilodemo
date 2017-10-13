@@ -77,8 +77,6 @@ int application_start(void)
     require_noerr(err, exit);
 
 exit:
-
     mico_rtos_delete_thread(NULL);
-
     return err;
 }

@@ -8,7 +8,7 @@
 #define ALARM_FILE_FLAG_LEN 8
 #define ALARM_FILE_FLAG_STRING "ALARMFIL"
 
-#define SOUND_STREAM_DEFAULT_LENGTH 1500
+#define SOUND_STREAM_DEFAULT_LENGTH 2000
 
 extern mico_queue_t eland_sound_R_W_queue;    //flash sound 讀寫命令队列
 extern mico_queue_t eland_sound_reback_queue; //flash sound 讀寫完成返回队列
@@ -34,7 +34,7 @@ typedef struct __SOUND_READ_WRITE_TYPE_
 
 typedef enum {
     ERRNONE,
-    NOFILE,
+    FILE_NOT_FIND,
 } SOUND_FILE_ERR_TYPE;
 typedef struct __SOUND_CALLBACK_TYPE_
 {

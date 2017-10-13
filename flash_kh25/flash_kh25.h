@@ -3,8 +3,8 @@
 #include "mico.h"
 #include "eland_spi.h"
 
-#define KH25L8006
-//#define KH25L1606
+//#define KH25L8006
+#define KH25L1606
 
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
@@ -71,6 +71,6 @@ void flash_kh25_block_erase(uint32_t address);
 void flash_kh25_chip_erase(void);
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
 
-#define flash_kh25_check_string "flash_kh25_check_str1ng"
+#define flash_kh25_check_string "flash_kh25_check_string"
 
 #endif
