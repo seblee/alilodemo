@@ -679,7 +679,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             sound_flash_pos = 0;
         }
 
-        alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_callback_type_t), sizeof(uint8_t));
+        alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
         memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_024kbps", 19);
         alarm_w_r_queue->is_read = false;
         alarm_w_r_queue->total_len = inHeader->contentLength;
@@ -693,7 +693,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
 
         alarm_w_r_queue->sound_data = context->content;
         client_log("send queue");
-        client_log("inlen = %ld,sound_flash_pos = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos, sound_flash_pos);
+        client_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
         err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
         require_noerr(err, exit);
         client_log("wait callback");

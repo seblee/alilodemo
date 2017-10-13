@@ -15,15 +15,15 @@ extern mico_queue_t eland_sound_reback_queue; //flash sound 讀寫完成返回�
 
 typedef struct __SOUND_FILE_TYPE_
 {
-    char flag[ALARM_FILE_FLAG_LEN];
-    char alarm_ID[ALARM_ID_LEN];
+    char flag[ALARM_FILE_FLAG_LEN + 1];
+    char alarm_ID[ALARM_ID_LEN + 1];
     uint32_t file_len;
     uint32_t file_address;
 } _sound_file_type_t;
 
 typedef struct __SOUND_READ_WRITE_TYPE_
 {
-    char alarm_ID[ALARM_ID_LEN];
+    char alarm_ID[ALARM_ID_LEN + 1];
     bool is_read;
     uint32_t total_len;
     uint32_t file_address;

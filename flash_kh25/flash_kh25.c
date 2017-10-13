@@ -1,4 +1,6 @@
 #include "flash_kh25.h"
+#include "eland_sound.h"
+
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 
 uint8_t *elandSPIBuffer = NULL;
@@ -108,7 +110,6 @@ static void flash_kh25_write_disable(void)
 static void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t length)
 {
     uint8_t cache[5];
-    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX);
     flash_kh25_write_enable();
     //the page program
     v_CSIsEnableSimulate(&Spi_eland, 1);
@@ -122,6 +123,7 @@ static void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t 
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
     flash_kh25_write_disable();
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX);
 }
 static OSStatus flash_kh25_check_device(void)
 {
@@ -309,6 +311,7 @@ OSStatus flash_kh25_init(void)
     OSStatus err = kGeneralErr;
     v_SPIInitSimulate(&Spi_eland); //初始化IO
     mico_thread_sleep(1);
+
     /*****check flash******/
     err = flash_kh25_check_device();
     require_noerr_string(err, exit, "check kh25 flash failed");
@@ -321,12 +324,12 @@ OSStatus flash_kh25_init(void)
     else
     {
         flash_kh25_log("first read:%s", elandSPIBuffer);
-        memset(elandSPIBuffer, 0, 60);
+        memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
         //flash_kh25_sector_erase(KH25_CHECK_ADDRESS);
         flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
         sprintf((char *)(elandSPIBuffer), "%s", flash_kh25_check_string);
         flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
-        memset(elandSPIBuffer, 0, 60);
+        memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
         flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
         if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
             flash_kh25_log("check again:%s", elandSPIBuffer);

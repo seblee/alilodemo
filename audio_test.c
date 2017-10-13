@@ -32,6 +32,7 @@
 #include "mico.h"
 #include "netclock_uart.h"
 #include "flash_kh25.h"
+#include "eland_sound.h"
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
 static void player_flash_thread(mico_thread_arg_t arg)
@@ -42,28 +43,49 @@ static void player_flash_thread(mico_thread_arg_t arg)
     audio_play_id = audio_service_system_generate_stream_id();
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
+    _sound_read_write_type_t *alarm_w_r_queue = NULL;
+    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
+
     test_log("player_flash_thread");
     flashdata = malloc(1501);
     audio_play_id = audio_service_system_generate_stream_id();
     flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
     flash_read_stream.pdata = flashdata;
     flash_read_stream.stream_id = audio_play_id;
-    flash_read_stream.total_len = 164601;
-    flash_read_stream.stream_len = 1500;
 
-    flash_kh25_read(flashdata, 0x001000, 3);
-    test_log("first data = %02x %02x %02x", *flashdata, *(flashdata + 1), *(flashdata + 2));
+    alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
+    memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+    memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_024kbps", 19);
+    alarm_w_r_queue->is_read = true;
+    alarm_w_r_queue->sound_data = flashdata;
 
 falsh_read_start:
-    if (flash_read_stream.total_len > data_pos)
+
+    alarm_w_r_queue->pos = data_pos;
+    test_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
+    err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
+    require_noerr(err, exit);
+    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+    require_noerr(err, exit);
+
+    if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
     {
-        flash_read_stream.stream_len = ((flash_read_stream.total_len - data_pos) > 1500) ? 1500 : (flash_read_stream.total_len - data_pos);
+        if (data_pos == 0)
+        {
+            flash_read_stream.total_len = alarm_w_r_queue->total_len;
+        }
+        flash_read_stream.stream_len = alarm_w_r_queue->len;
+    }
+    else if (alarm_r_w_callbcke_queue->read_write_err == NOFILE)
+    {
+        test_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
+        goto exit;
     }
     test_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
              (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
              (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
-
-    flash_kh25_read(flashdata, data_pos + 0x001000, flash_read_stream.stream_len);
+    test_log("free_callback_queue");
+    free(alarm_r_w_callbcke_queue);
     data_pos += flash_read_stream.stream_len;
 
 audio_transfer:
@@ -88,8 +110,10 @@ audio_transfer:
     if (data_pos < flash_read_stream.total_len)
         goto falsh_read_start;
     test_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS !");
-
+exit:
     free(flashdata);
+    free(alarm_w_r_queue);
+
     mico_rtos_delete_thread(NULL);
 }
 

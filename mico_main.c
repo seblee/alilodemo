@@ -26,7 +26,7 @@ int application_start(void)
     app_log_trace();
     OSStatus err = kNoErr;
     mico_Context_t *mico_context;
-    app_netclock_log("\r\n>>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
+    app_netclock_log(">>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
     /*Register elandstate_queue: elandstate for uart*/
@@ -57,6 +57,10 @@ int application_start(void)
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
 
+    /*start init eland SPI*/
+    err = start_eland_flash_service();
+    require_noerr(err, exit);
+
     /* Wait for wlan connection*/
     //app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
@@ -65,14 +69,11 @@ int application_start(void)
     /*start sntp service*/
     //start_sntp_service();
 
-    /*start init eland SPI*/
-    start_eland_flash_service();
-
     /*start eland HTTP service */
-    err = start_eland_service();
+    //err = start_eland_service();
     require_noerr(err, exit);
 
-    //err = start_test_thread();
+    err = start_test_thread();
     require_noerr(err, exit);
 
 exit:
