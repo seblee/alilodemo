@@ -97,6 +97,10 @@ static OSStatus user_key_init(void)
 OSStatus hal_alilo_rabbit_init(void)
 {
     OSStatus err;
+    mscp_result_t result = MSCP_RST_ERROR;
+    ADUIO_SYSTEM_STATE_S Aduio_state;
+    memset(&Aduio_state, 0, sizeof(ADUIO_SYSTEM_STATE_S));
+
     err = mico_rtos_init_semaphore(&recordKeyPress_Sem, 1);
     require_noerr(err, exit);
 
@@ -108,6 +112,9 @@ OSStatus hal_alilo_rabbit_init(void)
 
     err = audio_service_init();
     require_noerr(err, exit);
+
+    err = audio_service_system_get_system_state(&result, &Aduio_state);
+    hal_log("get_system_state err:%d result:%d**********", err, result);
 
     err = user_key_init();
     require_noerr(err, exit);

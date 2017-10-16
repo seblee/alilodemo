@@ -45,6 +45,10 @@ static void player_flash_thread(mico_thread_arg_t arg)
     uint8_t *flashdata = NULL;
     _sound_read_write_type_t *alarm_w_r_queue = NULL;
     _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
+    uint16_t volume_data = 0;
+    bool volume_max_flag = false;
+    ADUIO_SYSTEM_STATE_S Aduio_state;
+    memset(&Aduio_state, 0, sizeof(ADUIO_SYSTEM_STATE_S));
 
     test_log("player_flash_thread");
     flashdata = malloc(2001);
@@ -55,10 +59,25 @@ static void player_flash_thread(mico_thread_arg_t arg)
 
     alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
     memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(alarm_w_r_queue->alarm_ID, "Alarm01", 17);
+    memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_064kbps", strlen("maki_emo_16_064kbps"));
     alarm_w_r_queue->is_read = true;
     alarm_w_r_queue->sound_data = flashdata;
 
+    if (volume_max_flag == false)
+    {
+        err = audio_service_system_get_system_state(&result, &Aduio_state);
+        test_log("get_system_state err:%d result:%d**********", err, result);
+        if (Aduio_state.volume_state == ROBOT_SYS_VOLUME_STATE_MAX)
+            volume_max_flag = true;
+        else
+        {
+            volume_data += 100;
+            err = audio_service_volume_up(&result, 100);
+            if (err != kNoErr)
+                test_log("volume_down failed**********");
+        }
+    }
+    test_log("volume_data:-------------%d---", volume_data);
 falsh_read_start:
 
     alarm_w_r_queue->pos = data_pos;
@@ -95,6 +114,7 @@ falsh_read_start:
 
 audio_transfer:
     err = audio_service_stream_play(&result, &flash_read_stream);
+
     if (err != kNoErr)
     {
         test_log("audio_stream_play() error!!!!");
@@ -113,6 +133,7 @@ audio_transfer:
             err = kNoErr;
         }
     }
+
     if (data_pos < flash_read_stream.total_len)
         goto falsh_read_start;
     test_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS !");
