@@ -95,21 +95,25 @@ static void eland_flash_service(mico_thread_arg_t arg)
         }
         else //有文件標誌
         {
-            if (get_soundfileflag == FILE_SCAN_START)
-                get_soundfileflag = FIND_A_FILE;
-            else if (get_soundfileflag == GET_FILE_SCAN_START)
+            sound_log("%s", alarm_file_cache->alarm_ID);
+            switch (get_soundfileflag)
             {
+            case FILE_SCAN_START:
+                get_soundfileflag = FIND_A_FILE;
+                break;
+            case GET_FILE_SCAN_START:
                 get_soundfileflag = GET_FILE_START;
                 sound_sector_start = sector_count * KH25L8006_SECTOR_SIZE;
                 eland_sound_point = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
                 memcpy((uint8_t *)eland_sound_point + sizeof(*eland_sound_point) - sizeof(_sound_file_type_t), alarm_file_cache, sizeof(_sound_file_type_t));
-            }
-            else if (get_soundfileflag == GET_FILE_START)
-            {
+                break;
+            case GET_FILE_START:
                 eland_sound_point = (_sound_file_type_t *)realloc(eland_sound_point, (sizeof(*eland_sound_point) + sizeof(_sound_file_type_t)));
                 memcpy((uint8_t *)eland_sound_point + sizeof(*eland_sound_point) - sizeof(_sound_file_type_t), alarm_file_cache, sizeof(_sound_file_type_t));
+                break;
+            default:
+                break;
             }
-
             sector_count += (alarm_file_cache->file_len + sizeof(_sound_file_type_t)) / KH25L8006_SECTOR_SIZE;
             sector_count += (((alarm_file_cache->file_len + sizeof(_sound_file_type_t)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
 

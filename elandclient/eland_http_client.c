@@ -35,6 +35,7 @@
 #include "eland_http_client.h"
 #include "flash_kh25.h"
 #include "eland_sound.h"
+#include "netclock.h"
 
 #define client_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
@@ -680,7 +681,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
 
         alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-        memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_064kbps", 19);
+        memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
         alarm_w_r_queue->is_read = false;
         alarm_w_r_queue->total_len = inHeader->contentLength;
         //memcpy(context->content + inPos, inData, inLen);

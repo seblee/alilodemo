@@ -233,9 +233,9 @@ void flash_kh25_chip_erase(void)
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
 
-    flash_kh25_log("chip_erase end");
     flash_kh25_write_disable();
     flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
+    flash_kh25_log("chip_erase end");
     free(spireadbuffer);
 }
 /* flash 按頁寫入數據*/

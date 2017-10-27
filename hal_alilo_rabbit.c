@@ -113,9 +113,6 @@ OSStatus hal_alilo_rabbit_init(void)
     err = audio_service_init();
     require_noerr(err, exit);
 
-    err = audio_service_system_get_system_state(&result, &Aduio_state);
-    hal_log("get_system_state err:%d result:%d**********", err, result);
-
     err = user_key_init();
     require_noerr(err, exit);
 

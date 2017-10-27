@@ -33,6 +33,8 @@
 #include "netclock_uart.h"
 #include "flash_kh25.h"
 #include "eland_sound.h"
+#include "netclock.h"
+
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
 static void player_flash_thread(mico_thread_arg_t arg)
@@ -59,7 +61,7 @@ static void player_flash_thread(mico_thread_arg_t arg)
 
     alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
     memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(alarm_w_r_queue->alarm_ID, "maki_emo_16_064kbps", strlen("maki_emo_16_064kbps"));
+    memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
     alarm_w_r_queue->is_read = true;
     alarm_w_r_queue->sound_data = flashdata;
 
@@ -72,7 +74,7 @@ static void player_flash_thread(mico_thread_arg_t arg)
         else
         {
             volume_data += 100;
-            err = audio_service_volume_up(&result, 100);
+            err = audio_service_volume_up(&result, 1);
             if (err != kNoErr)
                 test_log("volume_down failed**********");
         }

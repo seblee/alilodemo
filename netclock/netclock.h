@@ -32,13 +32,16 @@ OSStatus ProcessPostJson(char *InputJson);
 
 //eland sound down load
 #define ELAND_DOWN_LOAD_METHOD HTTP_GET
-//#define ELAND_DOWN_LOAD_URI ("/mockup/browser/sound/Alarm01.mp3") ///api/download.php?vid=taichi_16_128kbps
+//#define ELAND_DOWN_LOAD_URI ("/mockup/browser/sound/Alarm01.mp3")
 //#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_024kbps")
-#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_064kbps")
+//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_064kbps")
 //#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_096kbps")
 //#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_128kbps")
+//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
+#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
+//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_40kbps")
 
-//eland 情報登錄
+//eland 情報登錄 / download.php ? vid = 01_64kbpse ELAND_DEVICE_INFO_UPDATE_URI("/")
 #define ELAND_DEVICE_LOGIN_METHOD HTTP_POST
 #define ELAND_DEVICE_LOGIN_URI ("/api/device/regist")
 
