@@ -9,7 +9,7 @@
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
 #define Eland_SCLK MICO_GPIO_12
-#define Eland_MOSI MICO_GPIO_22
+#define Eland_MOSI MICO_GPIO_13
 #define Eland_MISO MICO_GPIO_14
 
 #define KH25L8006_PAGE_SIZE 256

@@ -1,14 +1,23 @@
-/*
- * netclockuart.h
- *
- *  Created on: 2017年7月27日
- *      Author: ceeu
- */
-
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2017-11-01 10:13:33
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2017-11-01 10:18:16
+ * @brief   :
+ ****************************************************************************
+**/
 #ifndef _NETCLOCK_NETCLOCKUART_H_
 #define _NETCLOCK_NETCLOCKUART_H_
+
+/* Private include -----------------------------------------------------------*/
 #include "mico.h"
 
+/* Private typedef -----------------------------------------------------------*/
 //状态宏定义
 /*Eland 状态*/
 typedef enum {
@@ -33,26 +42,30 @@ typedef struct __msg_queue
     uint32_t value;
 } msg_queue;
 
-typedef struct __TxDataStc
-{
-    uint8_t Elandheader;
-    // uint8_t ElandLen;
-    Eland_Status_type Elandstatus;
-    mico_rtc_time_t ElandRtctime;
-    uint8_t ElandTrail;
-} TxDataStc;
+typedef enum {
+    KEY_READ_02 = 0X02,
+    TIME_SET_03,
+    TIME_READ_04,
+} __msg_function_t;
 
-/*全局变量*/
+/* Private define ------------------------------------------------------------*/
+#define Uart_Packet_Header (uint8_t)(0x55)
+#define Uart_Packet_Trail (uint8_t)(0xaa)
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 extern mico_queue_t elandstate_queue;
-extern TxDataStc ElandTranmmiteToMcu;
 
-/*函数*/
+/* Private function prototypes -----------------------------------------------*/
 void start_uart_service(void);
 void netclock_uart_thread(mico_thread_arg_t args);
 void uart_recv_thread_DDE(uint32_t arg);
 void uart_send_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void StateReceivethread(mico_thread_arg_t arg);
-void SendElandQueue(msg_queue_type Type,uint32_t value);
+void SendElandQueue(msg_queue_type Type, uint32_t value);
+
+OSStatus Eland_Uart_Push_Uart_Send_Mutex(uint8_t *DataBody);
+/* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

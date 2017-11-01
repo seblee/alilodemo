@@ -1,3 +1,18 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2017-10-31 17:37:53
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2017-10-31 17:42:45
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "../alilodemo/audio_test.h"
 #include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/mico_app_define.h"
@@ -10,11 +25,20 @@
 #include "flash_kh25.h"
 #include "eland_sound.h"
 
+/* Private typedef -----------------------------------------------------------*/
+
+/* Private define ------------------------------------------------------------*/
 #define app_netclock_log(M, ...) custom_log("APP", M, ##__VA_ARGS__)
 #define app_log_trace() custom_log_trace("APP")
 
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 mico_mutex_t WifiMutex = NULL;
-/* MICO system callback: Restore default configuration provided by application */
+
+/* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
 
 void ssl_log(const int logLevel, const char *const logMessage)
 {
@@ -73,7 +97,7 @@ int application_start(void)
     //err = start_eland_service();
     require_noerr(err, exit);
 
-    err = start_test_thread();
+    //err = start_test_thread();
     require_noerr(err, exit);
 
 exit:
