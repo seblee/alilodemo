@@ -42,6 +42,12 @@ typedef struct __msg_queue
     uint32_t value;
 } msg_queue;
 
+typedef struct __msg_send_queue
+{
+    uint16_t length;
+    uint8_t *data;
+} __msg_send_queue_t;
+
 typedef enum {
     KEY_READ_02 = 0X02,
     TIME_SET_03,
@@ -65,7 +71,7 @@ int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void StateReceivethread(mico_thread_arg_t arg);
 void SendElandQueue(msg_queue_type Type, uint32_t value);
 
-OSStatus Eland_Uart_Push_Uart_Send_Mutex(uint8_t *DataBody);
+OSStatus Eland_Uart_Push_Uart_Send_Mutex(__msg_send_queue_t *DataBody);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */
