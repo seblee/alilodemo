@@ -76,7 +76,7 @@ void start_uart_service(void)
 
     err = mico_start_timer(&timer100_key); //開始定時器
     require_noerr(err, exit);
-    //Eland 设置状态 ※
+    //Eland 设置状态
     SendElandQueue(Queue_ElandState_type, ElandBegin);
 exit:
     return;
@@ -113,10 +113,16 @@ void uart_send_thread_DDE(uint32_t arg)
     while (1)
     {
     WaitSend:
-        if (SendBuffToMcu->data != NULL)
-            free(SendBuffToMcu->data);
         if (SendBuffToMcu != NULL)
+        {
+            if (SendBuffToMcu->data != NULL)
+            {
+                free(SendBuffToMcu->data);
+                SendBuffToMcu->data = NULL;
+            }
             free(SendBuffToMcu);
+            SendBuffToMcu = NULL;
+        }
         err = mico_rtos_pop_from_queue(&eland_uart_send_queue, &SendBuffToMcu, MICO_WAIT_FOREVER);
         require_noerr(err, WaitSend);
         err = MicoUartSend(MICO_UART_2, SendBuffToMcu->data, SendBuffToMcu->length);
@@ -169,9 +175,15 @@ exit:
     }
     if (DataReceived != NULL)
     {
+        if (DataReceived->data)
+        {
+            free(DataReceived->data);
+            DataReceived->data = NULL;
+        }
         free(DataReceived);
         DataReceived = NULL;
     }
+
     mico_rtos_delete_thread(NULL);
 }
 
@@ -279,10 +291,15 @@ static OSStatus push_usart_to_queue(__msg_send_queue_t *usart_send)
 
     if (err != kNoErr)
     {
-        if (usart_send->data != NULL)
+        if (usart_send != NULL)
         {
-            free(usart_send->data);
-            usart_send->data = NULL;
+            if (usart_send->data != NULL)
+            {
+                free(usart_send->data);
+                usart_send->data = NULL;
+            }
+            free(usart_send);
+            usart_send = NULL;
         }
         Eland_uart_log("push req to eland_uart_send_queue error");
         goto exit;
@@ -305,13 +322,13 @@ static OSStatus get_usart_from_queue(void)
             err = mico_rtos_pop_from_queue(&eland_uart_send_queue, &usart_sen, 10);
             if (err == kNoErr)
             {
-                if (usart_sen->data != NULL)
-                {
-                    free(usart_sen->data);
-                    usart_sen = NULL;
-                }
                 if (usart_sen != NULL)
                 {
+                    if (usart_sen->data != NULL)
+                    {
+                        free(usart_sen->data);
+                        usart_sen = NULL;
+                    }
                     free(usart_sen);
                     usart_sen = NULL;
                 }
@@ -337,6 +354,11 @@ static OSStatus get_usart_from_queue(void)
 
     if (usart_rec != NULL)
     {
+        if (usart_rec->data != NULL)
+        {
+            free(usart_rec->data);
+            usart_rec->data = NULL;
+        }
         free(usart_rec);
         usart_rec = NULL;
     }
