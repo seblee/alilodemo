@@ -54,6 +54,18 @@ typedef enum {
     TIME_READ_04,
 } __msg_function_t;
 
+typedef enum {
+    KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
+    KEY_Reset = (uint16_t)0x0002,     /*!< 軟件復位 */
+    KEY_Add = (uint16_t)0x0004,       /*!< 時間＋   */
+    KEY_Minus = (uint16_t)0x0008,     /*!< 時間－   */
+    KEY_MON = (uint16_t)0x0010,       /*!< mon時間  */
+    KEY_AlarmMode = (uint16_t)0x0020, /*!< 鬧鐘模式 */
+    KEY_Wifi = (uint16_t)0x0040,      /*!< wifi模式 */
+    KEY_Snooze = (uint16_t)0x0080,    /*!< 貪睡     */
+    KEY_Alarm = (uint16_t)0x0100,     /*!< 鬧鐘     */
+} KEY_State_TypeDef;
+
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)

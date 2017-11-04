@@ -33,7 +33,6 @@ volatile uint8_t rx_data[UART_BUFFER_LENGTH];
 
 mico_mutex_t ElandUartMutex = NULL; //uart独立访问
 
-uint16_t ElandStateDate[2];
 mico_queue_t elandstate_queue = NULL;
 
 mico_queue_t eland_uart_send_queue = NULL;    //eland HTTP的发送请求队列
@@ -364,7 +363,15 @@ static OSStatus get_usart_from_queue(void)
     }
     return err;
 }
-
+extern void PlatformEasyLinkButtonLongPressedCallback(void);
 void MODH_Read_02H(__msg_send_queue_t *usart_rec)
 {
+    static uint16_t Key_Count = 0, Key_Restain = 0;
+    static KEY_State_TypeDef Reset_key_Restain;
+    Key_Count = ((*(usart_rec->data + 3)) << 8) | *(usart_rec->data + 4);
+    Key_Restain = ((*(usart_rec->data + 5)) << 8) | *(usart_rec->data + 6);
+    Reset_key_Restain = Reset_key_Restain ^ (Key_Restain & KEY_Reset);
+
+    if (Reset_key_Restain != 0)
+        PlatformEasyLinkButtonLongPressedCallback();
 }

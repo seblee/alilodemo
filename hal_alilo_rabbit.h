@@ -27,7 +27,7 @@ extern uint8_t mic_record_id;
 extern uint8_t audio_play_id;
 extern uint8_t flag_mic_start;
 extern uint8_t flagAudioPlay;
-extern uint8_t flagHttpdServerAP ;
+extern uint8_t flagHttpdServerAP;
 
 extern OSStatus hal_alilo_rabbit_init(void);
 extern int32_t hal_getVoiceData(uint8_t *voice_buf, uint32_t voice_buf_len);

@@ -93,7 +93,7 @@ static OSStatus user_key_init(void)
 {
     return robot_event_service_start(_recordKeyAction_cb);
 }
-
+extern system_context_t *sys_context;
 OSStatus hal_alilo_rabbit_init(void)
 {
     OSStatus err;
@@ -116,6 +116,26 @@ OSStatus hal_alilo_rabbit_init(void)
     err = user_key_init();
     require_noerr(err, exit);
 
+    mico_rtos_thread_sleep(3); //wait for audio ready
+
+    if (sys_context->flashContentInRam.micoSystemConfig.configured == unConfigured)
+        audio_service_sound_remind_start(&result, 2); //請先幫我配置無線網絡吧
+    else
+        audio_service_sound_remind_start(&result, 3); //正在連接無線網絡
+
+//audio_service_sound_remind_start(&result, 1); //我的小夥伴，快來和我玩耍吧
+//audio_service_sound_remind_start(&result, 2);//請先幫我配置無線網絡吧
+//audio_service_sound_remind_start(&result, 3); //正在連接無線網絡
+//audio_service_sound_remind_start(&result, 4); //請長安與我對話吧
+//audio_service_sound_remind_start(&result, 5); //這個問題有點難，我還在學習
+//audio_service_sound_remind_start(&result, 6); //對不起，沒有聽清，請再來一次
+//audio_service_sound_remind_start(&result, 7); //網絡連接失敗
+//audio_service_sound_remind_start(&result, 8); //設備正在升級中，請稍等一會吧
+//audio_service_sound_remind_start(&result, 9); //還剩百分之二十五電量，電量快不足了
+//audio_service_sound_remind_start(&result, 10); //還剩百分之五電量，快幫我衝充電吧
+//audio_service_sound_remind_start(&result, 11); //微信發送的聲音 “嗚”
+//audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔”
+//audio_service_sound_remind_start(&result, 13); //“叮叮”聲
 exit:
     return err;
 }
