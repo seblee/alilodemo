@@ -1,6 +1,8 @@
 #ifndef _AUDIO_TEST_H
 #define _AUDIO_TEST_H
 
+#include "mico.h"
+
 #define URL_FILE_DNLD "http://xiaowine.cee0.com/music/greatwall.mp3"
 //"http://xiaowine.cee0.com/music/window_start.mp3"
 //"http://xiaowine.cee0.com/music/Strength_Of_A_Thousand_Men.wav"
@@ -14,6 +16,7 @@
 //"http://www.cee0.com/Human_Legacy.mp3"
 //"http://fdfs.xmcdn.com/group21/M00/84/14/wKgJLVg_jIPRlRj0AEncvwvmmWc779.mp3"
 
+extern mico_semaphore_t flash_play_Sem;
 extern int start_test_thread(void);
 
 #endif

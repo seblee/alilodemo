@@ -90,7 +90,10 @@ int application_start(void)
     //app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
+
     audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔” 指示wifi已經連接
+    mico_rtos_thread_sleep(1);
+
     /*start sntp service*/
     //start_sntp_service();
 
@@ -98,7 +101,7 @@ int application_start(void)
     //err = start_eland_service();
     require_noerr(err, exit);
 
-    //err = start_test_thread();
+    err = start_test_thread();
     require_noerr(err, exit);
 
 exit:

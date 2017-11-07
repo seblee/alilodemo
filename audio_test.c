@@ -37,6 +37,8 @@
 
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
+mico_semaphore_t flash_play_Sem = NULL;
+
 static void player_flash_thread(mico_thread_arg_t arg)
 {
     AUDIO_STREAM_PALY_S flash_read_stream;
@@ -45,10 +47,9 @@ static void player_flash_thread(mico_thread_arg_t arg)
     audio_play_id = audio_service_system_generate_stream_id();
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
-    _sound_read_write_type_t *alarm_w_r_queue = NULL;
-    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
-    uint16_t volume_data = 0;
-    bool volume_max_flag = false;
+    // _sound_read_write_type_t *alarm_w_r_queue = NULL;
+    // _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
+
     ADUIO_SYSTEM_STATE_S Aduio_state;
     memset(&Aduio_state, 0, sizeof(ADUIO_SYSTEM_STATE_S));
 
@@ -58,60 +59,63 @@ static void player_flash_thread(mico_thread_arg_t arg)
     flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
     flash_read_stream.pdata = flashdata;
     flash_read_stream.stream_id = audio_play_id;
+    flash_read_stream.total_len = 264717;
 
-    alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-    memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
-    alarm_w_r_queue->is_read = true;
-    alarm_w_r_queue->sound_data = flashdata;
-
-    if (volume_max_flag == false)
-    {
-        err = audio_service_system_get_system_state(&result, &Aduio_state);
-        test_log("get_system_state err:%d result:%d**********", err, result);
-        if (Aduio_state.volume_state == ROBOT_SYS_VOLUME_STATE_MAX)
-            volume_max_flag = true;
-        else
-        {
-            volume_data += 100;
-            err = audio_service_volume_up(&result, 1);
-            if (err != kNoErr)
-                test_log("volume_down failed**********");
-        }
-    }
-    test_log("volume_data:-------------%d---", volume_data);
+// alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
+// memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+// memcpy(alarm_w_r_queue->alarm_ID, "taichi_16_064kbps", strlen("taichi_16_064kbps"));
+// alarm_w_r_queue->is_read = true;
+// alarm_w_r_queue->sound_data = flashdata;
+wait_sem:
+    test_log("wait_sem");
+    mico_rtos_get_semaphore(&flash_play_Sem, MICO_WAIT_FOREVER);
+    data_pos = 0;
 falsh_read_start:
 
-    alarm_w_r_queue->pos = data_pos;
-    test_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
-    err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
-    require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
-    require_noerr(err, exit);
+    //alarm_w_r_queue->pos = data_pos;
+    //test_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
 
-    if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
+    // err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
+    // require_noerr(err, exit);
+    // err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+    // require_noerr(err, exit);
+    /*****************************************************/
+    if ((flash_read_stream.total_len - data_pos) > 1500)
     {
-        test_log("ERRNONE");
-        if (data_pos == 0)
-        {
-            flash_read_stream.total_len = alarm_w_r_queue->total_len;
-        }
-        flash_read_stream.stream_len = alarm_w_r_queue->len;
-    }
-    else if (alarm_r_w_callbcke_queue->read_write_err == FILE_NOT_FIND)
-    {
-        test_log("FILE_NOT_FIND");
-        goto exit;
+        flash_kh25_read(flashdata, data_pos + 0x001000, 1500);
+        flash_read_stream.stream_len = 1500;
     }
     else
     {
-        test_log("ELSE %d", (uint8_t)alarm_r_w_callbcke_queue->read_write_err);
+        flash_kh25_read(flashdata, data_pos + 0x001000, flash_read_stream.total_len - data_pos);
+        flash_read_stream.stream_len = (flash_read_stream.total_len - data_pos);
     }
+
+    /*****************************************************/
+
+    // if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
+    // {
+    //     test_log("ERRNONE");
+    //     if (data_pos == 0)
+    //     {
+    //         flash_read_stream.total_len = alarm_w_r_queue->total_len;
+    //     }
+    //     flash_read_stream.stream_len = alarm_w_r_queue->len;
+    // }
+    // else if (alarm_r_w_callbcke_queue->read_write_err == FILE_NOT_FIND)
+    // {
+    //     test_log("FILE_NOT_FIND");
+    //     goto exit;
+    // }
+    // else
+    // {
+    //     test_log("ELSE %d", (uint8_t)alarm_r_w_callbcke_queue->read_write_err);
+    // }
     test_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
              (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
              (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
-    test_log("free_callback_queue");
-    free(alarm_r_w_callbcke_queue);
+    // test_log("free_callback_queue");
+    // free(alarm_r_w_callbcke_queue);
     data_pos += flash_read_stream.stream_len;
 
 audio_transfer:
@@ -137,11 +141,17 @@ audio_transfer:
     }
 
     if (data_pos < flash_read_stream.total_len)
+    {
         goto falsh_read_start;
-    test_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS !");
+        test_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS !");
+    }
+
 exit:
-    free(flashdata);
-    free(alarm_w_r_queue);
+    mico_rtos_get_semaphore(&flash_play_Sem, 10);
+    goto wait_sem;
+
+    // free(flashdata);
+    // free(alarm_w_r_queue);
 
     mico_rtos_delete_thread(NULL);
 }
@@ -286,6 +296,9 @@ static void url_paly_stop_thread(mico_thread_arg_t arg)
 OSStatus start_test_thread(void)
 {
     OSStatus err = kNoErr;
+    err = mico_rtos_init_semaphore(&flash_play_Sem, 1);
+    require_noerr(err, exit);
+
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_flash_thread, 0x900, 0);
     require_noerr(err, exit);
 

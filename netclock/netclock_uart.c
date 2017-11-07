@@ -15,6 +15,8 @@
 /* Private include -----------------------------------------------------------*/
 #include "netclock_uart.h"
 #include "mico.h"
+#include "../alilodemo/audio_test.h"
+#include "../alilodemo/hal_alilo_rabbit.h"
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -367,11 +369,28 @@ extern void PlatformEasyLinkButtonLongPressedCallback(void);
 void MODH_Read_02H(__msg_send_queue_t *usart_rec)
 {
     static uint16_t Key_Count = 0, Key_Restain = 0;
-    static KEY_State_TypeDef Reset_key_Restain;
+    static KEY_State_TypeDef Reset_key_Restain, KEY_Snooze_Count;
+
     Key_Count = ((*(usart_rec->data + 3)) << 8) | *(usart_rec->data + 4);
     Key_Restain = ((*(usart_rec->data + 5)) << 8) | *(usart_rec->data + 6);
     Reset_key_Restain = Reset_key_Restain ^ (Key_Restain & KEY_Reset);
 
+    KEY_Snooze_Count = KEY_Snooze_Count ^ (Key_Count & KEY_Snooze);
+
     if (Reset_key_Restain != 0)
         PlatformEasyLinkButtonLongPressedCallback();
+
+    if (Key_Count & KEY_Snooze)
+    {
+        if (flash_play_Sem != NULL)
+            mico_rtos_set_semaphore(&flash_play_Sem);
+    }
+
+    if (((KEY_Add | KEY_Minus) & Key_Restain) == (KEY_Add | KEY_Minus))
+    {
+        if (flagAudioPlay == 1)
+            mico_rtos_set_semaphore(&urlFileDownload_Sem);
+        if ((flagAudioPlay == 2) || (flagAudioPlay == 3))
+            mico_rtos_set_semaphore(&urlPalyStreamStop_Sem);
+    }
 }

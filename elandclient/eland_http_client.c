@@ -661,9 +661,10 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
     //     return err;
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
-    _sound_read_write_type_t *alarm_w_r_queue = NULL;
-    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
+    //_sound_read_write_type_t *alarm_w_r_queue = NULL;
+    //_sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
     static uint32_t sound_flash_pos = 0;
+    static uint32_t sound_flash_address = 0x001000;
 
     if (inHeader->chunkedData == false)
     { //Extra data with a content length value
@@ -680,30 +681,30 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             sound_flash_pos = 0;
         }
 
-        alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-        memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
-        alarm_w_r_queue->is_read = false;
-        alarm_w_r_queue->total_len = inHeader->contentLength;
+        // alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
+        // memcpy(alarm_w_r_queue->alarm_ID, "taichi_16_064kbps", strlen("taichi_16_064kbps"));
+        // alarm_w_r_queue->is_read = false;
+        // alarm_w_r_queue->total_len = inHeader->contentLength;
         //memcpy(context->content + inPos, inData, inLen);
         memcpy(context->content, inData, inLen);
-        // flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
-        //sound_flash_address += inLen;
+        flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
+        sound_flash_address += inLen;
+        client_log("totle_length = %ld", sound_flash_address);
+        // alarm_w_r_queue->len = inLen;
+        // alarm_w_r_queue->pos = sound_flash_pos;
 
-        alarm_w_r_queue->len = inLen;
-        alarm_w_r_queue->pos = sound_flash_pos;
-
-        alarm_w_r_queue->sound_data = (uint8_t *)context->content;
-        client_log("send queue");
-        client_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
-        err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
-        require_noerr(err, exit);
-        client_log("wait callback");
-        err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
-        require_noerr(err, exit);
-        sound_flash_pos += inLen;
-        free(alarm_w_r_queue);
-        free(alarm_r_w_callbcke_queue);
-        client_log("free queue");
+        // alarm_w_r_queue->sound_data = (uint8_t *)context->content;
+        // client_log("send queue");
+        // client_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
+        // err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
+        // require_noerr(err, exit);
+        // client_log("wait callback");
+        // err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+        // require_noerr(err, exit);
+        // sound_flash_pos += inLen;
+        // free(alarm_w_r_queue);
+        // free(alarm_r_w_callbcke_queue);
+        // client_log("free queue");
     }
     else
     { //extra data use a chunked data protocol

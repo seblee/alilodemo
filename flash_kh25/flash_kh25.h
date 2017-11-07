@@ -9,7 +9,7 @@
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
 #define Eland_SCLK MICO_GPIO_12
-#define Eland_MOSI MICO_GPIO_13
+#define Eland_MOSI MICO_GPIO_13 //MICO_GPIO_22
 #define Eland_MISO MICO_GPIO_14
 
 #define KH25L8006_PAGE_SIZE 256
@@ -71,6 +71,6 @@ void flash_kh25_block_erase(uint32_t address);
 void flash_kh25_chip_erase(void);
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
 
-#define flash_kh25_check_string "flash_kh25_check_str1ng"
+#define flash_kh25_check_string "flash_kh25_check_str2ng"
 
 #endif
