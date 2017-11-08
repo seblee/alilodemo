@@ -13,6 +13,7 @@ mico_queue_t wifistate_queue = NULL;
 void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 {
     msg_wify_queue my_message;
+    mscp_result_t result = MSCP_RST_ERROR;
     IPStatusTypedef *IPStatus_Cache = NULL;
     switch (status)
     {
@@ -33,6 +34,9 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         my_message.value = Wify_Station_Connect_Successed;
         if (wifistate_queue != NULL)
             mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
+
+        audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔” 指示wifi已經連接
+        mico_rtos_thread_sleep(1);
         break;
     case NOTIFY_STATION_DOWN:
         WifiSet_log("Wi-Fi STATION disconnected.");

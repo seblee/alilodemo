@@ -298,15 +298,15 @@ OSStatus start_test_thread(void)
     OSStatus err = kNoErr;
     err = mico_rtos_init_semaphore(&flash_play_Sem, 1);
     require_noerr(err, exit);
-
+    //mico_rtos_set_semaphore(&flash_play_Sem);
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_flash_thread, 0x900, 0);
     require_noerr(err, exit);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread, 0x1500, 0);
-    require_noerr(err, exit);
+// err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "URL Thread", url_fileDownload_test_thread, 0x1500, 0);
+// require_noerr(err, exit);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "url PlayStop Thread", url_paly_stop_thread, 0x1500, 0);
-    require_noerr(err, exit);
+// err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "url PlayStop Thread", url_paly_stop_thread, 0x1500, 0);
+// require_noerr(err, exit);
 
 exit:
     return err;

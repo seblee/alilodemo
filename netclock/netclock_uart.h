@@ -73,7 +73,7 @@ typedef enum {
 
 /* Private variables ---------------------------------------------------------*/
 extern mico_queue_t elandstate_queue;
-
+extern mico_timer_t timer100_key;
 /* Private function prototypes -----------------------------------------------*/
 void start_uart_service(void);
 void netclock_uart_thread(mico_thread_arg_t args);

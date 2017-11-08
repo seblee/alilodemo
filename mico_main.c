@@ -88,11 +88,8 @@ int application_start(void)
 
     /* Wait for wlan connection*/
     //app_netclock_log("wait for wifi on");
-    mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
+    mico_rtos_get_semaphore(&wifi_netclock, 10);
     app_netclock_log("wifi connected successful");
-
-    audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔” 指示wifi已經連接
-    mico_rtos_thread_sleep(1);
 
     /*start sntp service*/
     //start_sntp_service();
