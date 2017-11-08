@@ -66,6 +66,8 @@ static void player_flash_thread(mico_thread_arg_t arg)
 // memcpy(alarm_w_r_queue->alarm_ID, "taichi_16_064kbps", strlen("taichi_16_064kbps"));
 // alarm_w_r_queue->is_read = true;
 // alarm_w_r_queue->sound_data = flashdata;
+
+//mico_rtos_set_semaphore(&flash_play_Sem);
 wait_sem:
     test_log("wait_sem");
     mico_rtos_get_semaphore(&flash_play_Sem, MICO_WAIT_FOREVER);
@@ -242,8 +244,9 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
     OSStatus err = kNoErr;
     mscp_result_t result = MSCP_RST_ERROR;
     test_log("url_fileDownloadtest_thread created.");
-    mico_rtos_thread_sleep(1);
+    mico_rtos_thread_sleep(3);
     flagAudioPlay = 1;
+    //mico_rtos_set_semaphore(&urlFileDownload_Sem);
     while (1)
     {
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
@@ -253,7 +256,7 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
             err = hal_url_fileDownload_start(URL_FILE_DNLD);
             test_log("file download status: err = %d", err);
             SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
-            flagAudioPlay = 2;
+            flagAudioPlay = 1;
             break;
         case 2:
             err = hal_url_fileDownload_pause();

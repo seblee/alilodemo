@@ -42,6 +42,7 @@ mico_queue_t eland_uart_receive_queue = NULL; //eland HTTP的接收响应队列
 
 mico_timer_t timer100_key;
 
+uint8_t count_key_time = 0;
 /* Private function prototypes -----------------------------------------------*/
 static void Eland_Key02_Send(void *arg);
 static OSStatus push_usart_to_queue(__msg_send_queue_t *usart_send);
@@ -233,15 +234,16 @@ static void Eland_Key02_Send(void *arg)
 
     msg_send = (__msg_send_queue_t *)calloc(sizeof(__msg_send_queue_t), sizeof(uint8_t));
 
-    msg_send->length = 4;
+    msg_send->length = 5;
 
     Cache = calloc(msg_send->length, sizeof(uint8_t));
     msg_send->data = Cache;
 
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = KEY_READ_02;
-    *(Cache + 2) = 0;
-    *(Cache + 3) = Uart_Packet_Trail;
+    *(Cache + 2) = 1;
+    *(Cache + 3) = count_key_time;
+    *(Cache + 4) = Uart_Packet_Trail;
     Eland_uart_log("size of cache %d", sizeof(*Cache));
     err = Eland_Uart_Push_Uart_Send_Mutex(msg_send);
     if (err != kNoErr)
@@ -369,19 +371,39 @@ extern void PlatformEasyLinkButtonLongPressedCallback(void);
 void MODH_Read_02H(__msg_send_queue_t *usart_rec)
 {
     static uint16_t Key_Count = 0, Key_Restain = 0;
-    static KEY_State_TypeDef Reset_key_Restain, KEY_Snooze_Count;
+    static uint16_t Reset_key_Restain_Trg, Reset_key_Restain_count;
+    static uint16_t KEY_Snooze_Count_Trg, KEY_Snooze_Count_count;
+    static uint16_t KEY_Minus_Count_Trg, KEY_Minus_Count_count;
+    static uint16_t KEY_Add_Count_Trg, KEY_Add_Count_count;
 
-    Key_Count = ((*(usart_rec->data + 3)) << 8) | *(usart_rec->data + 4);
-    Key_Restain = ((*(usart_rec->data + 5)) << 8) | *(usart_rec->data + 6);
-    Reset_key_Restain = Reset_key_Restain ^ (Key_Restain & KEY_Reset);
+    uint16_t ReadData;
 
-    KEY_Snooze_Count = KEY_Snooze_Count ^ (Key_Count & KEY_Snooze);
+    Key_Count = (uint16_t)((*(usart_rec->data + 3)) << 8) | *(usart_rec->data + 4);
+    Key_Restain = (uint16_t)((*(usart_rec->data + 5)) << 8) | *(usart_rec->data + 6);
 
-    if (Reset_key_Restain != 0)
+    ReadData = Key_Restain & KEY_Reset;
+    Reset_key_Restain_Trg = ReadData & (ReadData ^ Reset_key_Restain_count);
+    Reset_key_Restain_count = ReadData;
+    if (Reset_key_Restain_Trg)
         PlatformEasyLinkButtonLongPressedCallback();
 
-    if (Key_Count & KEY_Snooze)
-    {
+    ReadData = Key_Count & KEY_Minus;
+    KEY_Add_Count_Trg = ReadData & (ReadData ^ KEY_Add_Count_count);
+    KEY_Add_Count_count = ReadData;
+    if (KEY_Add_Count_Trg)
+        count_key_time++;
+
+    ReadData = Key_Count & KEY_Minus;
+    KEY_Minus_Count_Trg = ReadData & (ReadData ^ KEY_Minus_Count_count);
+    KEY_Minus_Count_count = ReadData;
+    if (KEY_Minus_Count_Trg)
+        count_key_time++;
+
+    ReadData = Key_Count & KEY_Snooze;
+    KEY_Snooze_Count_Trg = ReadData & (ReadData ^ KEY_Snooze_Count_count);
+    KEY_Snooze_Count_count = ReadData;
+    if (KEY_Snooze_Count_Trg)
+    {count_key_time++;
         if (flash_play_Sem != NULL)
             mico_rtos_set_semaphore(&flash_play_Sem);
     }

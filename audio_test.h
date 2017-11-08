@@ -3,7 +3,7 @@
 
 #include "mico.h"
 
-#define URL_FILE_DNLD "http://xiaowine.cee0.com/music/greatwall.mp3"
+#define URL_FILE_DNLD "http://xiaowine.cee0.com/music/window_start.mp3"
 //"http://xiaowine.cee0.com/music/window_start.mp3"
 //"http://xiaowine.cee0.com/music/Strength_Of_A_Thousand_Men.wav"
 //"http://xiaowine.cee0.com/music/greatwall.mp3"
