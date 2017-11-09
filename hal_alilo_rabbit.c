@@ -196,6 +196,7 @@ bool hal_player_start(const char *data, uint32_t data_len, uint32_t file_total_l
 
 static void file_download_state_cb(void *context, HTTP_FILE_DOWNLOAD_STATE_E state, uint32_t progress, uint32_t user_args)
 {
+    static uint8_t times = 0;
     //    FILE_DOWNLOAD_CONTEXT_S *file_download_context = (FILE_DOWNLOAD_CONTEXT_S *)context;
 
     PLAYER_OPTION_S *s_player_option_p = (PLAYER_OPTION_S *)user_args;
@@ -214,21 +215,22 @@ static void file_download_state_cb(void *context, HTTP_FILE_DOWNLOAD_STATE_E sta
     if (state == HTTP_FILE_DOWNLOAD_STATE_SUCCESS)
     {
         s_player_option_p->file_download_status_e = HTTP_FILE_DOWNLOAD_STATE_SUCCESS;
-        hal_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS!");
         mico_rtos_thread_msleep(300);
+        hal_log("set urlFileDownload_Sem");
         mico_rtos_set_semaphore(&urlFileDownload_Sem);
+        hal_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS! times = %d", times++);
     }
     else if (state == HTTP_FILE_DOWNLOAD_STATE_FAILED)
     {
         s_player_option_p->file_download_status_e = HTTP_FILE_DOWNLOAD_STATE_FAILED;
-        hal_log("state is HTTP_FILE_DOWNLOAD_STATE_FAILED!!!");
         mico_rtos_thread_msleep(300);
         mico_rtos_set_semaphore(&urlFileDownload_Sem);
+        hal_log("state is HTTP_FILE_DOWNLOAD_STATE_FAILED!!!");
     }
 
     return;
 }
-
+extern mico_queue_t eland_volum;
 static bool file_download_data_cb(void *context, const char *data, uint32_t data_len, uint32_t user_args)
 {
     AUDIO_STREAM_PALY_S fm_stream;
@@ -236,6 +238,7 @@ static bool file_download_data_cb(void *context, const char *data, uint32_t data
     FILE_DOWNLOAD_CONTEXT_S *file_download_context = (FILE_DOWNLOAD_CONTEXT_S *)context;
     mscp_result_t result = MSCP_RST_ERROR;
     PLAYER_OPTION_S *s_player_option_p = (PLAYER_OPTION_S *)user_args;
+    uint8_t volum = 0;
 
     require_string((file_download_context != NULL) && (data_len <= 2000) && (data_len != 0), exit, "data len error");
 
@@ -255,6 +258,15 @@ static bool file_download_data_cb(void *context, const char *data, uint32_t data
     }
 
 audio_transfer:
+    err = mico_rtos_pop_from_queue(&eland_volum, &volum, 10);
+    if (err == kNoErr)
+    {
+        if (volum == 1)
+            audio_service_volume_up(&result, 1);
+        else if (volum == 2)
+            audio_service_volume_down(&result, 1);
+    }
+
     err = audio_service_stream_play(&result, &fm_stream);
     if (err != kNoErr)
     {
@@ -289,9 +301,9 @@ exit:
 
 OSStatus hal_url_fileDownload_start(char *url)
 {
-    hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_test");
     stream_play_opt.type = AUDIO_STREAM_TYPE_MP3;
     ai_stream_play_id = audio_service_system_generate_stream_id();
+    hal_log(">>>>>>>>>>>>>>>>>>> hal_url_fileDownload_test id = %d", ai_stream_play_id);
     stream_play_opt.stream_player_id = ai_stream_play_id;
 
     return http_file_download_start((FILE_DOWNLOAD_CONTEXT *)(&g_file_download_context_user),

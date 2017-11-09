@@ -38,6 +38,7 @@
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
 mico_semaphore_t flash_play_Sem = NULL;
+mico_queue_t eland_volum = NULL;
 
 static void player_flash_thread(mico_thread_arg_t arg)
 {
@@ -243,19 +244,23 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
 {
     OSStatus err = kNoErr;
     mscp_result_t result = MSCP_RST_ERROR;
+    uint8_t times = 0;
     test_log("url_fileDownloadtest_thread created.");
     mico_rtos_thread_sleep(3);
     flagAudioPlay = 1;
-    //mico_rtos_set_semaphore(&urlFileDownload_Sem);
+    mico_rtos_set_semaphore(&urlFileDownload_Sem);
     while (1)
     {
+        test_log("wait urlFileDownload_Sem");
         mico_rtos_get_semaphore(&urlFileDownload_Sem, MICO_WAIT_FOREVER);
+        test_log("times = %d flagAudioPlay = %d", times++, flagAudioPlay);
+        mico_rtos_thread_msleep(100);
         switch (flagAudioPlay)
         {
         case 1:
             err = hal_url_fileDownload_start(URL_FILE_DNLD);
             test_log("file download status: err = %d", err);
-            SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
+            //SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
             flagAudioPlay = 1;
             break;
         case 2:
@@ -277,6 +282,7 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
             break;
         }
     }
+    test_log("exit **************** ");
 }
 
 static void url_paly_stop_thread(mico_thread_arg_t arg)
@@ -300,6 +306,9 @@ OSStatus start_test_thread(void)
 {
     OSStatus err = kNoErr;
     err = mico_rtos_init_semaphore(&flash_play_Sem, 1);
+    require_noerr(err, exit);
+
+    err = mico_rtos_init_queue(&eland_volum, "eland_volum", sizeof(uint8_t), 3);
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "ASR Thread", player_flash_thread, 0x900, 0);

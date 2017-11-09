@@ -197,7 +197,6 @@ int uart_get_one_packet(uint8_t *inBuf, int inBufLen)
     p = inBuf;
     Eland_uart_log("received  ********");
     err = MicoUartRecv(MICO_UART_2, p, 1, MICO_WAIT_FOREVER);
-    Eland_uart_log("received  %02x", *p);
 
     require_noerr(err, exit);
     require((*p == Uart_Packet_Header), exit);
@@ -246,13 +245,13 @@ static void Eland_Key02_Send(void *arg)
     *(Cache + 4) = Uart_Packet_Trail;
     Eland_uart_log("size of cache %d", sizeof(*Cache));
     err = Eland_Uart_Push_Uart_Send_Mutex(msg_send);
-    if (err != kNoErr)
-    {
-        if (Cache != NULL)
-            free(Cache);
-        if (msg_send != NULL)
-            free(msg_send);
-    }
+    // if (err != kNoErr)
+    // {
+    //     if (Cache != NULL)
+    //         free(Cache);
+    //     if (msg_send != NULL)
+    //         free(msg_send);
+    // }
 }
 
 static void Eland_Key_destroy_timer(void)
@@ -316,7 +315,7 @@ static OSStatus get_usart_from_queue(void)
     OSStatus err = kGeneralErr;
     uint16_t rec_len;
     __msg_send_queue_t *usart_rec, *usart_sen;
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &usart_rec, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &usart_rec, 40);
     if (err != kNoErr)
     {
         Eland_uart_log("mico_rtos_pop_from_queue() timeout!!!");
@@ -375,8 +374,9 @@ void MODH_Read_02H(__msg_send_queue_t *usart_rec)
     static uint16_t KEY_Snooze_Count_Trg, KEY_Snooze_Count_count;
     static uint16_t KEY_Minus_Count_Trg, KEY_Minus_Count_count;
     static uint16_t KEY_Add_Count_Trg, KEY_Add_Count_count;
-
+    mscp_result_t result = MSCP_RST_ERROR;
     uint16_t ReadData;
+    uint8_t volum = 0;
 
     Key_Count = (uint16_t)((*(usart_rec->data + 3)) << 8) | *(usart_rec->data + 4);
     Key_Restain = (uint16_t)((*(usart_rec->data + 5)) << 8) | *(usart_rec->data + 6);
@@ -387,23 +387,32 @@ void MODH_Read_02H(__msg_send_queue_t *usart_rec)
     if (Reset_key_Restain_Trg)
         PlatformEasyLinkButtonLongPressedCallback();
 
-    ReadData = Key_Count & KEY_Minus;
+    ReadData = Key_Count & KEY_Add;
     KEY_Add_Count_Trg = ReadData & (ReadData ^ KEY_Add_Count_count);
     KEY_Add_Count_count = ReadData;
     if (KEY_Add_Count_Trg)
+    {
         count_key_time++;
+        volum = 1;
+        mico_rtos_push_to_queue(&eland_volum, &volum, 10);
+    }
 
     ReadData = Key_Count & KEY_Minus;
     KEY_Minus_Count_Trg = ReadData & (ReadData ^ KEY_Minus_Count_count);
     KEY_Minus_Count_count = ReadData;
     if (KEY_Minus_Count_Trg)
+    {
         count_key_time++;
+        volum = 2;
+        mico_rtos_push_to_queue(&eland_volum, &volum, 10);
+    }
 
     ReadData = Key_Count & KEY_Snooze;
     KEY_Snooze_Count_Trg = ReadData & (ReadData ^ KEY_Snooze_Count_count);
     KEY_Snooze_Count_count = ReadData;
     if (KEY_Snooze_Count_Trg)
-    {count_key_time++;
+    {
+        count_key_time++;
         if (flash_play_Sem != NULL)
             mico_rtos_set_semaphore(&flash_play_Sem);
     }
