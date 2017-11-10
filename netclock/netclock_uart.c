@@ -128,7 +128,6 @@ void uart_send_thread_DDE(uint32_t arg)
         require_noerr(err, WaitSend);
         Eland_uart_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     }
-
     mico_rtos_delete_thread(NULL);
 }
 

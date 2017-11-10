@@ -28,7 +28,6 @@ $(NAME)_SOURCES := mico_main.c \
 				   netclock/netclock.c \
 				   netclock/netclock_httpd.c \
 				   netclock/netclock_wifi.c \
-				   netclock/sntp_client.c \
 				   netclock/netclock_uart.c \
 				   netclockota/netclock_ota.c \
 				   flash_kh25/eland_spi.c \
@@ -38,8 +37,7 @@ $(NAME)_SOURCES := mico_main.c \
 				   
 $(NAME)_COMPONENTS := utilities/url \
 					  utilities \
-					  daemons/http_server \
-				 	  protocols/SNTP
+					  daemons/http_server 
 				 	  
 $(NAME)_COMPONENTS += daemons/ota_server
 

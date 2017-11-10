@@ -20,7 +20,6 @@
 #include "netclockconfig.h"
 #include "netclock.h"
 #include "netclock_uart.h"
-#include "sntp_client.h"
 #include "netclock_wifi.h"
 #include "flash_kh25.h"
 #include "eland_sound.h"
@@ -74,7 +73,6 @@ int application_start(void)
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
 
-    app_netclock_log("mico_system_init");
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
@@ -91,8 +89,6 @@ int application_start(void)
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
     audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔” 指示wifi已經連接
-    /*start sntp service*/
-    //start_sntp_service();
 
     /*start eland HTTP service */
     //err = start_eland_service();
