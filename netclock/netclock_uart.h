@@ -49,12 +49,6 @@ typedef struct __msg_send_queue
 } __msg_send_queue_t;
 
 typedef enum {
-    KEY_READ_02 = 0X02,
-    TIME_SET_03,
-    TIME_READ_04,
-} __msg_function_t;
-
-typedef enum {
     KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
     KEY_Reset = (uint16_t)0x0002,     /*!< 軟件復位 */
     KEY_Add = (uint16_t)0x0004,       /*!< 時間＋   */
@@ -66,6 +60,17 @@ typedef enum {
     KEY_Alarm = (uint16_t)0x0100,     /*!< 鬧鐘     */
 } KEY_State_TypeDef;
 
+typedef enum {
+    KEY_READ_02 = 0X02,
+    TIME_SET_03,
+    TIME_READ_04,
+} __msg_function_t;
+
+typedef enum {
+    ELAND_CMD_NONE, /*空命令*/
+    ELAND_SEND_02H, /*發送02H命令*/
+    ELAND_SEND_03H, /*發送03H命令*/
+} eland_usart_cmd_t;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
@@ -76,7 +81,6 @@ extern mico_queue_t elandstate_queue;
 
 /* Private function prototypes -----------------------------------------------*/
 void start_uart_service(void);
-void netclock_uart_thread(mico_thread_arg_t args);
 void uart_recv_thread_DDE(uint32_t arg);
 void uart_send_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
