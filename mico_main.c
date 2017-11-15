@@ -56,6 +56,7 @@ int application_start(void)
     /*Register elandstate_queue: elandstate for uart*/
     err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
 
+    err = Eland_Rtc_Init();
     /*start init uart & start service*/
     start_uart_service();
 

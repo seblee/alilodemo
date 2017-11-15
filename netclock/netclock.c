@@ -62,9 +62,6 @@ static OSStatus alarm_off_record_entry(void);
 //eland OTA 固件升級開始通知
 static OSStatus ota_update_start_notice(void);
 
-//eland 測試使用RTC
-char cur_time_print[20];
-char start_time_print[20];
 static uint32_t eland_http_request_count = 0;
 static uint32_t eland_http_success_count = 0;
 
@@ -116,24 +113,9 @@ exit:
 OSStatus start_eland_service(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
 
     NetclockInitSuccess = false;
     err = mico_rtos_init_semaphore(&elandservicestart, 1);
-    require_noerr(err, exit);
-
-    cur_time.year = 17; //设置时间
-    cur_time.month = 9;
-    cur_time.date = 23;
-    cur_time.weekday = 2;
-    cur_time.hr = 18;
-    cur_time.min = 10;
-    cur_time.sec = 0;
-    memset(cur_time_print, 0, 20);
-    memset(start_time_print, 0, 20);
-    sprintf(start_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-
-    err = MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
     require_noerr(err, exit);
 
     /* create eland init thread */
@@ -506,7 +488,6 @@ exit:
 static OSStatus eland_device_info_login(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
     char *device_info_login_body = NULL;
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
@@ -548,10 +529,8 @@ start_sync_status:
         err = kGeneralErr;
         goto exit;
     }
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
-              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    Eland_log("request = %ld,success = %ld ",
+              eland_http_request_count, eland_http_success_count);
     //Eland_log("<===== eland_device_info_login success <======");
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -586,7 +565,6 @@ exit:
 static OSStatus eland_device_info_get(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
     char *request_uri_cache;
@@ -628,10 +606,8 @@ DEVICE_INFO_GET_START:
         err = kGeneralErr;
         goto exit;
     }
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
-              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    Eland_log("request = %ld,success = %ld",
+              eland_http_request_count, eland_http_success_count);
     //Eland_log("<===== eland_device_info_login success <======");
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -662,7 +638,7 @@ exit:
 static OSStatus alarm_sound_download(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
+
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
 
@@ -700,10 +676,8 @@ ALARM_SOUND_DOWNLOAD_START:
         err = kGeneralErr;
         goto exit;
     }
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
-              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    Eland_log("request = %ld,success = %ld",
+              eland_http_request_count, eland_http_success_count);
     //Eland_log("<===== eland_device_info_login success <======");
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -732,7 +706,6 @@ exit:
 static OSStatus eland_alarm_start_notice(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
     char *request_uri_cache;
@@ -774,10 +747,8 @@ ALARM_START_NOTICE_START:
         err = kGeneralErr;
         goto exit;
     }
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
-              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    Eland_log("request = %ld,success = %ld",
+              eland_http_request_count, eland_http_success_count);
     //Eland_log("<===== eland_device_info_login success <======");
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -807,7 +778,6 @@ exit:
 static OSStatus alarm_off_record_entry(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
     char *eland_request_body_cache = NULL;
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
@@ -852,10 +822,8 @@ ALARM_OFF_RECORD_ENTRY_START:
         goto exit;
     }
 
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
-              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    Eland_log("request = %ld,success = %ld ",
+              eland_http_request_count, eland_http_success_count);
     //Eland_log("<===== eland_device_info_login success <======");
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -885,7 +853,6 @@ exit:
 static OSStatus ota_update_start_notice(void)
 {
     OSStatus err = kGeneralErr;
-    mico_rtc_time_t cur_time = {0};
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
 
@@ -925,10 +892,8 @@ OTA_UPDATE_NOTICE_START:
         err = kGeneralErr;
         goto exit;
     }
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    sprintf(cur_time_print, "20%02d-%02d-%02d %02d:%02d:%02d", cur_time.year, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec);
-    Eland_log("request = %ld,success = %ld %16s--%16s<===<===",
-              eland_http_request_count, eland_http_success_count, start_time_print, cur_time_print);
+    Eland_log("request = %ld,success = %ld",
+              eland_http_request_count, eland_http_success_count);
     //Eland_log("<===== eland_device_info_login success <======");
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -1161,44 +1126,18 @@ exit:
 
     return err;
 }
-//eland down load sound call back function
-//static OSStatus eland_down_load_call_back(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
-//                                          size_t inLen, void *inUserContext)
-//{
-//    OSStatus err = kNoErr;
-//    http_context_t *context = inUserContext;
-//    //static uint32_t sound_flash_address = 0x001000;
-//    Eland_log("inPos = %ld,inLen = %d", inPos, inLen);
-//    //eland_sound_download_pos += inLen;
-//
-//    // Extra data with a content length value
-//    if (inPos == 0 && context->content == NULL)
-//    {
-//        if (elandSPIBuffer != NULL)
-//            free(elandSPIBuffer);
-//        elandSPIBuffer = calloc(1500 + 1, sizeof(uint8_t));
-//        require_action(elandSPIBuffer, exit, err = kNoMemoryErr);
-//    }
-//    memcpy(elandSPIBuffer, inData, inLen);
-//
-//    flash_kh25_write_page(elandSPIBuffer, sound_flash_address, inLen);
-//    sound_flash_address += inLen;
-//exit:
-//    return err;
-//}
-/* Called when HTTPHeaderClear is called */
-//static void eland_down_load_onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext)
-//{
-//    UNUSED_PARAMETER(inHeader);
-//    http_context_t *context = inUserContext;
-//    if (context->content)
-//    {
-//        free(context->content);
-//        context->content = NULL;
-//    }
-//    if (elandSPIBuffer != NULL)
-//    {
-//        free(elandSPIBuffer);
-//        elandSPIBuffer = NULL;
-//    }
-//}
+
+OSStatus Eland_Rtc_Init(void)
+{
+    OSStatus status = kNoErr;
+    mico_rtc_time_t cur_time = {0};
+    cur_time.year = 17; //设置时间
+    cur_time.month = 11;
+    cur_time.date = 15;
+    cur_time.weekday = 4;
+    cur_time.hr = 15;
+    cur_time.min = 10;
+    cur_time.sec = 7;
+    status = MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
+    return status;
+}

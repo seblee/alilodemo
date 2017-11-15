@@ -23,6 +23,8 @@ bool get_wifi_status(void);
 void free_json_obj(json_object **json_obj);
 void destory_upload_data(void);
 
+OSStatus Eland_Rtc_Init(void);
+
 OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
 

@@ -67,9 +67,10 @@ typedef enum {
 } __msg_function_t;
 
 typedef enum {
-    ELAND_CMD_NONE, /*空命令*/
-    ELAND_SEND_02H, /*發送02H命令*/
-    ELAND_SEND_03H, /*發送03H命令*/
+    ELAND_CMD_NONE,     /*空命令*/
+    ELAND_SEND_CMD_02H, /*發送02H命令*/
+    ELAND_SEND_CMD_03H, /*發送03H命令*/
+    ELAND_SEND_CMD_04H, /*發送04H命令*/
 } eland_usart_cmd_t;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
