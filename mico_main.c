@@ -49,7 +49,6 @@ int application_start(void)
     app_log_trace();
     OSStatus err = kNoErr;
     mico_Context_t *mico_context;
-    mscp_result_t result = MSCP_RST_ERROR;
     app_netclock_log(">>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
@@ -89,7 +88,6 @@ int application_start(void)
     //app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
-    audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔” 指示wifi已經連接
 
     /*start eland HTTP service */
     //err = start_eland_service();

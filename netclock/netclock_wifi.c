@@ -62,12 +62,10 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
 {
     msg_wify_queue my_message;
-    mscp_result_t result = MSCP_RST_ERROR;
-    WifiSet_log("Wi-Fi STATION connecte failed");
+     WifiSet_log("Wi-Fi STATION connecte failed");
     my_message.value = Wify_Station_Connect_Failed;
     if (wifistate_queue != NULL)
         mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
-    audio_service_sound_remind_start(&result, 7); //網絡連接失敗
 }
 
 void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
