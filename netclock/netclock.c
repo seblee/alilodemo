@@ -16,7 +16,6 @@
 ELAND_DES_S *netclock_des_g = NULL;
 static bool NetclockInitSuccess = false;
 
-static mico_semaphore_t elandservicestart = NULL;
 //http client mutex
 static mico_mutex_t http_send_setting_mutex = NULL;
 json_object *ElandJsonData = NULL;
@@ -47,55 +46,20 @@ static OSStatus push_http_req_to_queue(ELAND_HTTP_REQUEST_SETTING_S *http_req);
 OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
                                  ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
                                  uint32_t id);
-//eland init 線程
-static void NetclockInit(mico_thread_arg_t arg);
-//eland 情報登錄
-static OSStatus eland_device_info_login(void);
-//eland 情報取得
-static OSStatus eland_device_info_get(void);
+
+//eland 通信情報取得
+static OSStatus eland_communication_info_get(void);
 //eland 下載數據
 static OSStatus alarm_sound_download(void);
-//eland 鬧鐘開始通知
-static OSStatus eland_alarm_start_notice(void);
-//eland 鬧鐘OFF履歷登錄
-static OSStatus alarm_off_record_entry(void);
-//eland OTA 固件升級開始通知
-static OSStatus ota_update_start_notice(void);
-
-static uint32_t eland_http_request_count = 0;
-static uint32_t eland_http_success_count = 0;
 
 //生成一个http回话id
-static uint32_t
-generate_http_session_id(void)
+static uint32_t generate_http_session_id(void)
 {
     static uint32_t id = 1;
 
     return id++;
 }
 OSStatus netclock_desInit(void)
-{
-    OSStatus err = kGeneralErr;
-    if (false == CheckNetclockDESSetting())
-    {
-        //结构体覆盖
-        Eland_log("[NOTICE]recovery settings!!!!!!!");
-        err = Netclock_des_recovery();
-        require_noerr(err, exit);
-    }
-    Eland_log("local firmware version:%s", Eland_Firmware_Version);
-    return kNoErr;
-exit:
-    Eland_log("netclock_des_g init err");
-    if (netclock_des_g != NULL)
-    {
-        memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
-        mico_system_context_update(mico_system_context_get());
-    }
-    return kGeneralErr;
-}
-/**/
-OSStatus InitNetclockService(void)
 {
     OSStatus err = kGeneralErr;
     mico_Context_t *context = NULL;
@@ -105,27 +69,58 @@ OSStatus InitNetclockService(void)
 
     netclock_des_g = (ELAND_DES_S *)mico_system_context_get_user_data(context);
     require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
-    err = kNoErr;
+
+    //数据结构体初始化
+    if (false == CheckNetclockDESSetting())
+    {
+        //结构体覆盖
+        Eland_log("[NOTICE]recovery settings!!!!!!!");
+        err = Netclock_des_recovery();
+        require_noerr(err, exit);
+    }
+    Eland_log("local firmware version:%s", Eland_Firmware_Version);
+
+    return kNoErr;
 exit:
-    return err;
+    if (netclock_des_g != NULL)
+    {
+        memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
+        mico_system_context_update(mico_system_context_get());
+    }
+    Eland_log("netclock_des_g init err");
+    return kGeneralErr;
 }
+
 //啟動Netclock net work
 OSStatus start_eland_service(void)
 {
     OSStatus err = kGeneralErr;
 
     NetclockInitSuccess = false;
-    err = mico_rtos_init_semaphore(&elandservicestart, 1);
+    require_string(get_wifi_status() == true, exit, "wifi is not connect");
+
+    /*初始化互斥信号量*/
+    err = mico_rtos_init_mutex(&http_send_setting_mutex);
     require_noerr(err, exit);
 
-    /* create eland init thread */
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "eland_init", NetclockInit, 0x800, (uint32_t)NULL);
-    require_noerr_string(err, exit, "ERROR: Unable to start the eland_init thread");
+    //闹钟初始化
+    //开启http client 后台线程
+    err = start_client_serrvice(); //内部有队列初始化,需要先执行 //ssl登录等
+    require_noerr(err, exit);
 
-    mico_rtos_get_semaphore(&elandservicestart, MICO_WAIT_FOREVER); //wait until get semaphore
+    //startsNetclockinit:
+
+    //1.eland 通訊情報取得
+    err = eland_communication_info_get();
+    require_noerr(err, exit);
+
+    //3.eland test  下載音頻到flash
+    err = alarm_sound_download(); //暫時做測試用
+    require_noerr(err, exit);
+
+    NetclockInitSuccess = true;
 
 exit:
-    mico_rtos_deinit_semaphore(&elandservicestart); //銷毀 不再使用的信號量
 
     if (NetclockInitSuccess == true)
     {
@@ -139,77 +134,14 @@ exit:
     }
     return err;
 }
-//闹钟初始化
-static void NetclockInit(mico_thread_arg_t arg)
-{
-    UNUSED_PARAMETER(arg);
-    OSStatus err = kGeneralErr;
-
-    require_string(get_wifi_status() == true, exit, "wifi is not connect");
-    /*初始化互斥信号量*/
-    err = mico_rtos_init_mutex(&http_send_setting_mutex);
-    require_noerr(err, exit);
-
-    //开启http client 后台线程
-    err = start_client_serrvice(); //内部有队列初始化,需要先执行 //ssl登录等
-    require_noerr(err, exit);
-
-    //startsNetclockinit:
-
-    //1.eland 情报同步到雲端(同步设备版本、硬件型号到云端)
-    //err = eland_device_info_login(); //暫時做測試用
-    require_noerr(err, exit);
-
-    //2.eland 情報從雲端獲取
-    //err = eland_device_info_get(); //暫時做測試用
-    require_noerr(err, exit);
-
-    //3.eland test  下載音頻到flash
-    err = alarm_sound_download(); //暫時做測試用
-    require_noerr(err, exit);
-
-    //4.eland 鬧鐘開始通知
-    //err = eland_alarm_start_notice(); //暫時做測試用
-    require_noerr(err, exit);
-
-    //5.eland 鬧鐘OFF履歷登錄
-    //err = alarm_off_record_entry(); //暫時做測試用
-    require_noerr(err, exit);
-
-    //6.eland OTA開始通知
-    //err = ota_update_start_notice(); //暫時做測試用
-    require_noerr(err, exit);
-
-    NetclockInitSuccess = true;
-
-exit:
-    if (NetclockInitSuccess == true)
-        mico_rtos_set_semaphore(&elandservicestart); //wait until get semaphore
-
-    // if (err != kNoErr)
-    // {
-    //     _bonjour();
-    // }
-
-    mico_rtos_delete_thread(NULL);
-    return;
-}
 
 //检查从flash读出的数据是否正确,不正确就恢复出厂设置
 bool CheckNetclockDESSetting(void)
 {
-    char firmware[64] = {0};
-    sprintf(firmware, "%s", Eland_Firmware_Version);
     /*check Eland_ID*/
-    if (0 != strcmp(netclock_des_g->eland_id, Eland_ID))
+    if (netclock_des_g->eland_id == 0)
     {
-        Eland_log("ElandID change!");
-        return false;
-    }
-    /*check ElandFirmwareVersion*/
-    if (0 != strcmp(netclock_des_g->firmware_version, firmware))
-    {
-        Eland_log("ElandFirmwareVersion changed!");
+        Eland_log("ElandID new!");
         return false;
     }
 
@@ -222,13 +154,32 @@ bool CheckNetclockDESSetting(void)
 
     if (netclock_des_g->IsActivate == true) //设备已激活
     {
-        /*check UserID */
+        /*check timezone*/
         if ((netclock_des_g->timezone_offset_sec < Timezone_offset_sec_Min) ||
             (netclock_des_g->timezone_offset_sec > Timezone_offset_sec_Max))
         {
             Eland_log("ElandZoneOffset is error!");
             return false;
         }
+        /*check UserID*/
+        if (strlen(netclock_des_g->user_id) == 0)
+        {
+            Eland_log("UserID error!");
+            return false;
+        }
+        /*check serial_number*/
+        if (strlen(netclock_des_g->serial_number) == 0)
+        {
+            Eland_log("UserID error!");
+            return false;
+        }
+    }
+
+    /*check ElandFirmwareVersion*/
+    if (0 != strncmp(netclock_des_g->firmware_version, Eland_Firmware_Version, (firmware_version_len - 1)))
+    {
+        Eland_log("ElandFirmwareVersion changed!");
+        sprintf(netclock_des_g->firmware_version, "%s", Eland_Firmware_Version);
     }
     return true;
 }
@@ -243,11 +194,11 @@ OSStatus Netclock_des_recovery(void)
     netclock_des_g->IsHava_superuser = false;
     netclock_des_g->IsRecovery = false;
 
-    memcpy(netclock_des_g->eland_id, Eland_ID, strlen(Eland_ID));                                     //Eland唯一识别的ID
+    netclock_des_g->eland_id = 5;                                                                     //Eland唯一识别的ID
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
     wlan_get_mac_address(mac);                                                                        //MAC地址
     memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));                      //MAC地址
-    sprintf(netclock_des_g->mac_address, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
     mico_system_context_update(mico_system_context_get());
@@ -257,7 +208,6 @@ OSStatus Netclock_des_recovery(void)
 /****start softAP event wait******/
 void start_HttpServer_softAP_thread(void)
 {
-
     mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Para_config",
                             ElandParameterConfiguration, 0x1000, (uint32_t)NULL);
 }
@@ -313,7 +263,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     require_action_string(DeviceJsonData, exit, err = kNoMemoryErr, "create DeviceJsonData object error!");
 
     Eland_log("Begin add DeviceJsonData object");
-    json_object_object_add(DeviceJsonData, "eland_id", json_object_new_string(Eland_ID));
+    json_object_object_add(DeviceJsonData, "eland_id", json_object_new_int(netclock_des_g->eland_id));
     json_object_object_add(DeviceJsonData, "user_id", json_object_new_string(netclock_des_g->user_id));
     json_object_object_add(DeviceJsonData, "eland_name", json_object_new_string(netclock_des_g->eland_name));
     json_object_object_add(DeviceJsonData, "timezone_offset_sec", json_object_new_int(netclock_des_g->timezone_offset_sec));
@@ -330,8 +280,6 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
-    json_object_object_add(DeviceJsonData, "firmware_update_download_url", json_object_new_string(netclock_des_g->firmware_update_download_url));
-    json_object_object_add(DeviceJsonData, "firmware_md5", json_object_new_string(netclock_des_g->firmware_update_download_url));
 
     json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 
@@ -466,16 +414,6 @@ OSStatus ProcessPostJson(char *InputJson)
         {
             netclock_des_g->timezone_offset_sec = json_object_get_int(val);
         }
-        else if (!strcmp(key, "firmware_update_download_url"))
-        {
-            memset(ota_url, 0, sizeof(ota_url));
-            sprintf(ota_url, "%s", json_object_get_string(val));
-        }
-        else if (!strcmp(key, "firmware_md5"))
-        {
-            memset(ota_md5, 0, sizeof(ota_md5));
-            sprintf(ota_md5, "%s", json_object_get_string(val));
-        }
     }
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以
     return kNoErr;
@@ -484,97 +422,17 @@ exit:
     return kGeneralErr;
 }
 
-//eland 情報登錄
-static OSStatus eland_device_info_login(void)
-{
-    OSStatus err = kGeneralErr;
-    char *device_info_login_body = NULL;
-    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
-    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
-    Eland_log("web_send_Get_Request");
-    device_info_login_body = malloc(1024);
-    memset(device_info_login_body, 0, 1024);
-    InitUpLoadData(device_info_login_body);
-
-start_sync_status:
-    while (get_wifi_status() == false)
-    {
-        Eland_log("https disconnect, eland_device_info_login is waitting...");
-        err = kGeneralErr;
-        goto exit;
-    }
-    if (get_https_connect_status() == false)
-    {
-        Eland_log("https_connect_status is not true");
-        mico_rtos_thread_sleep(2);
-        goto start_sync_status;
-    }
-
-    Eland_log("=====> eland_device_info_login send ======>");
-    eland_http_request_count++;
-    err = eland_push_http_req_mutex(ELAND_SYNC_STATUS_METHOD, ELAND_DEVICE_INFO_LOGIN, ELAND_DEVICE_LOGIN_URI,
-                                    ELAND_HTTP_DOMAIN_NAME, device_info_login_body, &user_http_res);
-    require_noerr(err, exit);
-
-    //处理返回结果
-    if (user_http_res.status_code == 200)
-    {
-        eland_http_success_count++;
-        Eland_log("eland login successed 200");
-    }
-    else
-    {
-        Eland_log("eland login error %ld", user_http_res.status_code);
-        err = kGeneralErr;
-        goto exit;
-    }
-    Eland_log("request = %ld,success = %ld ",
-              eland_http_request_count, eland_http_success_count);
-    //Eland_log("<===== eland_device_info_login success <======");
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    mico_rtos_thread_sleep(1);
-    goto start_sync_status; //兩秒重複一次
-
-exit:
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    if (err != kNoErr)
-    {
-        Eland_log("<===== device_sync_status error <======");
-        mico_thread_msleep(200);
-        goto start_sync_status;
-    }
-
-    if (device_info_login_body != NULL) //释放资源
-    {
-        free(device_info_login_body);
-        device_info_login_body = NULL;
-    }
-    return err;
-}
-
-//eland 情報取得
-static OSStatus eland_device_info_get(void)
+//eland 通信情報取得
+static OSStatus eland_communication_info_get(void)
 {
     OSStatus err = kGeneralErr;
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-    char *request_uri_cache;
-    request_uri_cache = malloc(strlen(ELAND_DEVICE_INFO_GET_URI) + strlen("52017-09-14+19%3A45%3A47.289") + 1);
-    sprintf(request_uri_cache, ELAND_DEVICE_INFO_GET_URI, "6", "2017-09-20+15%3A06%3A53.289");
 
 DEVICE_INFO_GET_START:
-    while (get_wifi_status() == false)
+    if (get_wifi_status() == false)
     {
-        Eland_log("https disconnect, eland_device_info_login is waitting...");
+        Eland_log("wifi_status disconnect ");
         err = kGeneralErr;
         goto exit;
     }
@@ -585,19 +443,16 @@ DEVICE_INFO_GET_START:
         goto DEVICE_INFO_GET_START;
     }
 
-    Eland_log("=====> eland_device_info_get start ======>");
-    eland_http_request_count++;
-    err = eland_push_http_req_mutex(ELAND_DEVICE_INFO_GET_METHOD, //請求方式
-                                    ELAND_DEVICE_INFO_GET,        //請求類型
-                                    request_uri_cache,            //URI參數
-                                    ELAND_HTTP_DOMAIN_NAME,       //主機域名
-                                    "",                           //request body
-                                    &user_http_res);              //response 接收緩存
+    err = eland_push_http_req_mutex(ELAND_COMMUNICATION_INFO_UPDATE_METHOD, //請求方式
+                                    ELAND_COMMUNICATION_INFO_GET,           //請求類型
+                                    ELAND_COMMUNICATION_INFO_UPDATE_URI,    //URI參數
+                                    ELAND_HTTP_DOMAIN_NAME,                 //主機域名
+                                    "",                                     //request body
+                                    &user_http_res);                        //response 接收緩存
     require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)
     {
-        eland_http_success_count++;
         Eland_log("<===== eland_device_info_get end <======");
     }
     else
@@ -606,16 +461,6 @@ DEVICE_INFO_GET_START:
         err = kGeneralErr;
         goto exit;
     }
-    Eland_log("request = %ld,success = %ld",
-              eland_http_request_count, eland_http_success_count);
-    //Eland_log("<===== eland_device_info_login success <======");
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    mico_rtos_thread_sleep(1);
-    goto DEVICE_INFO_GET_START; //兩秒重複一次
 
 exit:
     if (user_http_res.eland_response_body != NULL) //释放资源
@@ -630,7 +475,6 @@ exit:
         goto DEVICE_INFO_GET_START;
     }
 
-    free(request_uri_cache);
     return err;
 }
 
@@ -643,7 +487,7 @@ static OSStatus alarm_sound_download(void)
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
 
 ALARM_SOUND_DOWNLOAD_START:
-    while (get_wifi_status() == false)
+    if (get_wifi_status() == false)
     {
         Eland_log("https disconnect, eland_device_info_login is waitting...");
         err = kGeneralErr;
@@ -656,8 +500,8 @@ ALARM_SOUND_DOWNLOAD_START:
         goto ALARM_SOUND_DOWNLOAD_START;
     }
     Eland_log("=====> alarm_sound_download send ======>");
-    eland_http_request_count++;
-    err = eland_push_http_req_mutex(HTTP_GET,               //請求方式
+
+    err = eland_push_http_req_mutex(ELAND_DOWN_LOAD_METHOD, //請求方式
                                     ELAND_ALARM_GET,        //請求類型
                                     ELAND_DOWN_LOAD_URI,    //URI參數
                                     ELAND_HTTP_DOMAIN_NAME, //主機域名
@@ -667,7 +511,6 @@ ALARM_SOUND_DOWNLOAD_START:
     //处理返回结果
     if (user_http_res.status_code == 200)
     {
-        eland_http_success_count++;
         Eland_log("<===== alarm_sound_download end <======");
     }
     else
@@ -676,17 +519,7 @@ ALARM_SOUND_DOWNLOAD_START:
         err = kGeneralErr;
         goto exit;
     }
-    Eland_log("request = %ld,success = %ld",
-              eland_http_request_count, eland_http_success_count);
-    //Eland_log("<===== eland_device_info_login success <======");
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    mico_rtos_thread_sleep(1);
-    return err;
-    goto ALARM_SOUND_DOWNLOAD_START; //兩秒重複一次
+
 exit:
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
@@ -700,221 +533,6 @@ exit:
         goto ALARM_SOUND_DOWNLOAD_START;
     }
 
-    return err;
-}
-//eland 鬧鐘開始通知
-static OSStatus eland_alarm_start_notice(void)
-{
-    OSStatus err = kGeneralErr;
-    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
-    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-    char *request_uri_cache;
-    request_uri_cache = malloc(strlen(ELAND_ALARM_START_NOTICE_URI) + strlen("50a259f14-f7c5-4128-8dd2-7f8a5cdc4702") + 1);
-    sprintf(request_uri_cache, ELAND_ALARM_START_NOTICE_URI, "5", "0a259f14-f7c5-4128-8dd2-7f8a5cdc4702");
-
-ALARM_START_NOTICE_START:
-    while (get_wifi_status() == false)
-    {
-        Eland_log("https disconnect, eland_device_info_login is waitting...");
-        err = kGeneralErr;
-        goto exit;
-    }
-    if (get_https_connect_status() == false)
-    {
-        Eland_log("https_connect_status is not true");
-        mico_rtos_thread_sleep(2);
-        goto ALARM_START_NOTICE_START;
-    }
-
-    Eland_log("=====> eland_alarm_start_notice start ======>");
-    eland_http_request_count++;
-    err = eland_push_http_req_mutex(ELAND_ALARM_START_NOTICE_METHOD, //請求方式
-                                    ELAND_ALARM_START_NOTICE,        //請求類型
-                                    request_uri_cache,               //URI參數
-                                    ELAND_HTTP_DOMAIN_NAME,          //主機域名
-                                    "",                              //request body
-                                    &user_http_res);                 //response 接收緩存
-    require_noerr(err, exit);
-    //处理返回结果
-    if (user_http_res.status_code == 200)
-    {
-        eland_http_success_count++;
-        Eland_log("<===== eland_alarm_start_notice successed <======");
-    }
-    else
-    {
-        Eland_log("alarm_start_notice error %ld", user_http_res.status_code);
-        err = kGeneralErr;
-        goto exit;
-    }
-    Eland_log("request = %ld,success = %ld",
-              eland_http_request_count, eland_http_success_count);
-    //Eland_log("<===== eland_device_info_login success <======");
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    mico_rtos_thread_sleep(1); //兩秒重複一次
-    goto ALARM_START_NOTICE_START;
-
-exit:
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    if (err != kNoErr)
-    {
-        Eland_log("<===== alarm_start_notice error <======");
-        mico_thread_msleep(200);
-        goto ALARM_START_NOTICE_START;
-    }
-    free(request_uri_cache);
-    return err;
-}
-
-//eland 鬧鐘OFF履歷登錄
-static OSStatus alarm_off_record_entry(void)
-{
-    OSStatus err = kGeneralErr;
-    char *eland_request_body_cache = NULL;
-    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
-    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
-    eland_request_body_cache = malloc(400);
-    memset(eland_request_body_cache, 0, 400);
-    init_alarm_off_record_json(eland_request_body_cache);
-
-ALARM_OFF_RECORD_ENTRY_START:
-    while (get_wifi_status() == false)
-    {
-        Eland_log("https disconnect, eland_device_info_login is waitting...");
-        err = kGeneralErr;
-        goto exit;
-    }
-    if (get_https_connect_status() == false)
-    {
-        Eland_log("https_connect_status is not true");
-        mico_rtos_thread_sleep(2);
-        goto ALARM_OFF_RECORD_ENTRY_START;
-    }
-
-    Eland_log("=====> alarm_off_record_entry start ======>");
-    eland_http_request_count++;
-    err = eland_push_http_req_mutex(ELAND_ALARM_OFF_RECORD_ENTRY_METHOD, //請求方式
-                                    ELAND_ALARM_OFF_RECORD_ENTRY,        //請求類型
-                                    ELAND_ALARM_OFF_RECORD_ENTRY_URI,    //URI參數
-                                    ELAND_HTTP_DOMAIN_NAME,              //主機域名
-                                    eland_request_body_cache,            //request body
-                                    &user_http_res);                     //response 接收緩存
-    require_noerr(err, exit);
-    //处理返回结果
-    if (user_http_res.status_code == 200)
-    {
-        eland_http_success_count++;
-        Eland_log("<===== alarm_off_record_entry successe <======");
-    }
-    else
-    {
-        Eland_log("alarm_off_record_entry error %ld", user_http_res.status_code);
-        err = kGeneralErr;
-        goto exit;
-    }
-
-    Eland_log("request = %ld,success = %ld ",
-              eland_http_request_count, eland_http_success_count);
-    //Eland_log("<===== eland_device_info_login success <======");
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    mico_rtos_thread_sleep(1); //兩秒重複一次
-    goto ALARM_OFF_RECORD_ENTRY_START;
-
-exit:
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    if (err != kNoErr)
-    {
-        Eland_log("<===== alarm_off_record_entry error <======");
-        mico_thread_msleep(200);
-        goto ALARM_OFF_RECORD_ENTRY_START;
-    }
-
-    free(eland_request_body_cache);
-    return err;
-}
-//eland OTA 固件升級開始通知
-static OSStatus ota_update_start_notice(void)
-{
-    OSStatus err = kGeneralErr;
-    ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
-    memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
-OTA_UPDATE_NOTICE_START:
-    while (get_wifi_status() == false)
-    {
-        Eland_log("https disconnect, eland_device_info_login is waitting...");
-        mico_rtos_thread_sleep(2);
-        err = kGeneralErr;
-        goto exit;
-    }
-    if (get_https_connect_status() == false)
-    {
-        Eland_log("https_connect_status is not true");
-        mico_rtos_thread_sleep(2);
-        goto OTA_UPDATE_NOTICE_START;
-    }
-
-    Eland_log("=====> eland_alarm_start_notice start ======>");
-    eland_http_request_count++;
-    err = eland_push_http_req_mutex(ELAND_OTA_START_NOTICE_METHOD, //請求方式
-                                    ELAND_OTA_START_NOTICE,        //請求類型
-                                    ELAND_OTA_START_NOTICE_URI,    //URI參數
-                                    ELAND_HTTP_DOMAIN_NAME,        //主機域名
-                                    "",                            //request body
-                                    &user_http_res);               //response 接收緩存
-    require_noerr(err, exit);
-    //处理返回结果
-    if (user_http_res.status_code == 200)
-    {
-        eland_http_success_count++;
-        Eland_log("<===== eland_alarm_start_notice successed <======");
-    }
-    else
-    {
-        Eland_log("alarm_start_notice error %ld", user_http_res.status_code);
-        err = kGeneralErr;
-        goto exit;
-    }
-    Eland_log("request = %ld,success = %ld",
-              eland_http_request_count, eland_http_success_count);
-    //Eland_log("<===== eland_device_info_login success <======");
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    mico_rtos_thread_sleep(1); //兩秒重複一次
-    goto OTA_UPDATE_NOTICE_START;
-
-exit:
-    if (user_http_res.eland_response_body != NULL) //释放资源
-    {
-        free(user_http_res.eland_response_body);
-        user_http_res.eland_response_body = NULL;
-    }
-    if (err != kNoErr)
-    {
-        Eland_log("<===== alarm_start_notice error <======");
-        mico_thread_msleep(200);
-        goto OTA_UPDATE_NOTICE_START;
-    }
     return err;
 }
 
@@ -1097,7 +715,7 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
     // Eland_log("--------------------------------------------------------");
     // Eland_log("eland_response_body:%s", eland_http_res_p->eland_response_body);
     // Eland_log("--------------------------------------------------------");
-    if ((request_type == ELAND_DEVICE_INFO_GET) && //只在login時候 做JSON格式检查
+    if ((request_type == ELAND_COMMUNICATION_INFO_GET) && //只在請求通信情報時候 做JSON格式检查
         ((eland_http_res_p->eland_response_body[0] != '{') ||
          eland_http_res_p->eland_response_body[res_body_len - 1] != '}'))
     {

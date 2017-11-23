@@ -39,13 +39,8 @@ typedef enum {
 
 typedef enum {
     ELAND_REQUEST_NONE,           //eland NONE
-    ELAND_DEVICE_INFO_LOGIN,      //eland 情報登錄
-    ELAND_DEVICE_INFO_UPDATE,     //eland 情報更新
-    ELAND_DEVICE_INFO_GET,        //eland 情報取得
+    ELAND_COMMUNICATION_INFO_GET, //eland 情報取得
     ELAND_ALARM_GET,              //eland 鬧鐘聲音取得
-    ELAND_ALARM_START_NOTICE,     //eland 鬧鐘開始通知
-    ELAND_ALARM_OFF_RECORD_ENTRY, //eland 鬧鐘OFF履歷登錄
-    ELAND_OTA_START_NOTICE,       //eland 固件升級開始通知
 } ELAND_HTTP_REQUEST_TYPE;
 
 typedef struct _ELAND_HTTP_RESPONSE_SETTING

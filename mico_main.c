@@ -52,33 +52,31 @@ int application_start(void)
     app_netclock_log(">>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
-    /*Register elandstate_queue: elandstate for uart*/
-    err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
 
     err = Eland_Rtc_Init();
-    /*start init uart & start service*/
-    start_uart_service();
+
+    /*Register elandstate_queue: elandstate for uart*/
+    err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
 
     /*start init system context*/
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
 
     /*init fog v2 service*/
-    app_netclock_log("init_netclock_service");
-    err = InitNetclockService();
+    err = netclock_desInit();
     require_noerr(err, exit);
 
-    err = netclock_desInit(); //数据结构体初始化
-    require_noerr(err, exit);
-
-    err = hal_alilo_rabbit_init();
-    require_noerr(err, exit);
+    /*start init uart & start service*/
+    start_uart_service();
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
 
+    err = hal_alilo_rabbit_init();
+    require_noerr(err, exit);
+
     /****start softAP event wait******/
-    start_HttpServer_softAP_thread();
+    //start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
     err = start_eland_flash_service();

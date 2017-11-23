@@ -232,13 +232,13 @@ static void uart_thread_DDE(uint32_t arg)
             continue;
         switch (eland_cmd)
         {
-        case ELAND_SEND_CMD_02H:
+        case ELAND_SEND_CMD_02H: //read key value
             Eland_H02_Send();
             break;
-        case ELAND_SEND_CMD_03H:
+        case ELAND_SEND_CMD_03H: //set MCU_RTC time
             Eland_H03_Send();
             break;
-        case ELAND_SEND_CMD_04H:
+        case ELAND_SEND_CMD_04H: //read MCU_RTC time to set RCT
             Eland_H04_Send();
             break;
         default:
