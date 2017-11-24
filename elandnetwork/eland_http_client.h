@@ -84,5 +84,8 @@ extern char *capem;
 
 OSStatus start_client_serrvice(void);
 bool get_https_connect_status(void);
+//域名域名DNS解析
+OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen);
+int user_set_tcp_keepalive(int socket, int send_timeout, int recv_timeout, int idle, int interval, int count);
 
 #endif

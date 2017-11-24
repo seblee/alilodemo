@@ -115,7 +115,7 @@ OSStatus start_eland_service(void)
     require_noerr(err, exit);
 
     //3.eland test  下載音頻到flash
-    err = alarm_sound_download(); //暫時做測試用
+    //err = alarm_sound_download(); //暫時做測試用
     require_noerr(err, exit);
 
     NetclockInitSuccess = true;
@@ -175,18 +175,14 @@ bool CheckNetclockDESSetting(void)
         }
     }
 
-    /*check ElandFirmwareVersion*/
-    if (0 != strncmp(netclock_des_g->firmware_version, Eland_Firmware_Version, (firmware_version_len - 1)))
-    {
-        Eland_log("ElandFirmwareVersion changed!");
-        sprintf(netclock_des_g->firmware_version, "%s", Eland_Firmware_Version);
-    }
     return true;
 }
 OSStatus Netclock_des_recovery(void)
 {
     unsigned char mac[10] = {0};
+    ELAND_DES_S des_g_Temp;
 
+    memcpy(&des_g_Temp, netclock_des_g, sizeof(ELAND_DES_S));
     memset(netclock_des_g, 0, sizeof(ELAND_DES_S)); //全局变量清空
     mico_system_context_update(mico_system_context_get());
 
@@ -194,11 +190,13 @@ OSStatus Netclock_des_recovery(void)
     netclock_des_g->IsHava_superuser = false;
     netclock_des_g->IsRecovery = false;
 
-    netclock_des_g->eland_id = 5;                                                                     //Eland唯一识别的ID
+    netclock_des_g->eland_id = des_g_Temp.eland_id;                                                   //Eland唯一识别的ID
+    memcpy(netclock_des_g->serial_number, des_g_Temp.serial_number, serial_number_len);               //Eland 串号
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
-    wlan_get_mac_address(mac);                                                                        //MAC地址
-    memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));                      //MAC地址
-    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    wlan_get_mac_address(mac); //MAC地址
+    memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
+    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); //MAC地址
     Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
     mico_system_context_update(mico_system_context_get());
@@ -243,8 +241,6 @@ bool get_wifi_status(void)
 
     return (bool)(link_status.is_connected);
 }
-
-const char Eland_Data[11] = {"ElandData"};
 
 OSStatus InitUpLoadData(char *OutputJsonstring)
 {
@@ -453,7 +449,7 @@ DEVICE_INFO_GET_START:
     //处理返回结果
     if (user_http_res.status_code == 200)
     {
-        Eland_log("<===== eland_device_info_get end <======");
+        Eland_log("<===== eland_communication_info_get end <======");
     }
     else
     {

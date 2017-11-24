@@ -259,8 +259,17 @@ static OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t add
     struct in_addr in_addr;
     char **pptr = NULL;
     char *ip_addr = NULL;
+    LinkStatusTypeDef link_status;
 
     if (addr == NULL || addrLen < 16)
+    {
+        return kGeneralErr;
+    }
+
+    memset(&link_status, 0, sizeof(link_status));
+    micoWlanGetLinkStatus(&link_status);
+
+    if (link_status.is_connected == false)
     {
         return kGeneralErr;
     }
@@ -272,13 +281,11 @@ static OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t add
     }
 
     pptr = host->h_addr_list;
-    //    for (; *pptr != NULL; pptr++ )
-    {
-        in_addr.s_addr = *(uint32_t *)(*pptr);
-        ip_addr = inet_ntoa(in_addr);
-        memset(addr, 0, addrLen);
-        memcpy(addr, ip_addr, strlen(ip_addr));
-    }
+
+    in_addr.s_addr = *(uint32_t *)(*pptr);
+    ip_addr = inet_ntoa(in_addr);
+    memset(addr, 0, addrLen);
+    memcpy(addr, ip_addr, strlen(ip_addr));
 
     return kNoErr;
 }
@@ -317,14 +324,7 @@ static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", eland_http_req->host_name); //增加hostname
     //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n"); //增加Connection设置
-    if ((eland_http_req->eland_request_type == ELAND_DEVICE_INFO_LOGIN) ||
-        (eland_http_req->eland_request_type == ELAND_DEVICE_INFO_UPDATE) ||
-        (eland_http_req->eland_request_type == ELAND_ALARM_OFF_RECORD_ENTRY))
-    {
-        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\n"); //增加Content-Type和Connection设置
-        //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Keepalive\r\n"); //增加Content-Type和Connection设置
-        //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Type: application/json\r\nConnection: Close\r\n"); //增加Content-Type和Connection设置
-    }
+
     //增加http body部分
     if (eland_http_req->http_body != NULL)
     {
@@ -365,7 +365,7 @@ exit:
 }
 
 //设置tcp keep_alive 参数
-static int user_set_tcp_keepalive(int socket, int send_timeout, int recv_timeout, int idle, int interval, int count)
+int user_set_tcp_keepalive(int socket, int send_timeout, int recv_timeout, int idle, int interval, int count)
 {
     int retVal = 0, opt = 0;
 
@@ -556,6 +556,7 @@ SSL_SEND:
                 //PrintHTTPHeader(httpHeader);
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
                 client_log("data lenth = %ld", (uint32_t)context.content_length);
+                client_log("data lenth = %s", context.content);
                 require_noerr(err, exit);
 #if (HTTP_REQ_LOG == 1)
                 client_log("Content %s0x%08x:[%ld]",

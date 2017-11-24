@@ -66,7 +66,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
+    //start_uart_service();
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
@@ -76,7 +76,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /****start softAP event wait******/
-    //start_HttpServer_softAP_thread();
+    start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
     err = start_eland_flash_service();
@@ -88,7 +88,7 @@ int application_start(void)
     app_netclock_log("wifi connected successful");
 
     /*start eland HTTP service */
-    //err = start_eland_service();
+    err = start_eland_service();
     require_noerr(err, exit);
 
     //err = start_test_thread();

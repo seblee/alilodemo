@@ -4,7 +4,6 @@
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 
 uint8_t *elandSPIBuffer = NULL;
-static mico_semaphore_t kh25_InitCompleteSem = NULL;
 // Define SPI pins
 Spi_t Spi_eland = {
     .ui_CS = Eland_CS,
@@ -42,30 +41,13 @@ static void flash_kh25_wait_for_WIP(uint32_t time)
     v_CSIsEnableSimulate(&Spi_eland, 0);
 }
 /*************************/
-OSStatus
-start_spi_test_service(void)
+OSStatus start_spi_test_service(void)
 {
     OSStatus err = kGeneralErr;
-    err = mico_rtos_init_semaphore(&kh25_InitCompleteSem, 1);
-    require_noerr_string(err, exit, "kh25_InitCompleteSem init err");
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "KH25_TEST_Thread", KH25_TEST_Thread, 0x1000, 0);
-    require_noerr_string(err, exit, "KH25_TEST_Thread err");
+    err = flash_kh25_init();
 
-    err = mico_rtos_get_semaphore(&kh25_InitCompleteSem, MICO_WAIT_FOREVER);
-    require_noerr_string(err, exit, "kh25_InitCompleteSem get err");
-
-    err = mico_rtos_deinit_semaphore(&kh25_InitCompleteSem);
-    require_noerr_string(err, exit, "kh25_InitCompleteSem deinit err");
-
-exit:
     return err;
-}
-void KH25_TEST_Thread(mico_thread_arg_t arts)
-{
-    flash_kh25_init();
-    mico_rtos_set_semaphore(&kh25_InitCompleteSem); //wait until get semaphore
-    mico_rtos_delete_thread(NULL);
 }
 
 void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length)
@@ -138,10 +120,8 @@ static OSStatus flash_kh25_check_device(void)
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
     require_string((cache[1] == 0xc2), exit, "flash_kh25 check err");
-    flash_kh25_log("manufacturer ID = 0x%02X", cache[1]);
-    flash_kh25_log("memory type     = 0x%02X", cache[2]);
-    flash_kh25_log("memory density  = 0x%02X", cache[3]);
-    flash_kh25_log("flash model     = %s", (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
+    flash_kh25_log("\r\nmanufacturer ID = 0x%02X\r\nmemory type     = 0x%02X\r\nmemory density  = 0x%02X\r\nflash model     = %s",
+                   cache[1], cache[2], cache[3], (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
     /**************RES***********************/
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -325,7 +305,6 @@ OSStatus flash_kh25_init(void)
     {
         flash_kh25_log("first read:%s", elandSPIBuffer);
         memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
-        //flash_kh25_sector_erase(KH25_CHECK_ADDRESS);
         flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
         sprintf((char *)(elandSPIBuffer), "%s", flash_kh25_check_string);
         flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
