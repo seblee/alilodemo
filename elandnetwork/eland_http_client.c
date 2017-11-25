@@ -253,7 +253,7 @@ bool get_https_connect_status(void)
 }
 
 //域名域名DNS解析
-static OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
+OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
 {
     struct hostent *host = NULL;
     struct in_addr in_addr;
