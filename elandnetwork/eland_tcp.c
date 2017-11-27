@@ -26,38 +26,68 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* Private function prototypes -----------------------------------------------*/
-
+static void TCP_thread_main(mico_thread_arg_t arg);
 /* Private functions ---------------------------------------------------------*/
-static bool has_timer_expired(Timer *timer)
+
+TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
+{
+    LinkStatusTypeDef link_status;
+
+    memset(&link_status, 0, sizeof(link_status));
+
+    micoWlanGetLinkStatus(&link_status);
+
+    elan_tcp_log("wifi link_status:%d", link_status.is_connected);
+
+    if (link_status.is_connected == true)
+    {
+        return NETWORK_PHYSICAL_LAYER_CONNECTED;
+    }
+    else
+    {
+        return NETWORK_MANUALLY_DISCONNECTED;
+    }
+}
+
+static bool has_timer_expired(struct timeval *timer)
 {
     struct timeval now, res;
     gettimeofday(&now, NULL);
-    timersub(&timer->end_time, &now, &res);
+    timersub(timer, &now, &res);
     return res.tv_sec < 0 || (res.tv_sec == 0 && res.tv_usec <= 0);
 }
-void Eland_TCP_IP_Service_Start(mico_thread_arg_t arg)
+
+static void TCP_tls_set_connect_params(Network_t *pNetwork,
+                                       char *pDestinationURL,
+                                       uint16_t destinationPort,
+                                       uint32_t timeout_ms)
 {
-}
-static void _iot_tls_set_connect_params(Eland_Network_t *pNetwork, char *pRootCALocation,
-                                        char *pDeviceCertLocation,
-                                        char *pDevicePrivateKeyLocation,
-                                        char *pDestinationURL,
-                                        uint16_t destinationPort,
-                                        uint32_t timeout_ms,
-                                        bool ServerVerificationFlag,
-                                        bool isUseSSLFlag)
-{
-    pNetwork->tlsConnectParams.DestinationPort = destinationPort;
+    pNetwork->tlsConnectParams.pRootCALocation = capem;
+    pNetwork->tlsConnectParams.pDeviceCertLocation = certificate;
+    pNetwork->tlsConnectParams.pDevicePrivateKeyLocation = private_key;
     pNetwork->tlsConnectParams.pDestinationURL = pDestinationURL;
-    pNetwork->tlsConnectParams.pDeviceCertLocation = pDeviceCertLocation;
-    pNetwork->tlsConnectParams.pDevicePrivateKeyLocation = pDevicePrivateKeyLocation;
-    pNetwork->tlsConnectParams.pRootCALocation = pRootCALocation;
+    pNetwork->tlsConnectParams.DestinationPort = destinationPort;
     pNetwork->tlsConnectParams.timeout_ms = timeout_ms;
-    pNetwork->tlsConnectParams.ServerVerificationFlag = ServerVerificationFlag;
-    pNetwork->tlsConnectParams.isUseSSL = isUseSSLFlag;
+    pNetwork->tlsConnectParams.ServerVerificationFlag = true;
+    pNetwork->tlsConnectParams.isUseSSL = true;
+
+    if (pNetwork->tlsConnectParams.isUseSSL == true)
+    {
+        ssl_set_client_version(TLS_V1_2_MODE);
+    }
+
+    pNetwork->connect = TCP_Connect;
+    pNetwork->write = TCP_Write;
+    pNetwork->read = TCP_Read;
+    pNetwork->disconnect = TCP_disconnect;
+    pNetwork->isConnected = TCP_Physical_is_connected;
+    pNetwork->destroy = TCP_tls_destroy;
+
+    pNetwork->tlsDataParams.server_fd = -1;
+    pNetwork->tlsDataParams.ssl = NULL;
 }
 
-OSStatus Eland_TCP_IP_Connect(Eland_Network_t *pNetwork, TLSConnectParams_t *Params)
+TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
 {
     OSStatus err = kGeneralErr;
     char ipstr[16] = {0};
@@ -66,41 +96,44 @@ OSStatus Eland_TCP_IP_Connect(Eland_Network_t *pNetwork, TLSConnectParams_t *Par
     int ret = 0;
     int errno;
     int root_ca_len = 0;
+    if (pNetwork == NULL)
+        return NULL_VALUE_ERROR;
+
     if (Params != NULL)
     {
-        _iot_tls_set_connect_params(pNetwork, Params->pRootCALocation, Params->pDeviceCertLocation,
-                                    Params->pDevicePrivateKeyLocation,
-                                    Params->pDestinationURL,
-                                    Params->DestinationPort,
-                                    Params->timeout_ms,
-                                    Params->ServerVerificationFlag,
-                                    Params->isUseSSL);
+        TCP_tls_set_connect_params(pNetwork,
+                                   Params->pDestinationURL,
+                                   Params->DestinationPort,
+                                   Params->timeout_ms);
     }
+
     err = usergethostbyname(pNetwork->tlsConnectParams.pDestinationURL, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
     {
         elan_tcp_log("ERROR: Unable to resolute the host address.");
-        goto exit;
-        //   return TCP_CONNECTION_ERROR;
+        return TCP_CONNECTION_ERROR;
     }
     elan_tcp_log("host:%s, ip:%s", pNetwork->tlsConnectParams.pDestinationURL, ipstr);
 
-    socket_fd = = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    ret = user_set_tcp_keepalive(&socket_fd, 5000, 1000, 10, 5, 3);
+    ret = user_set_tcp_keepalive(socket_fd, 5000, 1000, 10, 5, 3);
     if (ret < 0)
     {
-        client_log("user_set_tcp_keepalive() error");
-        err = kGeneralErr;
-        goto exit;
+        elan_tcp_log("ERROR: Unable to resolute the tcp connect");
+        return TCP_SETUP_ERROR;
     }
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(ipstr);
     addr.sin_port = htons(pNetwork->tlsConnectParams.DestinationPort); //
 
-    client_log("start connect");
+    elan_tcp_log("start connect");
     err = connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr));
-    require_noerr_string(err, exit, "connect https server failed");
+    if (err != kNoErr)
+    {
+        elan_tcp_log("ERROR: Unable to resolute the tcp connect");
+        return TCP_CONNECTION_ERROR;
+    }
 
     if (pNetwork->tlsConnectParams.isUseSSL == true)
     {
@@ -124,7 +157,7 @@ OSStatus Eland_TCP_IP_Connect(Eland_Network_t *pNetwork, TLSConnectParams_t *Par
             pNetwork->tlsDataParams.cacert = NULL;
             root_ca_len = 0;
         }
-        client_log("start ssl_connect");
+        elan_tcp_log("start ssl_connect");
         pNetwork->tlsDataParams.ssl = ssl_connect(socket_fd,
                                                   root_ca_len,
                                                   pNetwork->tlsDataParams.cacert, &errno);
@@ -135,76 +168,70 @@ OSStatus Eland_TCP_IP_Connect(Eland_Network_t *pNetwork, TLSConnectParams_t *Par
             close(socket_fd);
             pNetwork->tlsDataParams.server_fd = -1;
             err = kGeneralErr;
-            goto exit;
-            // return SSL_CONNECTION_ERROR;
+            return SSL_CONNECTION_ERROR;
         }
         elan_tcp_log("ssl connected");
     }
     pNetwork->tlsDataParams.server_fd = socket_fd;
-exit:
-    return err;
+    return TCP_SUCCESS;
 }
-OSStatus Eland_TCP_IP_Write(Eland_Network_t *pNetwork, uint8_t *pMsg, , uint32_t len, struct timeval *timer, uint32_t *written_len)
+TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, size_t len, struct timeval *timer, size_t *written_len)
 {
-    uint32_t written_so_far;
+    size_t written_so_far;
     bool isError_flag = false;
     int frags, ret = 0;
-    OSStatus err = kGeneralErr;
+
     struct timeval current_temp, timeforward = {0, 0};
     gettimeofday(&current_temp, NULL);
-    timeradd(&current_temp, &timer, &timeforward);
+    timeradd(&current_temp, timer, &timeforward);
 
-    for (written_so_far = 0, frags = 0; written_so_far < len && !has_timer_expired(timeforward); written_so_far += ret, frags++)
+    for (written_so_far = 0, frags = 0; written_so_far < len && !has_timer_expired(&timeforward); written_so_far += ret, frags++)
     {
-        while ((!has_timer_expired(timeforward)) && ((ret = ssl_send(pNetwork->tlsDataParams.ssl, pMsg + written_so_far, len - written_so_far)) <= 0))
+        while ((!has_timer_expired(&timeforward)) && ((ret = ssl_send(pNetwork->tlsDataParams.ssl, pMsg + written_so_far, len - written_so_far)) <= 0))
         {
             if (ret < 0)
             {
                 elan_tcp_log(" failed");
                 /* All other negative return values indicate connection needs to be reset.
                  * Will be caught in ping request so ignored here */
-                isErrorFlag = true;
+                isError_flag = true;
                 break;
             }
         }
-        if (isErrorFlag)
+        if (isError_flag)
         {
             break;
         }
     }
     *written_len = written_so_far;
-    elan_tcp_log("socket write done", written_so_far);
-    if (isErrorFlag)
+    elan_tcp_log("socket write done");
+    if (isError_flag)
     {
-        elan_tcp_log("socket write err");
-        err = kGeneralErr;
-        goto exit;
+        return NETWORK_SSL_WRITE_ERROR;
     }
     else if (has_timer_expired(timer) && written_so_far != len)
     {
-        elan_tcp_log("socket write time out");
-        err = kGeneralErr;
-        goto exit;
+        return NETWORK_SSL_WRITE_TIMEOUT_ERROR;
     }
-    err = kNoErr;
-exit:
-    return err;
+    return TCP_SUCCESS;
 }
-OSStatus Eland_TCP_IP_Read(Network *pNetwork, unsigned char *pMsg, size_t len, struct timeval *timer, size_t *read_len)
+TCP_Error_t TCP_Read(Network_t *pNetwork, unsigned char *pMsg, size_t len, struct timeval *timer, size_t *read_len)
 {
-    OSStatus err = kGeneralErr;
-    fd_set readfds;
+    size_t rxlen = 0;
     int ret = 0;
-    uint32_t rxlen = 0;
     int fd = pNetwork->tlsDataParams.server_fd;
+    fd_set readfds;
     struct timeval current_temp, timeforward = {0, 0};
 
     FD_ZERO(&readfds);
     FD_SET(fd, &readfds);
 
-    struct timeval current_temp, timeforward = {0, 0};
-    gettimeofday(&current_temp, NULL);
-    timeradd(&current_temp, &timer, &timeforward);
+    if (timer != NULL)
+    {
+        gettimeofday(&current_temp, NULL);
+        timeradd(&current_temp, timer, &timeforward);
+    }
+
     while (len > 0)
     {
         if (pNetwork->tlsConnectParams.isUseSSL == true)
@@ -215,15 +242,15 @@ OSStatus Eland_TCP_IP_Read(Network *pNetwork, unsigned char *pMsg, size_t len, s
             }
             else
             {
-                ret = select(fd + 1, &readfds, NULL, NULL, &t);
-                aws_platform_log("select ret %d", ret);
+                ret = select(fd + 1, &readfds, NULL, NULL, timer);
+                elan_tcp_log("select ret %d", ret);
                 if (ret <= 0)
                 {
                     break;
                 }
                 if (!FD_ISSET(fd, &readfds))
                 {
-                    aws_platform_log("fd is set err");
+                    elan_tcp_log("fd is set err");
                     break;
                 }
                 ret = ssl_recv(pNetwork->tlsDataParams.ssl, pMsg, len);
@@ -238,30 +265,31 @@ OSStatus Eland_TCP_IP_Read(Network *pNetwork, unsigned char *pMsg, size_t len, s
         }
         else if (ret < 0)
         {
-            aws_platform_log("socket read err");
-            err = kGeneralErr;
-            goto exit;
+            elan_tcp_log("socket read err");
+            return NETWORK_SSL_READ_ERROR;
         }
         // Evaluate timeout after the read to make sure read is done at least once
         if (has_timer_expired(timer))
         {
-            aws_platform_log("read time out");
-            err = kGeneralErr;
-            goto exit;
+            elan_tcp_log("read time out");
+            break;
         }
     }
     if (len == 0)
     {
-        *read_len = rxLen;
+        *read_len = rxlen;
+        return TCP_SUCCESS;
     }
     if (rxlen == 0)
     {
+        return NETWORK_SSL_NOTHING_TO_READ;
     }
-    err = kNoErr;
-exit:
-    return err;
+    else
+    {
+        return NETWORK_SSL_READ_TIMEOUT_ERROR;
+    }
 }
-OSStatus iot_tls_disconnect(Network *pNetwork)
+TCP_Error_t TCP_disconnect(Network_t *pNetwork)
 {
 
     /* All other negative return values indicate connection needs to be reset.
@@ -277,4 +305,75 @@ OSStatus iot_tls_disconnect(Network *pNetwork)
         pNetwork->tlsDataParams.server_fd = -1;
     }
     return kNoErr;
+}
+TCP_Error_t TCP_tls_destroy(Network_t *pNetwork)
+{
+    return TCP_SUCCESS;
+}
+
+TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
+{
+    TCP_Error_t rc;
+    OSStatus err;
+    if (pClient == NULL)
+        return NULL_VALUE_ERROR;
+
+    if (ServerParams != NULL)
+        TCP_tls_set_connect_params(&(pClient->networkStack),
+                                   ServerParams->pDestinationURL,
+                                   ServerParams->DestinationPort,
+                                   ServerParams->timeout_ms);
+
+    pClient->clientData.packetTimeoutMs = 20000;
+    pClient->clientData.commandTimeoutMs = 20000;
+
+    if ((pClient->networkStack.tlsConnectParams.pRootCALocation == NULL) ||
+        (pClient->networkStack.tlsConnectParams.pDeviceCertLocation == NULL) ||
+        (pClient->networkStack.tlsConnectParams.pDevicePrivateKeyLocation == NULL) ||
+        (pClient->networkStack.tlsConnectParams.pDestinationURL == NULL) ||
+        (pClient->networkStack.tlsConnectParams.DestinationPort == 0))
+        return NULL_VALUE_ERROR;
+
+    pClient->clientData.isBlockOnThreadLockEnabled = true;
+
+    err = mico_rtos_init_mutex(&(pClient->clientData.state_change_mutex));
+    if (err != kNoErr)
+        return MUTEX_INIT_ERROR;
+    err = mico_rtos_init_mutex(&(pClient->clientData.tls_read_mutex));
+    if (err != kNoErr)
+        return MUTEX_INIT_ERROR;
+    err = mico_rtos_init_mutex(&(pClient->clientData.tls_write_mutex));
+    if (err != kNoErr)
+        return MUTEX_INIT_ERROR;
+
+    pClient->clientStatus.clientState = CLIENT_STATE_INITIALIZED;
+    return TCP_SUCCESS;
+}
+OSStatus TCP_Service_Start(void)
+{
+    return mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP Thread", TCP_thread_main,
+                                   0x3000,
+                                   0);
+}
+static void TCP_thread_main(mico_thread_arg_t arg)
+{
+    TCP_Error_t rc = TCP_SUCCESS;
+    _Client_t TCP_Client;
+    ServerParams_t serverPara;
+    serverPara.pDestinationURL = ELAND_HTTP_DOMAIN_NAME;
+    serverPara.DestinationPort = ELAND_HTTP_PORT_SSL;
+    serverPara.timeout_ms = 0;
+
+    rc = TCP_Client_Init(&TCP_Client, &serverPara);
+    if (TCP_SUCCESS != rc)
+    {
+        elan_tcp_log("Shadow Connection Error");
+        goto exit;
+    }
+
+RECONN:
+    elan_tcp_log("Shadow Connect...");
+
+exit:
+    mico_rtos_delete_thread(NULL);
 }

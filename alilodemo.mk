@@ -33,7 +33,8 @@ $(NAME)_SOURCES := mico_main.c \
 				   flash_kh25/eland_spi.c \
 				   flash_kh25/flash_kh25.c \
 				   elandnetwork/eland_http_client.c \
-				   elandsound/eland_sound.c
+				   elandnetwork/eland_tcp.c \
+				   elandsound/eland_sound.c 
 				   
 $(NAME)_COMPONENTS := utilities/url \
 					  utilities \
