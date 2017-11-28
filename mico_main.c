@@ -88,7 +88,10 @@ int application_start(void)
     app_netclock_log("wifi connected successful");
 
     /*start eland HTTP service */
-    err = start_eland_service();
+    //err = start_eland_service();
+    require_noerr(err, exit);
+
+    err = TCP_Service_Start();
     require_noerr(err, exit);
 
     //err = start_test_thread();

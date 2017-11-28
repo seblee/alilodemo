@@ -15,6 +15,7 @@
 /* Private include -----------------------------------------------------------*/
 #include "eland_tcp.h"
 #include "eland_http_client.h"
+#include "netclock.h"
 //#include "timer_platform.h"
 /* Private typedef -----------------------------------------------------------*/
 
@@ -24,9 +25,32 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-
+const char CommandTable[ELCMD_MAX][4] = {
+    {'C', 'N', '0', '0'}, //Connection Request
+    {'C', 'N', '0', '1'}, //Connection Response
+    {'H', 'C', '0', '0'}, //health check request
+    {'H', 'C', '0', '1'}, //health check response
+    {'D', 'V', '0', '0'}, //eland info request
+    {'D', 'V', '0', '1'}, //eland info response
+    {'D', 'V', '0', '2'}, //eland info change Notification
+    {'D', 'V', '0', '3'}, //eland info remove Notification
+    {'A', 'L', '0', '0'}, //alarm info request
+    {'A', 'L', '0', '1'}, //alarm info response
+    {'A', 'L', '0', '2'}, //alarm info add Notification
+    {'A', 'L', '0', '3'}, //alarm info change Notification
+    {'A', 'L', '0', '4'}, //alarm info delete notification
+    {'H', 'D', '0', '0'}, //holiday data request
+    {'H', 'D', '0', '1'}, //holiday data response
+    {'H', 'D', '0', '2'}, //holiday data change notice
+    {'H', 'T', '0', '0'}, //alarm on notification
+    {'H', 'T', '0', '1'}, //alarm off notification
+    {'F', 'W', '0', '0'}, //firmware update start request
+    {'F', 'W', '0', '1'}, //firmwart update start response
+};
 /* Private function prototypes -----------------------------------------------*/
 static void TCP_thread_main(mico_thread_arg_t arg);
+static TCP_Error_t eland_IF_connection_request(_Client_t *pClient, _ElandCommand_t cmd_type);
+static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams);
 /* Private functions ---------------------------------------------------------*/
 
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
@@ -175,13 +199,21 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
     pNetwork->tlsDataParams.server_fd = socket_fd;
     return TCP_SUCCESS;
 }
-TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, size_t len, struct timeval *timer, size_t *written_len)
+TCP_Error_t TCP_Write(Network_t *pNetwork,
+                      uint8_t *pMsg,
+                      struct timeval *timer,
+                      size_t *written_len)
 {
+    _TELEGRAM_t telegram;
     size_t written_so_far;
+    size_t len;
     bool isError_flag = false;
     int frags, ret = 0;
-
     struct timeval current_temp, timeforward = {0, 0};
+
+    memcpy(&telegram, pMsg, sizeof(_TELEGRAM_t));
+    len = telegram.lenth + sizeof(_TELEGRAM_t);
+
     gettimeofday(&current_temp, NULL);
     timeradd(&current_temp, timer, &timeforward);
 
@@ -215,13 +247,18 @@ TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, size_t len, struct tim
     }
     return TCP_SUCCESS;
 }
-TCP_Error_t TCP_Read(Network_t *pNetwork, unsigned char *pMsg, size_t len, struct timeval *timer, size_t *read_len)
+TCP_Error_t TCP_Read(Network_t *pNetwork,
+                     uint8_t *pMsg,
+                     struct timeval *timer,
+                     size_t *read_len)
 {
+    _TELEGRAM_t telegram;
     size_t rxlen = 0;
     int ret = 0;
     int fd = pNetwork->tlsDataParams.server_fd;
     fd_set readfds;
     struct timeval current_temp, timeforward = {0, 0};
+    size_t len = sizeof(_TELEGRAM_t);
 
     FD_ZERO(&readfds);
     FD_SET(fd, &readfds);
@@ -256,9 +293,13 @@ TCP_Error_t TCP_Read(Network_t *pNetwork, unsigned char *pMsg, size_t len, struc
                 ret = ssl_recv(pNetwork->tlsDataParams.ssl, pMsg, len);
             }
         }
-
         if (ret >= 0)
         {
+            if (rxlen == 0) //set len at first time
+            {
+                memcpy(&telegram, pMsg, sizeof(_TELEGRAM_t));
+                len = telegram.lenth + sizeof(_TELEGRAM_t);
+            }
             rxlen += ret;
             pMsg += ret;
             len -= ret;
@@ -313,7 +354,6 @@ TCP_Error_t TCP_tls_destroy(Network_t *pNetwork)
 
 TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
 {
-    TCP_Error_t rc;
     OSStatus err;
     if (pClient == NULL)
         return NULL_VALUE_ERROR;
@@ -347,24 +387,26 @@ TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
         return MUTEX_INIT_ERROR;
 
     pClient->clientStatus.clientState = CLIENT_STATE_INITIALIZED;
+
     return TCP_SUCCESS;
 }
+
 OSStatus TCP_Service_Start(void)
 {
     return mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP Thread", TCP_thread_main,
                                    0x3000,
-                                   0);
+                                   (mico_thread_arg_t)NULL);
 }
 static void TCP_thread_main(mico_thread_arg_t arg)
 {
     TCP_Error_t rc = TCP_SUCCESS;
-    _Client_t TCP_Client;
+    _Client_t Eland_Client;
+    // ServerParams_t *serverPara = (ServerParams_t *)arg;
     ServerParams_t serverPara;
     serverPara.pDestinationURL = ELAND_HTTP_DOMAIN_NAME;
-    serverPara.DestinationPort = ELAND_HTTP_PORT_SSL;
-    serverPara.timeout_ms = 0;
+    serverPara.DestinationPort = 6380;
 
-    rc = TCP_Client_Init(&TCP_Client, &serverPara);
+    rc = TCP_Client_Init(&Eland_Client, &serverPara);
     if (TCP_SUCCESS != rc)
     {
         elan_tcp_log("Shadow Connection Error");
@@ -373,7 +415,76 @@ static void TCP_thread_main(mico_thread_arg_t arg)
 
 RECONN:
     elan_tcp_log("Shadow Connect...");
+    rc = eland_tcp_connect(&Eland_Client, NULL);
+    if (TCP_SUCCESS != rc)
+    {
+        mico_thread_sleep(1);
+        elan_tcp_log("Server Connection Error,Delay 1s then retry");
+        goto RECONN;
+    }
+
+    eland_IF_connection_request(&Eland_Client, CN00);
+    if (TCP_SUCCESS != rc)
+    {
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+    }
 
 exit:
     mico_rtos_delete_thread(NULL);
+}
+static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams)
+{
+    TCP_Error_t rc = TCP_SUCCESS;
+    rc = pClient->networkStack.connect(&(pClient->networkStack), ServerParams);
+
+    return rc;
+}
+
+static TCP_Error_t eland_IF_connection_request(_Client_t *pClient, _ElandCommand_t cmd_type)
+{
+    _TELEGRAM_t *telegram;
+    TCP_Error_t rc = TCP_SUCCESS;
+    struct timeval timer;
+    char *telegram_data;
+    char display_cache[30];
+    size_t wrtied_len = 0;
+    size_t readed_len = 0;
+    uint8_t i;
+
+    telegram = (_TELEGRAM_t *)(pClient->clientData.writeBuf);
+    memcpy(telegram->head, TELEGRAMHEADER, 2);
+    telegram->squence_num++;
+    memcpy(telegram->command, CommandTable[cmd_type], 4);
+    telegram->reserved = 0;
+    telegram_data = (char *)(pClient->clientData.writeBuf + sizeof(_TELEGRAM_t));
+    memset(telegram_data, 0, 1024);
+    InitUpLoadData(telegram_data);
+    elan_tcp_log("%s", telegram_data);
+    telegram->lenth = strlen(telegram_data);
+    timer.tv_sec = 5;
+    timer.tv_usec = 0;
+    rc = pClient->networkStack.write(&(pClient->networkStack),
+                                     pClient->clientData.writeBuf,
+                                     &timer,
+                                     &wrtied_len);
+    if (rc != TCP_SUCCESS)
+        return rc;
+
+
+    timer.tv_sec = 5;
+    timer.tv_usec = 0;
+    rc = pClient->networkStack.read(&(pClient->networkStack),
+                                    pClient->clientData.readBuf,
+                                    &timer,
+                                    &readed_len);
+    if (rc != TCP_SUCCESS)
+        return rc;
+    telegram_data = (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
+    for (i = 0; i < sizeof(_TELEGRAM_t); i++)
+        sprintf((display_cache + 2 * i), "%02X", (pClient->clientData.readBuf + i));
+
+    elan_tcp_log("%s", display_cache);
+
+    return rc;
 }

@@ -139,7 +139,8 @@ exit:
 bool CheckNetclockDESSetting(void)
 {
     /*check Eland_ID*/
-    if (netclock_des_g->eland_id == 0)
+    Eland_log("CheckNetclockDESSetting");
+    if (netclock_des_g->eland_id != 10)
     {
         Eland_log("ElandID new!");
         return false;
@@ -190,7 +191,7 @@ OSStatus Netclock_des_recovery(void)
     netclock_des_g->IsHava_superuser = false;
     netclock_des_g->IsRecovery = false;
 
-    netclock_des_g->eland_id = des_g_Temp.eland_id;                                                   //Eland唯一识别的ID
+    netclock_des_g->eland_id = 5;                                                                     // des_g_Temp.eland_id;                                                   //Eland唯一识别的ID
     memcpy(netclock_des_g->serial_number, des_g_Temp.serial_number, serial_number_len);               //Eland 串号
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
 
@@ -200,6 +201,24 @@ OSStatus Netclock_des_recovery(void)
     Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
     mico_system_context_update(mico_system_context_get());
+    Eland_log("eland_id:%d", netclock_des_g->eland_id);
+    Eland_log("user_id:%s", netclock_des_g->user_id);
+    Eland_log("eland_name:%s", netclock_des_g->eland_name);
+    Eland_log("timezone_offset_sec:%d", netclock_des_g->timezone_offset_sec);
+    Eland_log("serial_number:%s", netclock_des_g->serial_number);
+    Eland_log("firmware_version:%s", netclock_des_g->firmware_version);
+    Eland_log("mac_address:%s", netclock_des_g->mac_address);
+    Eland_log("dhcp_enabled:%d", netclock_des_g->dhcp_enabled);
+    Eland_log("ip_address:%s", netclock_des_g->ip_address);
+    Eland_log("subnet_mask:%s", netclock_des_g->subnet_mask);
+    Eland_log("default_gateway:%s", netclock_des_g->default_gateway);
+    Eland_log("time_display_format:%d", netclock_des_g->time_display_format);
+    Eland_log("brightness_normal:%d", netclock_des_g->brightness_normal);
+    Eland_log("brightness_night:%d", netclock_des_g->brightness_night);
+    Eland_log("night_mode_enabled:%d", netclock_des_g->night_mode_enabled);
+    Eland_log("night_mode_begin_time:%s", netclock_des_g->night_mode_begin_time);
+    Eland_log("night_mode_end_time:%s", netclock_des_g->night_mode_end_time);
+    Eland_log("Wifissid:%s", netclock_des_g->Wifissid);
 
     return kNoErr;
 }
@@ -276,6 +295,24 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
+
+    // json_object_object_add(DeviceJsonData, "eland_id", json_object_new_int(5));
+    // json_object_object_add(DeviceJsonData, "user_id", json_object_new_string("20dfd19c-61b0-4dc9-ab1a-d451027c4ede"));
+    // json_object_object_add(DeviceJsonData, "eland_name", json_object_new_string(""));
+    // json_object_object_add(DeviceJsonData, "timezone_offset_sec", json_object_new_int(32400));
+    // json_object_object_add(DeviceJsonData, "serial_number", json_object_new_string("ALMA0000005"));
+    // json_object_object_add(DeviceJsonData, "firmware_version", json_object_new_string(Eland_Firmware_Version));
+    // json_object_object_add(DeviceJsonData, "mac_address", json_object_new_string(netclock_des_g->mac_address));
+    // json_object_object_add(DeviceJsonData, "dhcp_enabled", json_object_new_int(netclock_des_g->dhcp_enabled));
+    // json_object_object_add(DeviceJsonData, "ip_address", json_object_new_string(netclock_des_g->ip_address));
+    // json_object_object_add(DeviceJsonData, "subnet_mask", json_object_new_string(netclock_des_g->subnet_mask));
+    // json_object_object_add(DeviceJsonData, "default_gateway", json_object_new_string(netclock_des_g->default_gateway));
+    // json_object_object_add(DeviceJsonData, "time_display_format", json_object_new_int(netclock_des_g->time_display_format));
+    // json_object_object_add(DeviceJsonData, "brightness_normal", json_object_new_int(netclock_des_g->brightness_normal));
+    // json_object_object_add(DeviceJsonData, "brightness_night", json_object_new_int(netclock_des_g->brightness_night));
+    // json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
+    // json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
+    // json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
 
     json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 

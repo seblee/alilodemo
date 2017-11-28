@@ -141,6 +141,30 @@ typedef enum {
     /** Mutex destroy failed */
     MUTEX_DESTROY_ERROR = -49,
 } TCP_Error_t;
+
+typedef enum _ElandCommand {
+    CN00 = 0,  //00 Connection Request
+    CN01,      //01 Connection Response
+    HC00,      //02 health check request
+    HC01,      //03 health check response
+    DV00,      //04 eland info request
+    DV01,      //05 eland info response
+    DV02,      //06 eland info change Notification
+    DV03,      //07 eland info remove Notification
+    AL00,      //08 alarm info request
+    AL01,      //09 alarm info response
+    AL02,      //10 alarm info add Notification
+    AL03,      //11 alarm info change Notification
+    AL04,      //12 alarm info delete notification
+    HD00,      //13 holiday data request
+    HD01,      //14 holiday data response
+    HD02,      //15 holiday data change notice
+    HT00,      //16 alarm on notification
+    HT01,      //17 alarm off notification
+    FW00,      //18 firmware update start request
+    FW01,      //19 firmwart update start response
+    ELCMD_MAX, //20
+} _ElandCommand_t;
 /**
  * @brief MQTT Client State Type
  *
@@ -224,11 +248,11 @@ struct _Eland_Network
 {
     TCP_Error_t (*connect)(Network_t *, ServerParams_t *);
 
-    TCP_Error_t (*read)(Network_t *, unsigned char *, size_t, struct timeval *, size_t *);  ///< Function pointer pointing to the network function to read from the network
-    TCP_Error_t (*write)(Network_t *, unsigned char *, size_t, struct timeval *, size_t *); ///< Function pointer pointing to the network function to write to the network
-    TCP_Error_t (*disconnect)(Network_t *);                                                 ///< Function pointer pointing to the network function to disconnect from the network
-    TCP_Error_t (*isConnected)(Network_t *);                                                ///< Function pointer pointing to the network function to check if TLS is connected
-    TCP_Error_t (*destroy)(Network_t *);                                                    ///< Function pointer pointing to the network function to destroy the network object
+    TCP_Error_t (*read)(Network_t *, uint8_t *, struct timeval *, size_t *);  ///< Function pointer pointing to the network function to read from the network
+    TCP_Error_t (*write)(Network_t *, uint8_t *, struct timeval *, size_t *); ///< Function pointer pointing to the network function to write to the network
+    TCP_Error_t (*disconnect)(Network_t *);                                   ///< Function pointer pointing to the network function to disconnect from the network
+    TCP_Error_t (*isConnected)(Network_t *);                                  ///< Function pointer pointing to the network function to check if TLS is connected
+    TCP_Error_t (*destroy)(Network_t *);                                      ///< Function pointer pointing to the network function to destroy the network object
 
     TLSConnectParams_t tlsConnectParams; //< TLSConnect params structure containing the common connection parameters
     TLSDataParams_t tlsDataParams;       //< TLSData params structure containing the connection data parameters that are specific to the library being used
@@ -256,15 +280,13 @@ typedef struct _ClientData
     size_t writeBufSize;
     size_t readBufSize;
 
-    unsigned char *writeBuf;
-    unsigned char *readBuf;
+    unsigned char writeBuf[2048];
+    unsigned char readBuf[2048];
 
-#ifdef _ENABLE_THREAD_SUPPORT_
     bool isBlockOnThreadLockEnabled;
     mico_mutex_t state_change_mutex;
     mico_mutex_t tls_read_mutex;
     mico_mutex_t tls_write_mutex;
-#endif
 
     //MessageHandlers messageHandlers[MQTT_NUM_SUBSCRIBE_HANDLERS];
     //iot_disconnect_handler disconnectHandler;
@@ -286,19 +308,29 @@ typedef struct _Client
     ClientData_t clientData;
     Network_t networkStack;
 } _Client_t;
-/* Private define ------------------------------------------------------------*/
 
+typedef struct _TELEGRAM
+{
+    char head[2];
+    int16_t squence_num;
+    char command[4];
+    int32_t lenth;
+    int32_t reserved;
+} _TELEGRAM_t;
+/* Private define ------------------------------------------------------------*/
+#define TELEGRAMHEADER "EL"
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 
 /* Private function prototypes -----------------------------------------------*/
 TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params);
-TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, size_t len, struct timeval *timer, size_t *written_len);
-TCP_Error_t TCP_Read(Network_t *pNetwork, unsigned char *pMsg, size_t len, struct timeval *timer, size_t *read_len);
+TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *written_len);
+TCP_Error_t TCP_Read(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *read_len);
 TCP_Error_t TCP_disconnect(Network_t *pNetwork);
 TCP_Error_t TCP_tls_destroy(Network_t *pNetwork);
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork);
+OSStatus TCP_Service_Start(void);
 
 /* Private functions ---------------------------------------------------------*/
 
