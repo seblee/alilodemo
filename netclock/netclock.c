@@ -185,14 +185,16 @@ OSStatus Netclock_des_recovery(void)
 
     memcpy(&des_g_Temp, netclock_des_g, sizeof(ELAND_DES_S));
     memset(netclock_des_g, 0, sizeof(ELAND_DES_S)); //全局变量清空
-    mico_system_context_update(mico_system_context_get());
+
+    // mico_system_context_update(mico_system_context_get());
 
     netclock_des_g->IsActivate = false;
     netclock_des_g->IsHava_superuser = false;
     netclock_des_g->IsRecovery = false;
 
-    netclock_des_g->eland_id = 5;                                                                     // des_g_Temp.eland_id;                                                   //Eland唯一识别的ID
-    memcpy(netclock_des_g->serial_number, des_g_Temp.serial_number, serial_number_len);               //Eland 串号
+    netclock_des_g->eland_id = 5; // des_g_Temp.eland_id; //Eland唯一识别的ID
+    sprintf(netclock_des_g->user_id, "20dfd19c-61b0-4dc9-ab1a-d451027c4ede");
+    sprintf(netclock_des_g->serial_number, "ALMA0000005");
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
 
     wlan_get_mac_address(mac); //MAC地址
@@ -200,11 +202,11 @@ OSStatus Netclock_des_recovery(void)
     sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); //MAC地址
     Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
-    mico_system_context_update(mico_system_context_get());
-    Eland_log("eland_id:%d", netclock_des_g->eland_id);
+    //mico_system_context_update(mico_system_context_get());
+    Eland_log("eland_id:%ld", netclock_des_g->eland_id);
     Eland_log("user_id:%s", netclock_des_g->user_id);
     Eland_log("eland_name:%s", netclock_des_g->eland_name);
-    Eland_log("timezone_offset_sec:%d", netclock_des_g->timezone_offset_sec);
+    Eland_log("timezone_offset_sec:%ld", netclock_des_g->timezone_offset_sec);
     Eland_log("serial_number:%s", netclock_des_g->serial_number);
     Eland_log("firmware_version:%s", netclock_des_g->firmware_version);
     Eland_log("mac_address:%s", netclock_des_g->mac_address);

@@ -40,11 +40,11 @@ typedef enum {
     /** Returned when a connection request is successful and packet response is connection accepted */
     TCP_CONNACK_CONNECTION_ACCEPTED = 1,
     /** Success return value - no error occurred */
-    TCP_SUCCESS = 0,
+    TCP_SUCCESS = 0, //
     /** A generic error. Not enough information for a specific error code */
     TCP_FAILURE = -1,
     /** A required parameter was passed as null */
-    NULL_VALUE_ERROR = -2,
+    NULL_VALUE_ERROR = -2, //
     /** The TCP socket could not be established */
     TCP_CONNECTION_ERROR = -3,
     /** The TLS handshake failed */
@@ -142,29 +142,29 @@ typedef enum {
     MUTEX_DESTROY_ERROR = -49,
 } TCP_Error_t;
 
-typedef enum _ElandCommand {
-    CN00 = 0,  //00 Connection Request
-    CN01,      //01 Connection Response
-    HC00,      //02 health check request
-    HC01,      //03 health check response
-    DV00,      //04 eland info request
-    DV01,      //05 eland info response
-    DV02,      //06 eland info change Notification
-    DV03,      //07 eland info remove Notification
-    AL00,      //08 alarm info request
-    AL01,      //09 alarm info response
-    AL02,      //10 alarm info add Notification
-    AL03,      //11 alarm info change Notification
-    AL04,      //12 alarm info delete notification
-    HD00,      //13 holiday data request
-    HD01,      //14 holiday data response
-    HD02,      //15 holiday data change notice
-    HT00,      //16 alarm on notification
-    HT01,      //17 alarm off notification
-    FW00,      //18 firmware update start request
-    FW01,      //19 firmwart update start response
-    ELCMD_MAX, //20
-} _ElandCommand_t;
+typedef enum _TCP_CMD {
+    CN00 = 0,   //00 Connection Request
+    CN01,       //01 Connection Response
+    HC00,       //02 health check request
+    HC01,       //03 health check response
+    DV00,       //04 eland info request
+    DV01,       //05 eland info response
+    DV02,       //06 eland info change Notification
+    DV03,       //07 eland info remove Notification
+    AL00,       //08 alarm info request
+    AL01,       //09 alarm info response
+    AL02,       //10 alarm info add Notification
+    AL03,       //11 alarm info change Notification
+    AL04,       //12 alarm info delete notification
+    HD00,       //13 holiday data request
+    HD01,       //14 holiday data response
+    HD02,       //15 holiday data change notice
+    HT00,       //16 alarm on notification
+    HT01,       //17 alarm off notification
+    FW00,       //18 firmware update start request
+    FW01,       //19 firmwart update start response
+    TCPCMD_MAX, //20
+} _TCP_CMD_t;
 /**
  * @brief MQTT Client State Type
  *
@@ -264,6 +264,10 @@ struct _Eland_Network
  * Contains data used by the MQTT Client
  *
  */
+// MQTT pub and sub buff len
+#define MQTT_TX_BUF_LEN (1024 + 200) //
+#define MQTT_RX_BUF_LEN (1024 + 200) //
+
 typedef struct _ClientData
 {
     uint16_t nextPacketId;
@@ -280,8 +284,8 @@ typedef struct _ClientData
     size_t writeBufSize;
     size_t readBufSize;
 
-    unsigned char writeBuf[2048];
-    unsigned char readBuf[2048];
+    unsigned char writeBuf[MQTT_TX_BUF_LEN];
+    unsigned char readBuf[MQTT_RX_BUF_LEN];
 
     bool isBlockOnThreadLockEnabled;
     mico_mutex_t state_change_mutex;

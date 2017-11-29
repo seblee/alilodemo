@@ -25,7 +25,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-const char CommandTable[ELCMD_MAX][4] = {
+const char CommandTable[TCPCMD_MAX][4] = {
     {'C', 'N', '0', '0'}, //Connection Request
     {'C', 'N', '0', '1'}, //Connection Response
     {'H', 'C', '0', '0'}, //health check request
@@ -49,8 +49,12 @@ const char CommandTable[ELCMD_MAX][4] = {
 };
 /* Private function prototypes -----------------------------------------------*/
 static void TCP_thread_main(mico_thread_arg_t arg);
-static TCP_Error_t eland_IF_connection_request(_Client_t *pClient, _ElandCommand_t cmd_type);
+static TCP_Error_t eland_IF_connection_request(_Client_t *pClient);
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams);
+static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, struct timeval *timer);
+static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type);
+static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, struct timeval *timer);
+
 /* Private functions ---------------------------------------------------------*/
 
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
@@ -310,7 +314,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
             return NETWORK_SSL_READ_ERROR;
         }
         // Evaluate timeout after the read to make sure read is done at least once
-        if (has_timer_expired(timer))
+        if (has_timer_expired(&timeforward))
         {
             elan_tcp_log("read time out");
             break;
@@ -358,6 +362,8 @@ TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
     if (pClient == NULL)
         return NULL_VALUE_ERROR;
 
+    memset(pClient, 0, sizeof(_Client_t));
+
     if (ServerParams != NULL)
         TCP_tls_set_connect_params(&(pClient->networkStack),
                                    ServerParams->pDestinationURL,
@@ -387,6 +393,7 @@ TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
         return MUTEX_INIT_ERROR;
 
     pClient->clientStatus.clientState = CLIENT_STATE_INITIALIZED;
+    pClient->clientStatus.isAutoReconnectEnabled = true; // auto reconnect
 
     return TCP_SUCCESS;
 }
@@ -423,7 +430,7 @@ RECONN:
         goto RECONN;
     }
 
-    eland_IF_connection_request(&Eland_Client, CN00);
+    eland_IF_connection_request(&Eland_Client);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
@@ -441,50 +448,82 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
     return rc;
 }
 
-static TCP_Error_t eland_IF_connection_request(_Client_t *pClient, _ElandCommand_t cmd_type)
+static TCP_Error_t eland_IF_connection_request(_Client_t *pClient)
 {
-    _TELEGRAM_t *telegram;
     TCP_Error_t rc = TCP_SUCCESS;
     struct timeval timer;
-    char *telegram_data;
-    char display_cache[30];
-    size_t wrtied_len = 0;
-    size_t readed_len = 0;
-    uint8_t i;
+    _TELEGRAM_t *telegram;
 
-    telegram = (_TELEGRAM_t *)(pClient->clientData.writeBuf);
+    timer.tv_sec = 5;
+    timer.tv_usec = 0;
+    rc = eland_IF_send_packet(pClient, CN00, &timer);
+    if (rc != TCP_SUCCESS)
+        return rc;
+
+    timer.tv_sec = 5;
+    timer.tv_usec = 0;
+    eland_IF_receive_packet(pClient, &timer);
+
+    if (rc != TCP_SUCCESS)
+        return rc;
+    telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+    if (strncmp(telegram->command, CommandTable[CN01], 4) != 0)
+        rc = TCP_SUCCESS;
+
+    return rc;
+}
+static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, struct timeval *timer)
+{
+    size_t wrtied_len = 0;
+    TCP_Error_t rc = TCP_SUCCESS;
+    if (NULL == pClient)
+    {
+        return NULL_VALUE_ERROR;
+    }
+    HandleRequeseCallbacks(pClient->clientData.writeBuf, cmd_type);
+
+    rc = pClient->networkStack.write(&(pClient->networkStack),
+                                     pClient->clientData.writeBuf,
+                                     timer,
+                                     &wrtied_len);
+
+    return rc;
+}
+
+static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
+{
+    _TELEGRAM_t *telegram = (_TELEGRAM_t *)pMsg;
+    char *telegram_data = NULL;
+
+    memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
+
     memcpy(telegram->head, TELEGRAMHEADER, 2);
     telegram->squence_num++;
     memcpy(telegram->command, CommandTable[cmd_type], 4);
     telegram->reserved = 0;
-    telegram_data = (char *)(pClient->clientData.writeBuf + sizeof(_TELEGRAM_t));
-    memset(telegram_data, 0, 1024);
-    InitUpLoadData(telegram_data);
-    elan_tcp_log("%s", telegram_data);
-    telegram->lenth = strlen(telegram_data);
-    timer.tv_sec = 5;
-    timer.tv_usec = 0;
-    rc = pClient->networkStack.write(&(pClient->networkStack),
-                                     pClient->clientData.writeBuf,
-                                     &timer,
-                                     &wrtied_len);
-    if (rc != TCP_SUCCESS)
-        return rc;
+    telegram->lenth = 0;
 
+    if (cmd_type == CN00)
+    {
+        telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
+        InitUpLoadData(telegram_data);
+        elan_tcp_log("%s", telegram_data);
+        telegram->lenth = strlen(telegram_data);
+    }
+}
+static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, struct timeval *timer)
+{
+    TCP_Error_t rc = TCP_SUCCESS;
+    size_t readed_len = 0;
+    if (NULL == pClient)
+    {
+        return NULL_VALUE_ERROR;
+    }
 
-    timer.tv_sec = 5;
-    timer.tv_usec = 0;
     rc = pClient->networkStack.read(&(pClient->networkStack),
                                     pClient->clientData.readBuf,
-                                    &timer,
+                                    timer,
                                     &readed_len);
-    if (rc != TCP_SUCCESS)
-        return rc;
-    telegram_data = (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
-    for (i = 0; i < sizeof(_TELEGRAM_t); i++)
-        sprintf((display_cache + 2 * i), "%02X", (pClient->clientData.readBuf + i));
-
-    elan_tcp_log("%s", display_cache);
 
     return rc;
 }

@@ -23,6 +23,7 @@
 #include "netclock_wifi.h"
 #include "flash_kh25.h"
 #include "eland_sound.h"
+#include "eland_tcp.h"
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -61,15 +62,15 @@ int application_start(void)
     /*start init system context*/
     mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
 
-    /*init fog v2 service*/
-    err = netclock_desInit();
-    require_noerr(err, exit);
-
     /*start init uart & start service*/
     //start_uart_service();
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
+    require_noerr(err, exit);
+
+    /*init fog v2 service*/
+    err = netclock_desInit();
     require_noerr(err, exit);
 
     err = hal_alilo_rabbit_init();
