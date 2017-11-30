@@ -140,6 +140,8 @@ typedef enum {
     MUTEX_UNLOCK_ERROR = -48,
     /** Mutex destroy failed */
     MUTEX_DESTROY_ERROR = -49,
+    /** Response err cmd */
+    CMD_BACK_ERROR = -50,
 } TCP_Error_t;
 
 typedef enum _TCP_CMD {
@@ -321,8 +323,11 @@ typedef struct _TELEGRAM
     int32_t lenth;
     int32_t reserved;
 } _TELEGRAM_t;
+
+typedef struct timeval _time_t;
 /* Private define ------------------------------------------------------------*/
 #define TELEGRAMHEADER "EL"
+#define COMMAND_LEN 4
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/

@@ -298,25 +298,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
 
-    // json_object_object_add(DeviceJsonData, "eland_id", json_object_new_int(5));
-    // json_object_object_add(DeviceJsonData, "user_id", json_object_new_string("20dfd19c-61b0-4dc9-ab1a-d451027c4ede"));
-    // json_object_object_add(DeviceJsonData, "eland_name", json_object_new_string(""));
-    // json_object_object_add(DeviceJsonData, "timezone_offset_sec", json_object_new_int(32400));
-    // json_object_object_add(DeviceJsonData, "serial_number", json_object_new_string("ALMA0000005"));
-    // json_object_object_add(DeviceJsonData, "firmware_version", json_object_new_string(Eland_Firmware_Version));
-    // json_object_object_add(DeviceJsonData, "mac_address", json_object_new_string(netclock_des_g->mac_address));
-    // json_object_object_add(DeviceJsonData, "dhcp_enabled", json_object_new_int(netclock_des_g->dhcp_enabled));
-    // json_object_object_add(DeviceJsonData, "ip_address", json_object_new_string(netclock_des_g->ip_address));
-    // json_object_object_add(DeviceJsonData, "subnet_mask", json_object_new_string(netclock_des_g->subnet_mask));
-    // json_object_object_add(DeviceJsonData, "default_gateway", json_object_new_string(netclock_des_g->default_gateway));
-    // json_object_object_add(DeviceJsonData, "time_display_format", json_object_new_int(netclock_des_g->time_display_format));
-    // json_object_object_add(DeviceJsonData, "brightness_normal", json_object_new_int(netclock_des_g->brightness_normal));
-    // json_object_object_add(DeviceJsonData, "brightness_night", json_object_new_int(netclock_des_g->brightness_night));
-    // json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
-    // json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
-    // json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
-
-    json_object_object_add(ElandJsonData, "device", DeviceJsonData);
+      json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 
     generate_data = json_object_to_json_string(ElandJsonData);
     require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
