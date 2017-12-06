@@ -60,6 +60,7 @@ static TCP_Error_t eland_IF_health_check(_Client_t *pClient);
 static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type);
 static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _time_t *timer);
 static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer);
+static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expectedCurrentState, ClientState_t newState);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -480,7 +481,7 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
     eland_set_client_state(pClient, clientState, CLIENT_STATE_CONNECTING);
     rc = pClient->networkStack.connect(&(pClient->networkStack), ServerParams);
 
-    if (MQTT_SUCCESS != rc)
+    if (TCP_SUCCESS != rc)
     {
         pClient->networkStack.disconnect(&(pClient->networkStack));
         pClient->networkStack.destroy(&(pClient->networkStack));
@@ -680,15 +681,15 @@ static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer)
     return rc;
 }
 
-ClientState_t eland_get_client_state(MQTT_Client *pClient)
+ClientState_t eland_get_client_state(_Client_t *pClient)
 {
-    FUNC_ENTRY;
+
     if (NULL == pClient)
     {
         return CLIENT_STATE_INVALID;
     }
 
-    FUNC_EXIT_RC(pClient->clientStatus.clientState);
+    return pClient->clientStatus.clientState ;
 }
 
 static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expectedCurrentState, ClientState_t newState)
@@ -699,22 +700,22 @@ static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expe
     {
         return NULL_VALUE_ERROR;
     }
-    err = mico_rtos_lock_mutex(pClient->clientStatus.state_change_mutex);
+    err = mico_rtos_lock_mutex(pClient->clientData.state_change_mutex);
     if (err != kNoErr)
         return MUTEX_LOCK_ERROR;
 
-    if (expectedCurrentState == mqtt_get_client_state(pClient))
+    if (expectedCurrentState == eland_get_client_state(pClient))
     {
         pClient->clientStatus.clientState = newState;
-        rc = MQTT_SUCCESS;
+        rc = TCP_SUCCESS;
     }
     else
     {
-        rc = MQTT_UNEXPECTED_CLIENT_STATE_ERROR;
+        rc = TCP_UNEXPECTED_CLIENT_STATE_ERROR;
     }
-    err = mico_rtos_unlock_mutex(pClient->clientStatus.state_change_mutex);
+    err = mico_rtos_unlock_mutex(pClient->clientData.state_change_mutex);
 
-    if ((err != kNoErr) && (rc == MQTT_SUCCESS))
+    if ((err != kNoErr) && (rc == TCP_SUCCESS))
         return MUTEX_UNLOCK_ERROR;
 
     return rc;

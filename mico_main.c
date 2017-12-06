@@ -15,7 +15,7 @@
 /* Private include -----------------------------------------------------------*/
 #include "../alilodemo/audio_test.h"
 #include "../alilodemo/hal_alilo_rabbit.h"
-#include "../alilodemo/mico_app_define.h"
+//#include "../alilodemo/mico_app_define.h"
 #include "mico.h"
 #include "netclockconfig.h"
 #include "netclock.h"

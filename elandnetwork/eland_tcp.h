@@ -340,7 +340,7 @@ TCP_Error_t TCP_disconnect(Network_t *pNetwork);
 TCP_Error_t TCP_tls_destroy(Network_t *pNetwork);
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork);
 OSStatus TCP_Service_Start(void);
-
+ClientState_t eland_get_client_state(_Client_t *pClient);
 /* Private functions ---------------------------------------------------------*/
 
 #endif
