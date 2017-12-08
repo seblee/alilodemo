@@ -14,6 +14,8 @@
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
 ELAND_DES_S *netclock_des_g = NULL;
+_ELAND_DEVICE_t *eland_device_state = NULL;
+
 static bool NetclockInitSuccess = false;
 
 //http client mutex
@@ -56,7 +58,6 @@ static OSStatus alarm_sound_download(void);
 static uint32_t generate_http_session_id(void)
 {
     static uint32_t id = 1;
-
     return id++;
 }
 OSStatus netclock_desInit(void)
@@ -67,15 +68,17 @@ OSStatus netclock_desInit(void)
     context = mico_system_context_get();
     require_action_string(context != NULL, exit, err = kGeneralErr, "[ERROR]context is NULL!!!");
 
-    netclock_des_g = (ELAND_DES_S *)mico_system_context_get_user_data(context);
-    require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
+    eland_device_state = (_ELAND_DEVICE_t *)mico_system_context_get_user_data(context);
+    require_action_string(eland_device_state != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
+
+    netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S));
 
     //数据结构体初始化
     if (false == CheckNetclockDESSetting())
     {
         //结构体覆盖
         Eland_log("[NOTICE]recovery settings!!!!!!!");
-        err = Netclock_des_recovery();
+
         require_noerr(err, exit);
     }
     Eland_log("local firmware version:%s", Eland_Firmware_Version);
@@ -108,8 +111,6 @@ OSStatus start_eland_service(void)
     err = start_client_serrvice(); //内部有队列初始化,需要先执行 //ssl登录等
     require_noerr(err, exit);
 
-    //startsNetclockinit:
-
     //1.eland 通訊情報取得
     err = eland_communication_info_get();
     require_noerr(err, exit);
@@ -119,9 +120,7 @@ OSStatus start_eland_service(void)
     require_noerr(err, exit);
 
     NetclockInitSuccess = true;
-
 exit:
-
     if (NetclockInitSuccess == true)
     {
         Eland_log("eland init success!");
@@ -136,21 +135,22 @@ exit:
 }
 
 //检查从flash读出的数据是否正确,不正确就恢复出厂设置
-bool CheckNetclockDESSetting(void)
+OSStatus CheckNetclockDESSetting(void)
 {
+    OSStatus err = kGeneralErr;
     /*check Eland_ID*/
     Eland_log("CheckNetclockDESSetting");
     if (netclock_des_g->eland_id != 10)
     {
         Eland_log("ElandID new!");
-        return false;
+        goto exit;
     }
 
     /*check MAC Address*/
     if (strlen(netclock_des_g->mac_address) != DEVICE_MAC_LEN)
     {
         Eland_log("MAC Address err!");
-        return false;
+        goto exit;
     }
 
     if (netclock_des_g->IsActivate == true) //设备已激活
@@ -160,23 +160,26 @@ bool CheckNetclockDESSetting(void)
             (netclock_des_g->timezone_offset_sec > Timezone_offset_sec_Max))
         {
             Eland_log("ElandZoneOffset is error!");
-            return false;
+            goto exit;
         }
         /*check UserID*/
         if (strlen(netclock_des_g->user_id) == 0)
         {
             Eland_log("UserID error!");
-            return false;
+            goto exit;
         }
         /*check serial_number*/
         if (strlen(netclock_des_g->serial_number) == 0)
         {
             Eland_log("UserID error!");
-            return false;
+            goto exit;
         }
     }
-
-    return true;
+    return kNoErr;
+exit:
+    err = Netclock_des_recovery();
+    require_noerr(err, exit);
+    return kGeneralErr;
 }
 OSStatus Netclock_des_recovery(void)
 {
@@ -298,7 +301,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
 
-      json_object_object_add(ElandJsonData, "device", DeviceJsonData);
+    json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 
     generate_data = json_object_to_json_string(ElandJsonData);
     require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");

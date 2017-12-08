@@ -69,15 +69,14 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 
 typedef struct _ELAND_DES_S //设备状态结构
 {
-    bool IsActivate;       //是否已激活设备
-    bool IsHava_superuser; //是否拥有超级用户
-    bool IsRecovery;       //是否需要回收授权
+    bool IsActivate;   //是否已激活设备
+    bool IsAlreadySet; //是否已經寫入設備碼 eg.
 
-    int32_t eland_id;                            //Eland唯一识别的ID
-    char user_id[user_id_len];                   //用户唯一识别ID，用户登录时获取
-    char eland_name[eland_name_Len];             //Eland名称，用户输入
+    int32_t eland_id;                      //Eland唯一识别的ID
+    char serial_number[serial_number_len]; //Eland的串口番号。
+    char eland_name[eland_name_Len];       //Eland名称，用户输入
+
     int32_t timezone_offset_sec;                 //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
-    char serial_number[serial_number_len];       //Eland的串口番号。
     char firmware_version[firmware_version_len]; //Eland固件版本号
     char mac_address[mac_address_Len];           //MAC地址
     int8_t dhcp_enabled;                         //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
@@ -94,4 +93,17 @@ typedef struct _ELAND_DES_S //设备状态结构
     char WifiKey[ElandKey_Len];                  //wifi 密碼
 } ELAND_DES_S;
 
+typedef struct _ELAND_DEVICE //设备状态结构
+{
+    bool IsActivate;   //是否已激活设备
+    bool IsAlreadySet; //是否已經寫入設備碼 eg.
+
+    int32_t eland_id;          //Eland唯一识别的ID
+    char user_id[user_id_len]; //用户唯一识别ID，用户登录时获取
+
+    char serial_number[serial_number_len];       //Eland的串口番号。
+    char firmware_version[firmware_version_len]; //Eland固件版本号
+    char mac_address[mac_address_Len];           //MAC地址
+    int8_t dhcp_enabled;                         //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
+} _ELAND_DEVICE_t;
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

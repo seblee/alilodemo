@@ -62,7 +62,7 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
 {
     msg_wify_queue my_message;
-     WifiSet_log("Wi-Fi STATION connecte failed");
+    WifiSet_log("Wi-Fi STATION connecte failed");
     my_message.value = Wify_Station_Connect_Failed;
     if (wifistate_queue != NULL)
         mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);

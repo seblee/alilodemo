@@ -141,7 +141,7 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
                                    Params->DestinationPort,
                                    Params->timeout_ms);
     }
-
+    elan_tcp_log("TCP_Connect");
     err = usergethostbyname(pNetwork->tlsConnectParams.pDestinationURL, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
     {
@@ -469,6 +469,9 @@ RECONN:
     }
 
 exit:
+    Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
+    Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
+    elan_tcp_log("TCP/IP out");
     mico_rtos_delete_thread(NULL);
 }
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams)
@@ -479,8 +482,8 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
         return NULL_VALUE_ERROR;
     clientState = eland_get_client_state(pClient);
     eland_set_client_state(pClient, clientState, CLIENT_STATE_CONNECTING);
-    rc = pClient->networkStack.connect(&(pClient->networkStack), ServerParams);
 
+    rc = pClient->networkStack.connect(&(pClient->networkStack), ServerParams);
     if (TCP_SUCCESS != rc)
     {
         pClient->networkStack.disconnect(&(pClient->networkStack));
@@ -568,7 +571,6 @@ static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
-
     return rc;
 }
 static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient)
@@ -677,7 +679,6 @@ static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer)
                                     pClient->clientData.readBuf,
                                     timer,
                                     &readed_len);
-
     return rc;
 }
 
@@ -689,7 +690,7 @@ ClientState_t eland_get_client_state(_Client_t *pClient)
         return CLIENT_STATE_INVALID;
     }
 
-    return pClient->clientStatus.clientState ;
+    return pClient->clientStatus.clientState;
 }
 
 static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expectedCurrentState, ClientState_t newState)
@@ -700,7 +701,7 @@ static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expe
     {
         return NULL_VALUE_ERROR;
     }
-    err = mico_rtos_lock_mutex(pClient->clientData.state_change_mutex);
+    err = mico_rtos_lock_mutex(&(pClient->clientData.state_change_mutex));
     if (err != kNoErr)
         return MUTEX_LOCK_ERROR;
 
@@ -713,7 +714,7 @@ static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expe
     {
         rc = TCP_UNEXPECTED_CLIENT_STATE_ERROR;
     }
-    err = mico_rtos_unlock_mutex(pClient->clientData.state_change_mutex);
+    err = mico_rtos_unlock_mutex(&(pClient->clientData.state_change_mutex));
 
     if ((err != kNoErr) && (rc == TCP_SUCCESS))
         return MUTEX_UNLOCK_ERROR;

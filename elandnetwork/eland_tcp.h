@@ -203,9 +203,9 @@ typedef struct _ClientStatus
  */
 typedef struct
 {
-    char *pDestinationURL;    ///< Pointer to string containing the endpoint of the MQTT service.
-    uint16_t DestinationPort; ///< Integer defining the connection port of the MQTT service.
-    uint32_t timeout_ms;      ///< Unsigned integer defining the TLS handshake timeout value in milliseconds.
+    char *pDestinationURL;    //< Pointer to string containing the endpoint of the MQTT service.
+    uint16_t DestinationPort; //< Integer defining the connection port of the MQTT service.
+    uint32_t timeout_ms;      //< Unsigned integer defining the TLS handshake timeout value in milliseconds.
 } ServerParams_t;
 
 /**
@@ -216,14 +216,14 @@ typedef struct
  */
 typedef struct
 {
-    char *pRootCALocation;           ///< Pointer to string containing the filename (including path) of the root CA file.
-    char *pDeviceCertLocation;       ///< Pointer to string containing the filename (including path) of the device certificate.
-    char *pDevicePrivateKeyLocation; ///< Pointer to string containing the filename (including path) of the device private key file.
-    char *pDestinationURL;           ///< Pointer to string containing the endpoint of the MQTT service.
-    uint16_t DestinationPort;        ///< Integer defining the connection port of the MQTT service.
-    uint32_t timeout_ms;             ///< Unsigned integer defining the TLS handshake timeout value in milliseconds.
-    bool ServerVerificationFlag;     ///< Boolean.  True = perform server certificate hostname validation.  False = skip validation \b NOT recommended.
-    bool isUseSSL;                   ///< is used ssl connect
+    char *pRootCALocation;           //< Pointer to string containing the filename (including path) of the root CA file.
+    char *pDeviceCertLocation;       //< Pointer to string containing the filename (including path) of the device certificate.
+    char *pDevicePrivateKeyLocation; //< Pointer to string containing the filename (including path) of the device private key file.
+    char *pDestinationURL;           //< Pointer to string containing the endpoint of the MQTT service.
+    uint16_t DestinationPort;        //< Integer defining the connection port of the MQTT service.
+    uint32_t timeout_ms;             //< Unsigned integer defining the TLS handshake timeout value in milliseconds.
+    bool ServerVerificationFlag;     //< Boolean.  True = perform server certificate hostname validation.  False = skip validation \b NOT recommended.
+    bool isUseSSL;                   //< is used ssl connect
 } TLSConnectParams_t;
 /**
  * @brief TLS Connection Parameters
@@ -250,11 +250,11 @@ struct _Eland_Network
 {
     TCP_Error_t (*connect)(Network_t *, ServerParams_t *);
 
-    TCP_Error_t (*read)(Network_t *, uint8_t *, struct timeval *, size_t *);  ///< Function pointer pointing to the network function to read from the network
-    TCP_Error_t (*write)(Network_t *, uint8_t *, struct timeval *, size_t *); ///< Function pointer pointing to the network function to write to the network
-    TCP_Error_t (*disconnect)(Network_t *);                                   ///< Function pointer pointing to the network function to disconnect from the network
-    TCP_Error_t (*isConnected)(Network_t *);                                  ///< Function pointer pointing to the network function to check if TLS is connected
-    TCP_Error_t (*destroy)(Network_t *);                                      ///< Function pointer pointing to the network function to destroy the network object
+    TCP_Error_t (*read)(Network_t *, uint8_t *, struct timeval *, size_t *);  //< Function pointer pointing to the network function to read from the network
+    TCP_Error_t (*write)(Network_t *, uint8_t *, struct timeval *, size_t *); //< Function pointer pointing to the network function to write to the network
+    TCP_Error_t (*disconnect)(Network_t *);                                   //< Function pointer pointing to the network function to disconnect from the network
+    TCP_Error_t (*isConnected)(Network_t *);                                  //< Function pointer pointing to the network function to check if TLS is connected
+    TCP_Error_t (*destroy)(Network_t *);                                      //< Function pointer pointing to the network function to destroy the network object
 
     TLSConnectParams_t tlsConnectParams; //< TLSConnect params structure containing the common connection parameters
     TLSDataParams_t tlsDataParams;       //< TLSData params structure containing the connection data parameters that are specific to the library being used

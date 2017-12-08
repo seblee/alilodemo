@@ -53,14 +53,13 @@ int application_start(void)
     app_netclock_log(">>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
-
     err = Eland_Rtc_Init();
 
     /*Register elandstate_queue: elandstate for uart*/
     err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
 
     /*start init system context*/
-    mico_context = mico_system_context_init(sizeof(ELAND_DES_S));
+    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
 
     /*start init uart & start service*/
     //start_uart_service();
