@@ -73,10 +73,10 @@ int application_start(void)
     require_noerr(err, exit);
 
     /****start softAP event wait******/
-    //start_HttpServer_softAP_thread();
+    start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
-    //err = start_eland_flash_service();
+    err = start_eland_flash_service();
     require_noerr(err, exit);
 
     /* Wait for wlan connection*/

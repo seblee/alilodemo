@@ -32,12 +32,6 @@ typedef enum {
     ElandAliloStop,
 } Eland_Status_type_t;
 
-typedef struct __msg_send_queue
-{
-    uint16_t length;
-    uint8_t *data;
-} __msg_send_queue_t;
-
 typedef enum {
     KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
     KEY_Reset = (uint16_t)0x0002,     /*!< 軟件復位 */
