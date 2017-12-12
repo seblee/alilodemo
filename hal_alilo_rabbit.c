@@ -73,8 +73,7 @@ static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
             mico_rtos_set_semaphore(&urlPalyStreamStop_Sem);
         break;
     case ROBOT_EVENT_KEY_CHILD_LOCK:
-        if (flagHttpdServerAP == 1)
-            mico_rtos_set_semaphore(&httpServer_softAP_event_Sem);
+
         break;
     default:
         recordKeyStatus = KEY_RELEASE;
@@ -97,8 +96,7 @@ extern system_context_t *sys_context;
 OSStatus hal_alilo_rabbit_init(void)
 {
     OSStatus err;
-    mscp_result_t result = MSCP_RST_ERROR;
-    ADUIO_SYSTEM_STATE_S Aduio_state;
+     ADUIO_SYSTEM_STATE_S Aduio_state;
     memset(&Aduio_state, 0, sizeof(ADUIO_SYSTEM_STATE_S));
 
     err = mico_rtos_init_semaphore(&recordKeyPress_Sem, 1);
@@ -118,24 +116,19 @@ OSStatus hal_alilo_rabbit_init(void)
 
     mico_rtos_thread_sleep(3); //wait for audio ready
 
-    if (sys_context->flashContentInRam.micoSystemConfig.configured == unConfigured)
-        audio_service_sound_remind_start(&result, 2); //請先幫我配置無線網絡吧
-    else
-        audio_service_sound_remind_start(&result, 3); //正在連接無線網絡
-
-//audio_service_sound_remind_start(&result, 1); //我的小夥伴，快來和我玩耍吧
-//audio_service_sound_remind_start(&result, 2);//請先幫我配置無線網絡吧
+//audio_service_sound_remind_start(&result, 1); //我的尝夥伴，快來和我玩耝坧
+//audio_service_sound_remind_start(&result, 2);//請先幫我酝置無線網絡坧
 //audio_service_sound_remind_start(&result, 3); //正在連接無線網絡
-//audio_service_sound_remind_start(&result, 4); //請長安與我對話吧
-//audio_service_sound_remind_start(&result, 5); //這個問題有點難，我還在學習
-//audio_service_sound_remind_start(&result, 6); //對不起，沒有聽清，請再來一次
+//audio_service_sound_remind_start(&result, 4); //請長安與我尝話坧
+//audio_service_sound_remind_start(&result, 5); //這個啝題有點難，我還在學習
+//audio_service_sound_remind_start(&result, 6); //尝丝起，沒有蝽清，請冝來一次
 //audio_service_sound_remind_start(&result, 7); //網絡連接失敗
-//audio_service_sound_remind_start(&result, 8); //設備正在升級中，請稍等一會吧
-//audio_service_sound_remind_start(&result, 9); //還剩百分之二十五電量，電量快不足了
-//audio_service_sound_remind_start(&result, 10); //還剩百分之五電量，快幫我衝充電吧
-//audio_service_sound_remind_start(&result, 11); //微信發送的聲音 “嗚”
-//audio_service_sound_remind_start(&result, 12); //門鈴聲音 “叮噔”
-//audio_service_sound_remind_start(&result, 13); //“叮叮”聲
+//audio_service_sound_remind_start(&result, 8); //設備正在均級中，請稝等一會坧
+//audio_service_sound_remind_start(&result, 9); //還剩百分之二坝五電針，電針快丝足了
+//audio_service_sound_remind_start(&result, 10); //還剩百分之五電針，快幫我衝充電坧
+//audio_service_sound_remind_start(&result, 11); //微信發逝的蝲音 “嗚”
+//audio_service_sound_remind_start(&result, 12); //門鈴蝲音 “坮噔”
+//audio_service_sound_remind_start(&result, 13); //“坮坮”蝲
 exit:
     return err;
 }

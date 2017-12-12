@@ -21,7 +21,8 @@
 //状态宏定义
 /*Eland 状态*/
 typedef enum {
-    ElandBegin = 0,
+    ElandNone = 0,
+    ElandBegin,
     ElandAPStatus,
     ElandHttpServerStatus,
     ElandWifyConnectedSuccessed,
@@ -29,18 +30,7 @@ typedef enum {
     ElandAliloPlay,
     ElandAliloPause,
     ElandAliloStop,
-} Eland_Status_type;
-
-typedef enum {
-    Queue_UTC_type,
-    Queue_ElandState_type,
-} msg_queue_type;
-
-typedef struct __msg_queue
-{
-    msg_queue_type type;
-    uint32_t value;
-} msg_queue;
+} Eland_Status_type_t;
 
 typedef struct __msg_send_queue
 {
@@ -64,6 +54,7 @@ typedef enum {
     KEY_READ_02 = 0X02,
     TIME_SET_03,
     TIME_READ_04,
+    ELAND_STATES_05,
 } __msg_function_t;
 
 typedef enum {
@@ -71,24 +62,20 @@ typedef enum {
     ELAND_SEND_CMD_02H, /*發送02H命令*/
     ELAND_SEND_CMD_03H, /*發送03H命令*/
     ELAND_SEND_CMD_04H, /*發送04H命令*/
+    ELAND_SEND_CMD_05H, /*發送05H命令*/
 } eland_usart_cmd_t;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
 /* Private macro -------------------------------------------------------------*/
 
-/* Private variables ---------------------------------------------------------*/
-extern mico_queue_t elandstate_queue;
-
 /* Private function prototypes -----------------------------------------------*/
 void start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
-void uart_send_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void StateReceivethread(mico_thread_arg_t arg);
-void SendElandQueue(msg_queue_type Type, uint32_t value);
+void SendElandStateQueue(Eland_Status_type_t value);
 
-OSStatus Eland_Uart_Push_Uart_Send_Mutex(__msg_send_queue_t *DataBody);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

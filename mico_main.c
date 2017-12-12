@@ -34,7 +34,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-mico_mutex_t WifiMutex = NULL;
+mico_mutex_t WifiConfigMutex = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -55,14 +55,8 @@ int application_start(void)
     err = ElandWifyStateNotifyInit();
     err = Eland_Rtc_Init();
 
-    /*Register elandstate_queue: elandstate for uart*/
-    err = mico_rtos_init_queue(&elandstate_queue, "elandstate_queue", sizeof(msg_queue), 3);
-
     /*start init system context*/
     mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
-
-    /*start init uart & start service*/
-    //start_uart_service();
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
@@ -72,18 +66,21 @@ int application_start(void)
     err = netclock_desInit();
     require_noerr(err, exit);
 
+    /*start init uart & start service*/
+    start_uart_service();
+
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
 
     /****start softAP event wait******/
-    start_HttpServer_softAP_thread();
+    //start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
-    err = start_eland_flash_service();
+    //err = start_eland_flash_service();
     require_noerr(err, exit);
 
     /* Wait for wlan connection*/
-    //app_netclock_log("wait for wifi on");
+    app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
 

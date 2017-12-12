@@ -12,7 +12,7 @@ OSStatus start_eland_service(void);
 OSStatus netclock_desInit(void);
 
 OSStatus StartNetclockService(void);
-bool CheckNetclockDESSetting(void);
+OSStatus CheckNetclockDESSetting(void);
 OSStatus Netclock_des_recovery(void);
 void start_HttpServer_softAP_thread(void);
 void ElandParameterConfiguration(mico_thread_arg_t args);

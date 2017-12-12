@@ -83,7 +83,6 @@ static int web_send_Post_Request(httpd_request_t *req)
     char post_back_body[20] = {"post response body"};
     mico_Context_t *context = NULL;
     bool para_succ = false;
-    msg_queue my_message;
     msg_wify_queue received;
 
     app_httpd_log("web_send_Post_Request");
@@ -114,9 +113,7 @@ static int web_send_Post_Request(httpd_request_t *req)
 
         if (received.value == Wify_Station_Connect_Successed)
         {
-            my_message.type = Queue_ElandState_type;
-            my_message.value = ElandWifyConnectedSuccessed;
-            mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+            SendElandStateQueue(ElandWifyConnectedSuccessed);
 
             app_httpd_log("Wifi parameter is correct");
             netclock_des_g->IsActivate = true;
@@ -155,11 +152,8 @@ static int web_send_Post_Request(httpd_request_t *req)
         else
         {
             app_httpd_log("connect wifi failed");
-
             Start_wifi_Station_SoftSP_Thread(Soft_AP);
-            my_message.type = Queue_ElandState_type;
-            my_message.value = ElandWifyConnectedFailed;
-            mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+            SendElandStateQueue(ElandWifyConnectedFailed);
         }
     }
     else
@@ -222,7 +216,6 @@ exit:
 int Eland_httpd_start(void)
 {
     OSStatus err = kNoErr;
-    msg_queue my_message;
     err = _app_httpd_start();
     require_noerr(err, exit);
 
@@ -231,9 +224,7 @@ int Eland_httpd_start(void)
         app_http_register_handlers();
         is_handlers_registered = true;
     }
-    my_message.type = Queue_ElandState_type;
-    my_message.value = ElandHttpServerStatus;
-    mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
+    SendElandStateQueue(ElandHttpServerStatus);
 exit:
     return err;
 }

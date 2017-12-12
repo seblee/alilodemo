@@ -242,21 +242,21 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
         case 1:
             err = hal_url_fileDownload_start(URL_FILE_DNLD);
             test_log("file download status: err = %d", err);
-            SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
+            SendElandStateQueue(ElandAliloPlay);
             flagAudioPlay = 2;
             break;
         case 2:
             err = hal_url_fileDownload_pause();
             audio_service_stream_pause(&result);
             test_log("file pause status: err = %d", err);
-            SendElandQueue(Queue_ElandState_type, ElandAliloPause);
+            SendElandStateQueue(ElandAliloPause);
             flagAudioPlay = 3;
             break;
         case 3:
             err = hal_url_fileDownload_continue();
             test_log("file continue status: err = %d", err);
             audio_service_stream_continue(&result);
-            SendElandQueue(Queue_ElandState_type, ElandAliloPlay);
+            SendElandStateQueue(ElandAliloPlay);
             flagAudioPlay = 2;
             break;
         default:
@@ -279,7 +279,7 @@ static void url_paly_stop_thread(mico_thread_arg_t arg)
 
         audio_service_stream_stop(&result, audio_service_system_generate_stream_id());
         flagAudioPlay = 1;
-        SendElandQueue(Queue_ElandState_type, ElandAliloStop);
+        SendElandStateQueue(ElandAliloStop);
     }
 }
 

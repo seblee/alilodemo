@@ -69,10 +69,12 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 
 typedef struct _ELAND_DES_S //设备状态结构
 {
-    bool IsActivate;   //是否已激活设备
-    bool IsAlreadySet; //是否已經寫入設備碼 eg.
+    bool IsActivate;   //is the device already activated
+    bool IsAlreadySet; //have already set factory info
 
-    int32_t eland_id;                      //Eland唯一识别的ID
+    int32_t eland_id;          //Eland唯一识别的ID
+    char user_id[user_id_len]; //用户唯一识别ID，用户登录时获取
+
     char serial_number[serial_number_len]; //Eland的串口番号。
     char eland_name[eland_name_Len];       //Eland名称，用户输入
 
@@ -101,9 +103,8 @@ typedef struct _ELAND_DEVICE //设备状态结构
     int32_t eland_id;          //Eland唯一识别的ID
     char user_id[user_id_len]; //用户唯一识别ID，用户登录时获取
 
-    char serial_number[serial_number_len];       //Eland的串口番号。
-    char firmware_version[firmware_version_len]; //Eland固件版本号
-    char mac_address[mac_address_Len];           //MAC地址
-    int8_t dhcp_enabled;                         //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
+    char serial_number[serial_number_len]; //Eland的串口番号。
+    int8_t dhcp_enabled;                   //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
+                                           //char mac_address[mac_address_Len];           //MAC地址
 } _ELAND_DEVICE_t;
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

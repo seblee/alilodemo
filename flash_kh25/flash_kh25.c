@@ -120,8 +120,8 @@ static OSStatus flash_kh25_check_device(void)
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
     require_string((cache[1] == 0xc2), exit, "flash_kh25 check err");
-    flash_kh25_log("\r\nmanufacturer ID = 0x%02X\r\nmemory type     = 0x%02X\r\nmemory density  = 0x%02X\r\nflash model     = %s",
-                   cache[1], cache[2], cache[3], (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
+    // flash_kh25_log("\r\nmanufacturer ID = 0x%02X\r\nmemory type     = 0x%02X\r\nmemory density  = 0x%02X\r\nflash model     = %s",
+    //                cache[1], cache[2], cache[3], (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
     /**************RES***********************/
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -132,7 +132,7 @@ static OSStatus flash_kh25_check_device(void)
     spiReadWirteOneData(&Spi_eland, cache, 5);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_log("electronic ID   = 0x%02X", cache[4]);
+    //flash_kh25_log("electronic ID   = 0x%02X", cache[4]);
     /**************REMS***********************/
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -143,8 +143,8 @@ static OSStatus flash_kh25_check_device(void)
     spiReadWirteOneData(&Spi_eland, cache, 6);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_log("manufacturer ID = 0x%02X", cache[4]);
-    flash_kh25_log("device ID       = 0x%02X", cache[5]);
+    // flash_kh25_log("manufacturer ID = 0x%02X", cache[4]);
+    // flash_kh25_log("device ID       = 0x%02X", cache[5]);
     /**************RDSR***********************/
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -152,9 +152,10 @@ static OSStatus flash_kh25_check_device(void)
     spiReadWirteOneData(&Spi_eland, cache, 2);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_log("status register = 0x%02X", cache[2]);
+    // flash_kh25_log("status register = 0x%02X", cache[2]);
     return kNoErr;
 exit:
+    flash_kh25_log("kh25 failed");
     return kGeneralErr;
 }
 

@@ -86,7 +86,7 @@ void Wifi_station_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_adv_st wNetConfigAdv;
 
-    mico_rtos_lock_mutex(&WifiMutex);
+    mico_rtos_lock_mutex(&WifiConfigMutex);
 
     micoWlanSuspend();
     /* Initialize wlan parameters */
@@ -103,14 +103,14 @@ void Wifi_station_threed(mico_thread_arg_t arg)
     WifiSet_log("connecting to %s...", wNetConfigAdv.ap_info.ssid);
     micoWlanStartAdv(&wNetConfigAdv);
 
-    mico_rtos_unlock_mutex(&WifiMutex);
+    mico_rtos_unlock_mutex(&WifiConfigMutex);
     mico_rtos_delete_thread(NULL);
 }
 void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_st wNetConfig;
 
-    mico_rtos_lock_mutex(&WifiMutex);
+    mico_rtos_lock_mutex(&WifiConfigMutex);
     WifiSet_log("Soft_ap_Server");
 
     micoWlanSuspend();
@@ -126,7 +126,7 @@ void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
-    mico_rtos_unlock_mutex(&WifiMutex);
+    mico_rtos_unlock_mutex(&WifiConfigMutex);
     mico_rtos_delete_thread(NULL);
 }
 
@@ -143,7 +143,7 @@ OSStatus ElandWifyStateNotifyInit(void)
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);
     /*Register user function for MiCO nitification: WiFi status changed*/
-    err = mico_rtos_init_mutex(&WifiMutex);
+    err = mico_rtos_init_mutex(&WifiConfigMutex);
     require_noerr(err, exit);
     /*Register user Wifi set mutex: WiFi status changed*/
     err = mico_system_notify_register(mico_notify_WIFI_STATUS_CHANGED,

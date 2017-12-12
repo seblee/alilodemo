@@ -12,7 +12,7 @@ typedef struct __msg_wiffy_queue
     msg_wify_status value;
 } msg_wify_queue;
 
-extern mico_mutex_t WifiMutex;
+extern mico_mutex_t WifiConfigMutex;
 extern mico_semaphore_t wifi_SoftAP_Sem;
 extern mico_semaphore_t wifi_netclock;
 extern mico_queue_t wifistate_queue;

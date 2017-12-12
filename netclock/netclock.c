@@ -69,9 +69,10 @@ OSStatus netclock_desInit(void)
     require_action_string(context != NULL, exit, err = kGeneralErr, "[ERROR]context is NULL!!!");
 
     eland_device_state = (_ELAND_DEVICE_t *)mico_system_context_get_user_data(context);
-    require_action_string(eland_device_state != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
+    require_action_string(eland_device_state != NULL, exit, err = kGeneralErr, "[ERROR]eland_device_state is NULL!!!");
 
     netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S));
+    require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
 
     //数据结构体初始化
     if (false == CheckNetclockDESSetting())
@@ -85,10 +86,14 @@ OSStatus netclock_desInit(void)
 
     return kNoErr;
 exit:
+    if (eland_device_state != NULL)
+    {
+        memset(eland_device_state, 0, sizeof(ELAND_DES_S));
+        mico_system_context_update(mico_system_context_get());
+    }
     if (netclock_des_g != NULL)
     {
         memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
-        mico_system_context_update(mico_system_context_get());
     }
     Eland_log("netclock_des_g init err");
     return kGeneralErr;
@@ -138,43 +143,39 @@ exit:
 OSStatus CheckNetclockDESSetting(void)
 {
     OSStatus err = kGeneralErr;
+    unsigned char mac[10] = {0};
     /*check Eland_ID*/
     Eland_log("CheckNetclockDESSetting");
-    if (netclock_des_g->eland_id != 10)
+    if (eland_device_state->IsAlreadySet == true) //have already set factory info
     {
-        Eland_log("ElandID new!");
-        goto exit;
-    }
+        if (eland_device_state->eland_id == 0)
+            goto exit;
+        if (strlen(eland_device_state->serial_number) == 0)
+            goto exit;
+        if (strlen(eland_device_state->serial_number) == 0)
+            goto exit;
 
-    /*check MAC Address*/
-    if (strlen(netclock_des_g->mac_address) != DEVICE_MAC_LEN)
-    {
-        Eland_log("MAC Address err!");
+        if (eland_device_state->IsActivate == true) //设备已激活
+        {
+            if (strlen(eland_device_state->user_id) == 0)
+            {
+                eland_device_state->IsActivate = false;
+                goto exit;
+            }
+        }
+    }
+    else
         goto exit;
-    }
 
-    if (netclock_des_g->IsActivate == true) //设备已激活
-    {
-        /*check timezone*/
-        if ((netclock_des_g->timezone_offset_sec < Timezone_offset_sec_Min) ||
-            (netclock_des_g->timezone_offset_sec > Timezone_offset_sec_Max))
-        {
-            Eland_log("ElandZoneOffset is error!");
-            goto exit;
-        }
-        /*check UserID*/
-        if (strlen(netclock_des_g->user_id) == 0)
-        {
-            Eland_log("UserID error!");
-            goto exit;
-        }
-        /*check serial_number*/
-        if (strlen(netclock_des_g->serial_number) == 0)
-        {
-            Eland_log("UserID error!");
-            goto exit;
-        }
-    }
+    netclock_des_g->eland_id = eland_device_state->eland_id; // des_g_Temp.eland_id; //Eland唯一识别的ID
+    memcpy(netclock_des_g->user_id, eland_device_state->user_id, user_id_len);
+    memcpy(netclock_des_g->serial_number, eland_device_state->serial_number, serial_number_len);
+    memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
+    wlan_get_mac_address(mac);                                                                        //MAC地址
+    memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
+    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); //MAC地址
+    Eland_log("device_mac:%s", netclock_des_g->mac_address);
+
     return kNoErr;
 exit:
     err = Netclock_des_recovery();
@@ -183,47 +184,14 @@ exit:
 }
 OSStatus Netclock_des_recovery(void)
 {
-    unsigned char mac[10] = {0};
     ELAND_DES_S des_g_Temp;
 
     memcpy(&des_g_Temp, netclock_des_g, sizeof(ELAND_DES_S));
     memset(netclock_des_g, 0, sizeof(ELAND_DES_S)); //全局变量清空
 
-    // mico_system_context_update(mico_system_context_get());
-
     netclock_des_g->IsActivate = false;
-    netclock_des_g->IsHava_superuser = false;
-    netclock_des_g->IsRecovery = false;
-
-    netclock_des_g->eland_id = 5; // des_g_Temp.eland_id; //Eland唯一识别的ID
-    sprintf(netclock_des_g->user_id, "20dfd19c-61b0-4dc9-ab1a-d451027c4ede");
-    sprintf(netclock_des_g->serial_number, "ALMA0000005");
-    memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
-
-    wlan_get_mac_address(mac); //MAC地址
-    memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
-    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); //MAC地址
-    Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
     //mico_system_context_update(mico_system_context_get());
-    Eland_log("eland_id:%ld", netclock_des_g->eland_id);
-    Eland_log("user_id:%s", netclock_des_g->user_id);
-    Eland_log("eland_name:%s", netclock_des_g->eland_name);
-    Eland_log("timezone_offset_sec:%ld", netclock_des_g->timezone_offset_sec);
-    Eland_log("serial_number:%s", netclock_des_g->serial_number);
-    Eland_log("firmware_version:%s", netclock_des_g->firmware_version);
-    Eland_log("mac_address:%s", netclock_des_g->mac_address);
-    Eland_log("dhcp_enabled:%d", netclock_des_g->dhcp_enabled);
-    Eland_log("ip_address:%s", netclock_des_g->ip_address);
-    Eland_log("subnet_mask:%s", netclock_des_g->subnet_mask);
-    Eland_log("default_gateway:%s", netclock_des_g->default_gateway);
-    Eland_log("time_display_format:%d", netclock_des_g->time_display_format);
-    Eland_log("brightness_normal:%d", netclock_des_g->brightness_normal);
-    Eland_log("brightness_night:%d", netclock_des_g->brightness_night);
-    Eland_log("night_mode_enabled:%d", netclock_des_g->night_mode_enabled);
-    Eland_log("night_mode_begin_time:%s", netclock_des_g->night_mode_begin_time);
-    Eland_log("night_mode_end_time:%s", netclock_des_g->night_mode_end_time);
-    Eland_log("Wifissid:%s", netclock_des_g->Wifissid);
 
     return kNoErr;
 }
@@ -236,19 +204,18 @@ void start_HttpServer_softAP_thread(void)
 
 void ElandParameterConfiguration(mico_thread_arg_t args)
 {
-    msg_queue my_message;
     flagHttpdServerAP = 1;
     while (1)
     {
         /*********wait for softap event***********/
         mico_rtos_get_semaphore(&httpServer_softAP_event_Sem, MICO_WAIT_FOREVER);
-        flagHttpdServerAP = 2;
-        Eland_log("Soft_ap_Server");
+        if (flagHttpdServerAP == 2)
+            continue;
+        else
+            flagHttpdServerAP = 2;
+        Eland_log("Soft_ap_Server start");
         Start_wifi_Station_SoftSP_Thread(Soft_AP);
-        my_message.type = Queue_ElandState_type;
-        my_message.value = ElandAPStatus;
-        mico_rtos_push_to_queue(&elandstate_queue, &my_message, MICO_WAIT_FOREVER);
-
+        SendElandStateQueue(ElandAPStatus);
         /* start http server thread */
         Eland_httpd_start();
     }
