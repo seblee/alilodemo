@@ -90,7 +90,6 @@ static int web_send_Post_Request(httpd_request_t *req)
     memset(buf, 0, buf_size);
     err = httpd_get_data(req, buf, buf_size);
     app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
-    app_httpd_log(">>>>>>>>web_send_Post_Request>>>>>>>>>>>");
     err = httpd_send_all_header(req, HTTP_RES_200, strlen(post_back_body), HTTP_CONTENT_JSON_STR);
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
@@ -114,7 +113,6 @@ static int web_send_Post_Request(httpd_request_t *req)
         if (received.value == Wify_Station_Connect_Successed)
         {
             SendElandStateQueue(ElandWifyConnectedSuccessed);
-
             app_httpd_log("Wifi parameter is correct");
             netclock_des_g->IsActivate = true;
             app_httpd_log("save wifi para,update flash"); //save
@@ -124,12 +122,10 @@ static int web_send_Post_Request(httpd_request_t *req)
             strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
             context->micoSystemConfig.keyLength = strlen(context->micoSystemConfig.key);
             context->micoSystemConfig.user_keyLength = strlen(context->micoSystemConfig.key);
-
             context->micoSystemConfig.channel = 0;
             memset(context->micoSystemConfig.bssid, 0x0, 6);
             context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
             context->micoSystemConfig.dhcpEnable = true;
-
             context->micoSystemConfig.configured = allConfigured;
             mico_system_context_update(context);
             if (strncmp(ota_url, "\0", 1) != 0)

@@ -45,6 +45,7 @@ typedef enum {
 } KEY_State_TypeDef;
 
 typedef enum {
+    KEY_FUN_NONE = 0x00, /*空命令*/
     KEY_READ_02 = 0X02,
     TIME_SET_03,
     TIME_READ_04,
@@ -61,6 +62,7 @@ typedef enum {
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
+#define Usart_Packet_Resend_time 5
 /* Private macro -------------------------------------------------------------*/
 
 /* Private function prototypes -----------------------------------------------*/

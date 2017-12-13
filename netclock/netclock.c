@@ -214,8 +214,8 @@ void ElandParameterConfiguration(mico_thread_arg_t args)
         else
             flagHttpdServerAP = 2;
         Eland_log("Soft_ap_Server start");
-        Start_wifi_Station_SoftSP_Thread(Soft_AP);
         SendElandStateQueue(ElandAPStatus);
+        Start_wifi_Station_SoftSP_Thread(Soft_AP);
         /* start http server thread */
         Eland_httpd_start();
     }
