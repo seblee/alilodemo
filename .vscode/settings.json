@@ -7,6 +7,9 @@
         "minwindef.h": "c",
         "corecrt.h": "c",
         "audio_test.h": "c",
-        "iosfwd": "c"
+        "iosfwd": "c",
+        "netclock_httpd.h": "c",
+        "robot_event.h": "c",
+        "eland_http_client.h": "c"
     }
 }

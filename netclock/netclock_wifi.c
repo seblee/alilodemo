@@ -96,8 +96,18 @@ void Wifi_station_threed(mico_thread_arg_t arg)
     wNetConfigAdv.key_len = strlen(netclock_des_g->WifiKey);              /* wlan key length */
     wNetConfigAdv.ap_info.security = SECURITY_TYPE_AUTO;                  /* wlan security mode */
     wNetConfigAdv.ap_info.channel = 0;                                    /* Select channel automatically */
-    wNetConfigAdv.dhcpMode = DHCP_Client;                                 /* Fetch Ip address from DHCP server */
-    wNetConfigAdv.wifi_retry_interval = 100;                              /* Retry interval after a failure connection */
+    if (netclock_des_g->dhcp_enabled == 1)
+        wNetConfigAdv.dhcpMode = DHCP_Client; /* Fetch Ip address from DHCP server */
+    else
+    {
+        wNetConfigAdv.dhcpMode = DHCP_Disable; /* Fetch Ip address from DHCP server */
+        memcpy(wNetConfigAdv.local_ip_addr, netclock_des_g->ip_address, 16);
+        memcpy(wNetConfigAdv.net_mask, netclock_des_g->subnet_mask, 16);
+        memcpy(wNetConfigAdv.gateway_ip_addr, netclock_des_g->default_gateway, 16);
+        memcpy(wNetConfigAdv.dnsServer_ip_addr, netclock_des_g->dnsServer, 16);
+    }
+
+    wNetConfigAdv.wifi_retry_interval = 100; /* Retry interval after a failure connection */
 
     /* Connect Now! */
     WifiSet_log("connecting to %s...", wNetConfigAdv.ap_info.ssid);
@@ -139,6 +149,8 @@ OSStatus ElandWifyStateNotifyInit(void)
     mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
     /*httpServer_softAP_event_Sem 信號量*/
     mico_rtos_init_semaphore(&httpServer_softAP_event_Sem, 1);
+    mico_rtos_set_semaphore(&httpServer_softAP_event_Sem); //start Soft_AP mode
+
     /*wifi state 消杯隊列*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);

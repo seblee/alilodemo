@@ -430,8 +430,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     static uint16_t Key_Count = 0, Key_Restain = 0;
     static uint16_t Reset_key_Restain_Trg, Reset_key_Restain_count;
     static uint16_t KEY_Add_Count_Trg, KEY_Add_Count_count;
-    static uint16_t KEY_Minus_Count_Trg, KEY_Minus_Count_count;
-    static uint16_t Set_Minus_Restain_Trg, Set_Minus_Restain_count;
+     static uint16_t Set_Minus_Restain_Trg, Set_Minus_Restain_count;
     uint16_t ReadData;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);

@@ -56,7 +56,7 @@ int application_start(void)
     err = Eland_Rtc_Init();
 
     /*start init system context*/
-    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
+    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t) + 1);
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
@@ -67,7 +67,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
+    // start_uart_service();
 
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
@@ -85,7 +85,7 @@ int application_start(void)
     app_netclock_log("wifi connected successful");
 
     /*start eland HTTP service */
-    //err = start_eland_service();
+    err = start_eland_service();
     require_noerr(err, exit);
 
     err = TCP_Service_Start();

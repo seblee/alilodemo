@@ -6,6 +6,7 @@
 extern const char Eland_Data[11];
 extern json_object *ElandJsonData;
 extern ELAND_DES_S *netclock_des_g;
+extern _ELAND_DEVICE_t *device_state;
 //extern static mico_semaphore_t WifiConnectSem;
 
 OSStatus start_eland_service(void);

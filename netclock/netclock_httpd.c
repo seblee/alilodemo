@@ -82,7 +82,6 @@ static int web_send_Post_Request(httpd_request_t *req)
     char *buf = NULL;
     char post_back_body[20] = {"post response body"};
     mico_Context_t *context = NULL;
-    bool para_succ = false;
     msg_wify_queue received;
 
     app_httpd_log("web_send_Post_Request");
@@ -109,12 +108,11 @@ static int web_send_Post_Request(httpd_request_t *req)
         /********驗證wifi  ssid password*************/
         Start_wifi_Station_SoftSP_Thread(Station);
         mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-
         if (received.value == Wify_Station_Connect_Successed)
         {
             SendElandStateQueue(ElandWifyConnectedSuccessed);
             app_httpd_log("Wifi parameter is correct");
-            netclock_des_g->IsActivate = true;
+            device_state->IsActivate = true;
             app_httpd_log("save wifi para,update flash"); //save
             context = mico_system_context_get();
             strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
@@ -125,9 +123,20 @@ static int web_send_Post_Request(httpd_request_t *req)
             context->micoSystemConfig.channel = 0;
             memset(context->micoSystemConfig.bssid, 0x0, 6);
             context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
-            context->micoSystemConfig.dhcpEnable = true;
+            if (netclock_des_g->dhcp_enabled == 1)
+                context->micoSystemConfig.dhcpEnable = true; /* Fetch Ip address from DHCP server */
+            else
+            {
+                context->micoSystemConfig.dhcpEnable = false; /* Fetch Ip address from DHCP server */
+                       memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
+                memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
+                memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
+                memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
+            }
+
             context->micoSystemConfig.configured = allConfigured;
-            mico_system_context_update(context);
+            //mico_system_context_update(context);
+
             if (strncmp(ota_url, "\0", 1) != 0)
             {
                 if (strncmp(ota_md5, "\0", 1) != 0)
@@ -142,28 +151,24 @@ static int web_send_Post_Request(httpd_request_t *req)
             }
             //app_httpd_log("system restart");
             //mico_system_power_perform(context, eState_Software_Reset);
-            Eland_httpd_stop(); //stop http server mode
-            flagHttpdServerAP = 1;
         }
-        else
-        {
-            app_httpd_log("connect wifi failed");
-            Start_wifi_Station_SoftSP_Thread(Soft_AP);
-            SendElandStateQueue(ElandWifyConnectedFailed);
-        }
+        Eland_httpd_stop(); //stop http server mode
+        flagHttpdServerAP = 1;
+        // else
+        // {
+        //     app_httpd_log("connect wifi failed");
+        //     Start_wifi_Station_SoftSP_Thread(Soft_AP);
+        //     SendElandStateQueue(ElandWifyConnectedFailed);
+        // }
     }
     else
     {
         app_httpd_log("Json error");
     }
 
-    if (para_succ == true)
-    {
-    }
-    free(buf);
     app_httpd_log("POST OVER");
-    buf = NULL;
 exit:
+    free(buf);
     return err;
 }
 

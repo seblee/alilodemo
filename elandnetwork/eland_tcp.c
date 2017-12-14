@@ -16,6 +16,7 @@
 #include "eland_tcp.h"
 #include "eland_http_client.h"
 #include "netclock.h"
+#include "netclock_wifi.h"
 //#include "timer_platform.h"
 /* Private typedef -----------------------------------------------------------*/
 
@@ -417,9 +418,16 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _Client_t Eland_Client;
     // ServerParams_t *serverPara = (ServerParams_t *)arg;
     ServerParams_t serverPara;
-    serverPara.pDestinationURL = ELAND_HTTP_DOMAIN_NAME;
-    serverPara.DestinationPort = 6380;
-
+    if ((netclock_des_g == NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
+    {
+        serverPara.pDestinationURL = netclock_des_g->tcpIP_host;
+        serverPara.DestinationPort = netclock_des_g->tcpIP_port;
+    }
+    else
+    {
+        serverPara.pDestinationURL = ELAND_HTTP_DOMAIN_NAME;
+        serverPara.DestinationPort = 6380;
+    }
     rc = TCP_Client_Init(&Eland_Client, &serverPara);
     if (TCP_SUCCESS != rc)
     {
@@ -480,6 +488,15 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
     ClientState_t clientState;
     if (NULL == pClient)
         return NULL_VALUE_ERROR;
+
+    rc = TCP_Physical_is_connected(&(pClient->networkStack));
+    if (rc != NETWORK_PHYSICAL_LAYER_CONNECTED)
+    {
+        elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
+        mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
+        return rc;
+    }
+
     clientState = eland_get_client_state(pClient);
     eland_set_client_state(pClient, clientState, CLIENT_STATE_CONNECTING);
 

@@ -9,9 +9,7 @@
 #define NETCLOCK_NETCLOCKCONFIG_H_
 #include "mico.h"
 
-#define Eland_ID ("0123456789ABCDEF")    //Eland唯一识别的ID
 #define Eland_Firmware_Version ("01.00") //Eland固件版本号
-#define Serial_Number ("00000001")       //Eland的串口番号
 
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
@@ -20,18 +18,18 @@
 #define ELAND_AP_SSID ("Eland")   //配置模式ssid
 #define ELAND_AP_KEY ("12345678") //配置模式key
 
-#define user_id_len 37         //Eland name
-#define eland_name_Len 151     //Eland名称，用户输入
-#define serial_number_len 12   //Eland的串口番号。
-#define firmware_version_len 6 //Eland固件版本号
-#define mac_address_Len 18     //MAC地址
-#define ip_address_Len 16      //Eland IP地址
-#define ElandSsid_Len 32       //wifi 用户名长度
-#define ElandKey_Len 64        //wifi 密码长度
-#define Time_Format_Len 9      //"HH:mm:ss"的形式
-#define DateTime_Len 19        //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
-#define Date_formate_len 11    //日期为"yyyy-MM-dd"的形式
-#define URL_Len 128            //URL长度
+#define user_id_len 37          //Eland name
+#define eland_name_Len 151      //Eland名称，用户输入
+#define serial_number_len 12    //Eland的串口番号。
+#define firmware_version_len 6  //Eland固件版本号
+#define mac_address_Len 18      //MAC地址
+#define ip_address_Len maxIpLen //Eland IP地址 必須為16，防止內存操作有問題
+#define ElandSsid_Len 32        //wifi 用户名长度
+#define ElandKey_Len 64         //wifi 密码长度
+#define Time_Format_Len 9       //"HH:mm:ss"的形式
+#define DateTime_Len 19         //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+#define Date_formate_len 11     //日期为"yyyy-MM-dd"的形式
+#define URL_Len 128             //URL长度
 
 #define alarm_id_len 37   //闹钟唯一识别的ID。
 #define alarm_color_len 8 //闹钟颜色的RGB字符串。"#RRGGBB"的形式。
@@ -69,9 +67,6 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 
 typedef struct _ELAND_DES_S //设备状态结构
 {
-    bool IsActivate;   //is the device already activated
-    bool IsAlreadySet; //have already set factory info
-
     int32_t eland_id;          //Eland唯一识别的ID
     char user_id[user_id_len]; //用户唯一识别ID，用户登录时获取
 
@@ -85,6 +80,7 @@ typedef struct _ELAND_DES_S //设备状态结构
     char ip_address[ip_address_Len];             //Eland IP地址
     char subnet_mask[ip_address_Len];            //Eland的IPv4子网掩码。
     char default_gateway[ip_address_Len];        //Eland的IPv4默认网关。
+    char dnsServer[ip_address_Len];              //DNS server ip address
     int8_t time_display_format;                  //12小时显示还是24小时显示的代码  1:12時間表示(AM/PM表示) 2 : 24時間表示
     int8_t brightness_normal;                    //通常时的液晶显示亮度。背光亮度
     int8_t brightness_night;                     //夜间模式时的液晶显示亮度、背光亮度
@@ -93,6 +89,9 @@ typedef struct _ELAND_DES_S //设备状态结构
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
     char Wifissid[ElandSsid_Len];                //wifi 賬號
     char WifiKey[ElandKey_Len];                  //wifi 密碼
+
+    char tcpIP_host[ip_address_Len];
+    uint16_t tcpIP_port;
 } ELAND_DES_S;
 
 typedef struct _ELAND_DEVICE //设备状态结构
@@ -100,11 +99,15 @@ typedef struct _ELAND_DEVICE //设备状态结构
     bool IsActivate;   //是否已激活设备
     bool IsAlreadySet; //是否已經寫入設備碼 eg.
 
-    int32_t eland_id;          //Eland唯一识别的ID
-    char user_id[user_id_len]; //用户唯一识别ID，用户登录时获取
-
+    int32_t eland_id;                      //Eland唯一识别的ID
     char serial_number[serial_number_len]; //Eland的串口番号。
-    int8_t dhcp_enabled;                   //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
-                                           //char mac_address[mac_address_Len];           //MAC地址
+
+    /*APP/tcpIP通信時獲取*/
+    char user_id[user_id_len];            //用户唯一识别ID
+    int8_t dhcp_enabled;                  //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
+    char ip_address[ip_address_Len];      //Eland IP地址
+    char subnet_mask[ip_address_Len];     //Eland 的IPv4子网掩码。
+    char default_gateway[ip_address_Len]; //Eland 的IPv4默认网关。
+    char dnsServer[ip_address_Len];       //DNS server ip address
 } _ELAND_DEVICE_t;
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

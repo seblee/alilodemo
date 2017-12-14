@@ -14,8 +14,7 @@
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
 ELAND_DES_S *netclock_des_g = NULL;
-_ELAND_DEVICE_t *eland_device_state = NULL;
-
+_ELAND_DEVICE_t *device_state = NULL;
 static bool NetclockInitSuccess = false;
 
 //http client mutex
@@ -68,27 +67,23 @@ OSStatus netclock_desInit(void)
     context = mico_system_context_get();
     require_action_string(context != NULL, exit, err = kGeneralErr, "[ERROR]context is NULL!!!");
 
-    eland_device_state = (_ELAND_DEVICE_t *)mico_system_context_get_user_data(context);
-    require_action_string(eland_device_state != NULL, exit, err = kGeneralErr, "[ERROR]eland_device_state is NULL!!!");
+    device_state = (_ELAND_DEVICE_t *)mico_system_context_get_user_data(context);
+    require_action_string(device_state != NULL, exit, err = kGeneralErr, "[ERROR]device_state is NULL!!!");
 
     netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S));
     require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
 
     //数据结构体初始化
-    if (false == CheckNetclockDESSetting())
-    {
-        //结构体覆盖
-        Eland_log("[NOTICE]recovery settings!!!!!!!");
+    err = CheckNetclockDESSetting();
+    require_noerr(err, exit);
 
-        require_noerr(err, exit);
-    }
     Eland_log("local firmware version:%s", Eland_Firmware_Version);
 
     return kNoErr;
 exit:
-    if (eland_device_state != NULL)
+    if (device_state != NULL)
     {
-        memset(eland_device_state, 0, sizeof(ELAND_DES_S));
+        memset(device_state, 0, sizeof(ELAND_DES_S));
         mico_system_context_update(mico_system_context_get());
     }
     if (netclock_des_g != NULL)
@@ -144,32 +139,50 @@ OSStatus CheckNetclockDESSetting(void)
 {
     OSStatus err = kGeneralErr;
     unsigned char mac[10] = {0};
-    /*check Eland_ID*/
+/*check Eland_ID*/
+start_Check:
     Eland_log("CheckNetclockDESSetting");
-    if (eland_device_state->IsAlreadySet == true) //have already set factory info
+    if (device_state->IsAlreadySet == true) //have already set factory info
     {
-        if (eland_device_state->eland_id == 0)
-            goto exit;
-        if (strlen(eland_device_state->serial_number) == 0)
-            goto exit;
-        if (strlen(eland_device_state->serial_number) == 0)
-            goto exit;
-
-        if (eland_device_state->IsActivate == true) //设备已激活
+        if (device_state->eland_id == 0)
         {
-            if (strlen(eland_device_state->user_id) == 0)
+            Eland_log("eland_id wrong");
+            goto exit;
+        }
+        if (strlen(device_state->serial_number) == 0)
+        {
+            Eland_log("serial_number wrong");
+            goto exit;
+        }
+
+        if (device_state->IsActivate == true) //设备已激活
+        {
+            if (strlen(device_state->user_id) == 0)
             {
-                eland_device_state->IsActivate = false;
-                goto exit;
+                device_state->IsActivate = false;
+                {
+                    Eland_log("serial_number wrong");
+                    goto exit;
+                }
             }
         }
     }
     else
-        goto exit;
+    {
+        Eland_log("device not set");
+        memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
+        device_state->eland_id = 5;
+        sprintf(device_state->serial_number, "ALML7%06ld", device_state->eland_id);
+        device_state->IsAlreadySet = true;
 
-    netclock_des_g->eland_id = eland_device_state->eland_id; // des_g_Temp.eland_id; //Eland唯一识别的ID
-    memcpy(netclock_des_g->user_id, eland_device_state->user_id, user_id_len);
-    memcpy(netclock_des_g->serial_number, eland_device_state->serial_number, serial_number_len);
+        Eland_log("eland_id %ld", device_state->eland_id);
+        Eland_log("eland_id %s", device_state->serial_number);
+        goto start_Check;
+    }
+
+    netclock_des_g->eland_id = device_state->eland_id; // des_g_Temp.eland_id; //Eland唯一识别的ID
+    memcpy(netclock_des_g->user_id, device_state->user_id, user_id_len);
+    memcpy(netclock_des_g->serial_number, device_state->serial_number, serial_number_len);
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
     wlan_get_mac_address(mac);                                                                        //MAC地址
     memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
@@ -188,8 +201,6 @@ OSStatus Netclock_des_recovery(void)
 
     memcpy(&des_g_Temp, netclock_des_g, sizeof(ELAND_DES_S));
     memset(netclock_des_g, 0, sizeof(ELAND_DES_S)); //全局变量清空
-
-    netclock_des_g->IsActivate = false;
 
     //mico_system_context_update(mico_system_context_get());
 
@@ -334,6 +345,7 @@ void destory_upload_data(void)
 //解析接收到的数据包
 OSStatus ProcessPostJson(char *InputJson)
 {
+    bool needupdateflash = false;
     json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL;
     if (*InputJson != '{')
     {
@@ -401,7 +413,49 @@ OSStatus ProcessPostJson(char *InputJson)
         {
             netclock_des_g->timezone_offset_sec = json_object_get_int(val);
         }
+        else if (!strcmp(key, "dhcp_enabled"))
+        {
+            netclock_des_g->dhcp_enabled = json_object_get_int(val);
+            device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
+        }
+        else if (!strcmp(key, "ip_address"))
+        {
+            memset(netclock_des_g->ip_address, 0, ip_address_Len);
+            sprintf(netclock_des_g->ip_address, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "subnet_mask"))
+        {
+            memset(netclock_des_g->subnet_mask, 0, ip_address_Len);
+            sprintf(netclock_des_g->subnet_mask, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "default_gateway"))
+        {
+            memset(netclock_des_g->default_gateway, 0, ip_address_Len);
+            sprintf(netclock_des_g->default_gateway, "%s", json_object_get_string(val));
+        }
     }
+
+    if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
+    {
+        needupdateflash = true;
+        memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
+    }
+    if (device_state->dhcp_enabled == 0)
+    {
+        if ((strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0) ||
+            (strncmp(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len) != 0) ||
+            (strncmp(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len) != 0) ||
+            (strncmp(device_state->dnsServer, netclock_des_g->dnsServer, ip_address_Len) != 0))
+        {
+            needupdateflash = true;
+            memcpy(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len);
+            memcpy(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len);
+            memcpy(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len);
+        }
+    }
+    if (needupdateflash == true)
+        mico_system_context_update(mico_system_context_get());
+
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以
     return kNoErr;
 exit:
@@ -413,6 +467,8 @@ exit:
 static OSStatus eland_communication_info_get(void)
 {
     OSStatus err = kGeneralErr;
+    json_object *ReceivedJsonCache = NULL, *ServerJsonCache = NULL;
+
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
 
@@ -440,6 +496,32 @@ DEVICE_INFO_GET_START:
     //处理返回结果
     if (user_http_res.status_code == 200)
     {
+        ReceivedJsonCache = json_tokener_parse((const char *)(user_http_res.eland_response_body));
+        if (ReceivedJsonCache == NULL)
+        {
+            Eland_log("json_tokener_parse error");
+            err = kGeneralErr;
+            goto exit;
+        }
+        //解析Server data
+        ServerJsonCache = json_object_object_get(ReceivedJsonCache, "server");
+        if ((ServerJsonCache == NULL) || ((json_object_get_object(ServerJsonCache)->head) == NULL))
+        {
+            Eland_log("get ServerJsonCache error");
+            goto exit;
+        }
+        json_object_object_foreach(ServerJsonCache, key, val)
+        {
+            if (!strcmp(key, "ip_address"))
+            {
+                memset(netclock_des_g->tcpIP_host, 0, ip_address_Len);
+                sprintf(netclock_des_g->tcpIP_host, "%s", json_object_get_string(val));
+            }
+            else if (!strcmp(key, "port"))
+            {
+                netclock_des_g->tcpIP_port = json_object_get_int(val);
+            }
+        }
         Eland_log("<===== eland_communication_info_get end <======");
     }
     else

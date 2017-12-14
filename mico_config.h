@@ -41,7 +41,7 @@
 
 #define EasyLink_Needs_Reboot
 
-#define MICO_SYSTEM_LOG_INFO_DISABLE
+//#define MICO_SYSTEM_LOG_INFO_DISABLE
 
 /************************************************************************
  * Application thread stack size */
