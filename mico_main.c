@@ -88,7 +88,7 @@ int application_start(void)
     err = start_eland_service();
     require_noerr(err, exit);
 
-    // err = TCP_Service_Start();
+    err = TCP_Service_Start();
     require_noerr(err, exit);
 
     //err = start_test_thread();

@@ -417,8 +417,12 @@ static void TCP_thread_main(mico_thread_arg_t arg)
 {
     TCP_Error_t rc = TCP_SUCCESS;
     _Client_t Eland_Client;
+    uint8_t tcp_write_flag[5];
     // ServerParams_t *serverPara = (ServerParams_t *)arg;
     ServerParams_t serverPara;
+    _time_t timer;
+    memset(tcp_write_flag, 1, 5);
+
     if ((netclock_des_g == NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
     {
         serverPara.pDestinationURL = netclock_des_g->tcpIP_host;
@@ -439,36 +443,52 @@ static void TCP_thread_main(mico_thread_arg_t arg)
 RECONN:
     elan_tcp_log("Shadow Connect...");
     rc = eland_tcp_connect(&Eland_Client, NULL);
+
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Server Connection Error,Delay 1s then retry");
         goto RECONN;
     }
-
-    eland_IF_connection_request(&Eland_Client);
-    if (TCP_SUCCESS != rc)
+    if (tcp_write_flag[0] > 0)
     {
-        mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        tcp_write_flag[0]--;
+        eland_IF_connection_request(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
     }
-    eland_IF_update_elandinfo(&Eland_Client);
-    if (TCP_SUCCESS != rc)
+    if (tcp_write_flag[1] > 0)
     {
-        mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        tcp_write_flag[1]--;
+        eland_IF_update_elandinfo(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
     }
-    eland_IF_update_alarm(&Eland_Client);
-    if (TCP_SUCCESS != rc)
+    if (tcp_write_flag[2] > 0)
     {
-        mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        tcp_write_flag[2]--;
+        eland_IF_update_alarm(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
     }
-    eland_IF_update_holiday(&Eland_Client);
-    if (TCP_SUCCESS != rc)
+    if (tcp_write_flag[3] > 0)
     {
-        mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        tcp_write_flag[3]--;
+        eland_IF_update_holiday(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
     }
     eland_IF_health_check(&Eland_Client);
     if (TCP_SUCCESS != rc)
@@ -476,7 +496,14 @@ RECONN:
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
     }
-
+    timer.tv_sec = 5;
+    timer.tv_usec = 0;
+    rc = eland_IF_receive_packet(&Eland_Client, &timer);
+    if (TCP_SUCCESS != rc)
+    {
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+    }
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);

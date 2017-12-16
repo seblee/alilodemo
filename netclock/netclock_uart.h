@@ -36,6 +36,7 @@ typedef enum {
     ElandAliloStop,
     HTTP_Get_HOST_INFO,
     TCPConnectedELSV,
+    TCPHealthCheck,
 } Eland_Status_type_t;
 typedef enum {
     KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
