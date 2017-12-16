@@ -17,6 +17,7 @@
 #include "eland_http_client.h"
 #include "netclock.h"
 #include "netclock_wifi.h"
+#include "netclock_uart.h"
 //#include "timer_platform.h"
 /* Private typedef -----------------------------------------------------------*/
 
@@ -535,7 +536,8 @@ static TCP_Error_t eland_IF_connection_request(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
-
+    if (rc == TCP_SUCCESS)
+        SendElandStateQueue(TCPConnectedELSV);
     return rc;
 }
 static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)

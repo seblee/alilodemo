@@ -94,6 +94,7 @@ static int web_send_Post_Request(httpd_request_t *req)
 
     err = httpd_send_body(req->sock, (const unsigned char *)post_back_body, strlen(post_back_body));
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+    SendElandStateQueue(ELAPPConnected);
     mico_thread_sleep(3); //等待傳輸完成
     if (ProcessPostJson(buf) == kNoErr)
     {
@@ -110,7 +111,6 @@ static int web_send_Post_Request(httpd_request_t *req)
         mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
         if (received.value == Wify_Station_Connect_Successed)
         {
-            SendElandStateQueue(ElandWifyConnectedSuccessed);
             app_httpd_log("Wifi parameter is correct");
             device_state->IsActivate = true;
             app_httpd_log("save wifi para,update flash"); //save
@@ -128,7 +128,7 @@ static int web_send_Post_Request(httpd_request_t *req)
             else
             {
                 context->micoSystemConfig.dhcpEnable = false; /* Fetch Ip address from DHCP server */
-                       memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
+                memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
                 memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
                 memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
                 memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
@@ -225,7 +225,7 @@ int Eland_httpd_start(void)
         app_http_register_handlers();
         is_handlers_registered = true;
     }
-    SendElandStateQueue(ElandHttpServerStatus);
+    SendElandStateQueue(HttpServerStatus);
 exit:
     return err;
 }

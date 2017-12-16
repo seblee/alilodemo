@@ -114,6 +114,7 @@ OSStatus start_eland_service(void)
     //1.eland 通訊情報取得
     err = eland_communication_info_get();
     require_noerr(err, exit);
+    SendElandStateQueue(HTTP_Get_HOST_INFO);
 
     //3.eland test  下載音頻到flash
     //err = alarm_sound_download(); //暫時做測試用
@@ -225,7 +226,6 @@ void ElandParameterConfiguration(mico_thread_arg_t args)
         else
             flagHttpdServerAP = 2;
         Eland_log("Soft_ap_Server start");
-        SendElandStateQueue(ElandAPStatus);
         Start_wifi_Station_SoftSP_Thread(Soft_AP);
         /* start http server thread */
         Eland_httpd_start();

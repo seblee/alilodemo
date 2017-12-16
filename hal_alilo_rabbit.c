@@ -30,6 +30,7 @@ static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
 {
     mscp_result_t result = MSCP_RST_ERROR;
     OSStatus err = kNoErr;
+    err = err;
     hal_log(">>>>>>>>>> event: %d >>>>>>>>>>", event);
     switch (event)
     {
@@ -96,7 +97,7 @@ extern system_context_t *sys_context;
 OSStatus hal_alilo_rabbit_init(void)
 {
     OSStatus err;
-     ADUIO_SYSTEM_STATE_S Aduio_state;
+    ADUIO_SYSTEM_STATE_S Aduio_state;
     memset(&Aduio_state, 0, sizeof(ADUIO_SYSTEM_STATE_S));
 
     err = mico_rtos_init_semaphore(&recordKeyPress_Sem, 1);

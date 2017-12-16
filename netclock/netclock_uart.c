@@ -16,6 +16,7 @@
 #include "netclock_uart.h"
 #include "mico.h"
 #include "netclock_httpd.h"
+#include "netclockconfig.h"
 #include "../alilodemo/inc/audio_service.h"
 /* Private typedef -----------------------------------------------------------*/
 
@@ -32,7 +33,7 @@
 volatile ring_buffer_t rx_buffer;
 volatile uint8_t rx_data[UART_BUFFER_LENGTH];
 
-mico_mutex_t ElandUartMutex = NULL; //uart独立访问
+//mico_mutex_t ElandUartMutex = NULL; //uart独立访问
 
 mico_queue_t eland_uart_receive_queue = NULL; //eland usart
 mico_queue_t eland_uart_CMD_queue = NULL;     //eland usart
@@ -48,10 +49,12 @@ static void Eland_H02_Send(void);
 static void Eland_H03_Send(void);
 static void Eland_H04_Send(void);
 static void ELAND_H05_Send(void);
+static void ELAND_H06_Send(void);
 static void MODH_Opration_02H(uint8_t *usart_rec);
 static void MODH_Opration_03H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
 static void MODH_Opration_05H(uint8_t *usart_rec);
+static void MODH_Opration_06H(uint8_t *usart_rec);
 static void timer100_key_handle(void *arg);
 static void uart_thread_DDE(uint32_t arg);
 static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
@@ -66,8 +69,6 @@ void start_uart_service(void)
     mico_Context_t *mico_context;
     //eland 状态数据互锁
 
-    err = mico_rtos_init_mutex(&ElandUartMutex);
-    require_noerr(err, exit);
     err = mico_rtos_init_semaphore(&Is_usart_complete_sem, 2);
 
     //初始化eland_uart_CMD_queue 發送 CMD 消息 初始化eland uart 發送 send 消息
@@ -108,6 +109,7 @@ void start_uart_service(void)
     require_noerr(err, exit);
     err = mico_rtos_get_semaphore(&Is_usart_complete_sem, MICO_WAIT_FOREVER); //two times
     require_noerr(err, exit);
+
     err = mico_rtos_deinit_semaphore(&Is_usart_complete_sem);
     require_noerr(err, exit);
 
@@ -205,6 +207,9 @@ static void Opration_Packet(uint8_t *data)
     case ELAND_STATES_05:
         MODH_Opration_05H(data);
         break;
+    case FIRM_WARE_06:
+        MODH_Opration_06H(data);
+        break;
     default:
         break;
     }
@@ -234,6 +239,9 @@ static void uart_thread_DDE(uint32_t arg)
             break;
         case ELAND_SEND_CMD_05H: //
             ELAND_H05_Send();
+            break;
+        case ELAND_SEND_CMD_06H: //
+            ELAND_H06_Send();
             break;
         default:
             break;
@@ -412,7 +420,42 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 5);
     require_noerr(err, exit);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)ELAND_STATES_05)
+        err = kNoErr;
+    else //10ms resend mechanism
+    {
+        mico_rtos_thread_msleep(10);
+        if (sended_times > 0)
+            goto start_send;
+    }
+exit:
+    if (Cache != NULL)
+        free(Cache);
+}
+static void ELAND_H06_Send(void)
+{
+    OSStatus err = kGeneralErr;
+    uint8_t *Cache;
+    __msg_function_t received_cmd = KEY_FUN_NONE;
+    uint8_t sended_times = Usart_Packet_Resend_time;
+
+    Cache = calloc(4 + strlen(Eland_Firmware_Version), sizeof(uint8_t));
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = FIRM_WARE_06;
+    *(Cache + 2) = strlen(Eland_Firmware_Version);
+    sprintf((char *)(Cache + 3), "%s", Eland_Firmware_Version);
+    *(Cache + 3 + strlen(Eland_Firmware_Version)) = Uart_Packet_Trail;
+start_send:
+    sended_times--;
+    err = elandUsartSendData(Cache, 4 + strlen(Eland_Firmware_Version));
+    require_noerr(err, exit);
+
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    require_noerr(err, exit);
+
+    if (received_cmd == (__msg_function_t)FIRM_WARE_06)
         err = kNoErr;
     else //10ms resend mechanism
     {
@@ -430,8 +473,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     static uint16_t Key_Count = 0, Key_Restain = 0;
     static uint16_t Reset_key_Restain_Trg, Reset_key_Restain_count;
     static uint16_t KEY_Add_Count_Trg, KEY_Add_Count_count;
-     static uint16_t Set_Minus_Restain_Trg, Set_Minus_Restain_count;
+    static uint16_t Set_Minus_Restain_Trg, Set_Minus_Restain_count;
     uint16_t ReadData;
+    eland_usart_cmd_t eland_cmd = ELAND_SEND_CMD_06H;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
@@ -446,7 +490,10 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     KEY_Add_Count_Trg = ReadData & (ReadData ^ KEY_Add_Count_count);
     KEY_Add_Count_count = ReadData;
     if (KEY_Add_Count_Trg)
+    {
         count_key_time++;
+        mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+    }
 
     if ((Key_Restain & KEY_Set) && (Key_Restain & KEY_Minus))
         ReadData = (KEY_Set | KEY_Minus);
@@ -472,5 +519,8 @@ static void MODH_Opration_04H(uint8_t *usart_rec)
     MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
 }
 static void MODH_Opration_05H(uint8_t *usart_rec)
+{
+}
+static void MODH_Opration_06H(uint8_t *usart_rec)
 {
 }

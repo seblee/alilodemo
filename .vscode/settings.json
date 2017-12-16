@@ -10,6 +10,7 @@
         "iosfwd": "c",
         "netclock_httpd.h": "c",
         "robot_event.h": "c",
-        "eland_http_client.h": "c"
+        "eland_http_client.h": "c",
+        "netclockconfig.h": "c"
     }
 }

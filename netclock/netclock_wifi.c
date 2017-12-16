@@ -31,12 +31,13 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         free(IPStatus_Cache);
         /*Send wifi state station*/
         my_message.value = Wify_Station_Connect_Successed;
+        SendElandStateQueue(WifyConnected);
         if (wifistate_queue != NULL)
             mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
         break;
     case NOTIFY_STATION_DOWN:
         WifiSet_log("Wi-Fi STATION disconnected.");
-
+        SendElandStateQueue(WifyDisConnected);
         break;
     case NOTIFY_AP_UP:
         WifiSet_log("Wi-Fi Soft_AP ready!");
@@ -51,8 +52,10 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
         sprintf(netclock_des_g->default_gateway, IPStatus_Cache->gate);
         free(IPStatus_Cache);
+        SendElandStateQueue(APStatus);
         break;
     case NOTIFY_AP_DOWN:
+        SendElandStateQueue(APStatusClosed);
         WifiSet_log("uAP disconnected.");
         break;
     default:
@@ -144,13 +147,14 @@ OSStatus ElandWifyStateNotifyInit(void)
 {
     OSStatus err;
     /*wifi station 信號針*/
-    mico_rtos_init_semaphore(&wifi_netclock, 1);
+    err = mico_rtos_init_semaphore(&wifi_netclock, 1);
+    require_noerr(err, exit);
     /*wifi softAP 信號針*/
-    mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
+    err = mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
+    require_noerr(err, exit);
     /*httpServer_softAP_event_Sem 信號量*/
-    mico_rtos_init_semaphore(&httpServer_softAP_event_Sem, 1);
-    mico_rtos_set_semaphore(&httpServer_softAP_event_Sem); //start Soft_AP mode
-
+    err = mico_rtos_init_semaphore(&httpServer_softAP_event_Sem, 1);
+    require_noerr(err, exit);
     /*wifi state 消杯隊列*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);

@@ -67,7 +67,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    // start_uart_service();
+    start_uart_service();
 
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
@@ -76,7 +76,7 @@ int application_start(void)
     start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
-    err = start_eland_flash_service();
+    // err = start_eland_flash_service();
     require_noerr(err, exit);
 
     /* Wait for wlan connection*/
@@ -88,7 +88,7 @@ int application_start(void)
     err = start_eland_service();
     require_noerr(err, exit);
 
-    err = TCP_Service_Start();
+    // err = TCP_Service_Start();
     require_noerr(err, exit);
 
     //err = start_test_thread();

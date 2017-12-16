@@ -23,15 +23,20 @@
 typedef enum {
     ElandNone = 0,
     ElandBegin,
-    ElandAPStatus,
-    ElandHttpServerStatus,
-    ElandWifyConnectedSuccessed,
-    ElandWifyConnectedFailed,
+    APStatus,
+    APStatusClosed,
+    HttpServerStatus,
+    HttpServerStop,
+    ELAPPConnected,
+    WifyConnected,
+    WifyDisConnected,
+    WifyConnectedFailed,
     ElandAliloPlay,
     ElandAliloPause,
     ElandAliloStop,
+    HTTP_Get_HOST_INFO,
+    TCPConnectedELSV,
 } Eland_Status_type_t;
-
 typedef enum {
     KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
     KEY_Reset = (uint16_t)0x0002,     /*!< 軟件復位 */
@@ -50,6 +55,7 @@ typedef enum {
     TIME_SET_03,
     TIME_READ_04,
     ELAND_STATES_05,
+    FIRM_WARE_06,
 } __msg_function_t;
 
 typedef enum {
@@ -58,6 +64,7 @@ typedef enum {
     ELAND_SEND_CMD_03H, /*發送03H命令*/
     ELAND_SEND_CMD_04H, /*發送04H命令*/
     ELAND_SEND_CMD_05H, /*發送05H命令*/
+    ELAND_SEND_CMD_06H, /*發送05H命令*/
 } eland_usart_cmd_t;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
