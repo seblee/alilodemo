@@ -155,6 +155,7 @@ OSStatus ElandWifyStateNotifyInit(void)
     /*httpServer_softAP_event_Sem 信號量*/
     err = mico_rtos_init_semaphore(&httpServer_softAP_event_Sem, 1);
     require_noerr(err, exit);
+    // mico_rtos_set_semaphore(&httpServer_softAP_event_Sem);
     /*wifi state 消杯隊列*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);

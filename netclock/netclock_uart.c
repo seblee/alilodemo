@@ -37,7 +37,7 @@ volatile uint8_t rx_data[UART_BUFFER_LENGTH];
 
 mico_queue_t eland_uart_receive_queue = NULL; //eland usart
 mico_queue_t eland_uart_CMD_queue = NULL;     //eland usart
-mico_queue_t eland_satae_queue = NULL;        //eland usart
+mico_queue_t eland_state_queue = NULL;        //eland usart
 
 mico_semaphore_t Is_usart_complete_sem = NULL;
 
@@ -72,10 +72,10 @@ void start_uart_service(void)
     err = mico_rtos_init_semaphore(&Is_usart_complete_sem, 2);
 
     //初始化eland_uart_CMD_queue 發送 CMD 消息 初始化eland uart 發送 send 消息
-    err = mico_rtos_init_queue(&eland_uart_CMD_queue, "eland_uart_CMD_queue", sizeof(eland_usart_cmd_t), 3); //只容纳一个成员 传递的只是地址
+    err = mico_rtos_init_queue(&eland_uart_CMD_queue, "eland_uart_CMD_queue", sizeof(eland_usart_cmd_t), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
-    //eland_satae_queue
-    err = mico_rtos_init_queue(&eland_satae_queue, "eland_satae_queue", sizeof(Eland_Status_type_t), 1); //只容纳一个成员 传递的只是地址
+    //eland_state_queue
+    err = mico_rtos_init_queue(&eland_state_queue, "eland_state_queue", sizeof(Eland_Status_type_t), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
     //初始化eland uart 發送 receive 消息 CMD
     err = mico_rtos_init_queue(&eland_uart_receive_queue, "eland_uart_receive_queue", sizeof(eland_usart_cmd_t), 1); //只容纳一个成员 传递的只是地址
@@ -246,6 +246,7 @@ static void uart_thread_DDE(uint32_t arg)
         default:
             break;
         }
+        mico_rtos_thread_msleep(5);
     }
     mico_rtos_delete_thread(NULL);
 }
@@ -254,14 +255,14 @@ void SendElandStateQueue(Eland_Status_type_t value)
 {
     Eland_Status_type_t state = value;
     eland_usart_cmd_t eland_cmd = ELAND_SEND_CMD_05H;
-    if (eland_satae_queue == NULL)
+    if (eland_state_queue == NULL)
         return;
-    if (mico_rtos_is_queue_full(&eland_satae_queue)) //if full pick out data then update state
-        mico_rtos_pop_from_queue(&eland_satae_queue, &state, 0);
+    if (mico_rtos_is_queue_full(&eland_state_queue)) //if full pick out data then update state
+        mico_rtos_pop_from_queue(&eland_state_queue, &state, 0);
     else
     {
         state = value;
-        mico_rtos_push_to_queue(&eland_satae_queue, &state, 10);
+        mico_rtos_push_to_queue(&eland_state_queue, &state, 10);
     }
 
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
@@ -406,7 +407,7 @@ static void ELAND_H05_Send(void)
     Eland_Status_type_t state = ElandNone;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = Usart_Packet_Resend_time;
-    err = mico_rtos_pop_from_queue(&eland_satae_queue, &state, 0);
+    err = mico_rtos_pop_from_queue(&eland_state_queue, &state, 0);
     if (err != kNoErr)
         return;
 

@@ -270,7 +270,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
     int ret = 0;
     int fd = pNetwork->tlsDataParams.server_fd;
     fd_set readfds;
-    _time_t current_temp, timeforward = {0, 0};
+    _time_t time, current_temp, timeforward = {0, 0};
     size_t len = sizeof(_TELEGRAM_t);
 
     FD_ZERO(&readfds);
@@ -278,6 +278,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
 
     if (timer != NULL)
     {
+        memcpy(&time, timer, sizeof(_time_t));
         gettimeofday(&current_temp, NULL);
         timeradd(&current_temp, timer, &timeforward);
     }
@@ -292,7 +293,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
             }
             else
             {
-                ret = select(fd + 1, &readfds, NULL, NULL, timer);
+                ret = select(fd + 1, &readfds, NULL, NULL, &time);
                 elan_tcp_log("select ret %d", ret);
                 if (ret <= 0)
                 {
@@ -418,6 +419,7 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     TCP_Error_t rc = TCP_SUCCESS;
     _Client_t Eland_Client;
     uint8_t tcp_write_flag[5];
+    uint16_t tcp_HC_flag = 1000;
     // ServerParams_t *serverPara = (ServerParams_t *)arg;
     ServerParams_t serverPara;
     _time_t timer;
@@ -443,13 +445,13 @@ static void TCP_thread_main(mico_thread_arg_t arg)
 RECONN:
     elan_tcp_log("Shadow Connect...");
     rc = eland_tcp_connect(&Eland_Client, NULL);
-
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Server Connection Error,Delay 1s then retry");
         goto RECONN;
     }
+cycle_loop:
     if (tcp_write_flag[0] > 0)
     {
         tcp_write_flag[0]--;
@@ -490,24 +492,33 @@ RECONN:
             elan_tcp_log("Connection Error rc = %d", rc);
         }
     }
-    eland_IF_health_check(&Eland_Client);
-    if (TCP_SUCCESS != rc)
+    if (tcp_HC_flag++ > 5)
     {
-        mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        tcp_HC_flag = 0;
+        eland_IF_health_check(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
     }
-    timer.tv_sec = 5;
-    timer.tv_usec = 0;
+    timer.tv_sec = 0;
+    timer.tv_usec = 10;
     rc = eland_IF_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
+            goto exit; //reconnect
     }
+    goto cycle_loop;
+
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
     elan_tcp_log("TCP/IP out");
+    goto RECONN;
     mico_rtos_delete_thread(NULL);
 }
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams)
@@ -564,7 +575,7 @@ static TCP_Error_t eland_IF_connection_request(_Client_t *pClient)
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
-        SendElandStateQueue(TCPConnectedELSV);
+        SendElandStateQueue(TCP_CN00);
     return rc;
 }
 static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
@@ -591,6 +602,8 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[DV01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
+    if (rc == TCP_SUCCESS)
+        SendElandStateQueue(TCP_DV00);
     return rc;
 }
 
@@ -617,6 +630,8 @@ static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
+    if (TCP_SUCCESS == rc)
+        SendElandStateQueue(TCP_AL00);
     return rc;
 }
 static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient)
@@ -643,7 +658,8 @@ static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HD01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
-
+    if (rc == TCP_SUCCESS)
+        SendElandStateQueue(TCP_HD00);
     return rc;
 }
 static TCP_Error_t eland_IF_health_check(_Client_t *pClient)
@@ -670,7 +686,8 @@ static TCP_Error_t eland_IF_health_check(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HC01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
-
+    if (rc == TCP_SUCCESS)
+        SendElandStateQueue(TCP_HC00);
     return rc;
 }
 
