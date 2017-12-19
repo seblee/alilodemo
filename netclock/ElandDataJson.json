@@ -26,3 +26,27 @@
 //ota_md5 4294b96a29da439fc295601ac8ffe8b7
 //ota_url http://xiaowine.cee0.com/ota.bin
 //ota_op start
+//2017年12月18日17: 11: 34
+{
+    "ssid": "TP-LINK_4850",
+    "password": "cq68794850",
+    "device": {
+        "eland_id": 5,
+        "user_id": "20dfd19c-61b0-4dc9-ab1a-d451027c4ede",
+        "eland_name": "test",
+        "timezone_offset_sec": 32400,
+        "serial_number": "ALML7000005",
+        "firmware_version": "01.00",
+        "mac_address": "B0:F8:93:15:25:B2",
+        "dhcp_enabled": 1,
+        "ip_address": "192.168.0.1",
+        "subnet_mask": "255.255.255.0",
+        "default_gateway": "255.255.255.255",
+        "time_display_format": 1,
+        "brightness_normal": 80,
+        "brightness_night": 20,
+        "night_mode_enabled": 0,
+        "night_mode_begin_time": 22,
+        "night_mode_end_time": 6
+    }
+}
