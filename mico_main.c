@@ -67,7 +67,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
+    //start_uart_service();
 
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);

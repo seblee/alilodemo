@@ -78,17 +78,24 @@ exit:
 static int web_send_Post_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
+    int ret;
     int buf_size = 1024;
     char *buf = NULL;
     char post_back_body[20] = {"post response body"};
     mico_Context_t *context = NULL;
     msg_wify_queue received;
+    buf = malloc(buf_size + 1);
+    memset(buf, 0, buf_size + 1);
+    /* read and parse header */
 
-    app_httpd_log("web_send_Post_Request");
-    buf = malloc(buf_size);
-    memset(buf, 0, buf_size);
-    err = httpd_get_data(req, buf, buf_size);
-    app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
+    memset(buf, 0, buf_size + 1);
+    do
+    {
+        ret = httpd_get_data(req, buf, buf_size - 1);
+        app_httpd_log("remain_bytes:%d,total_len:%d", req->remaining_bytes, req->body_nbytes);
+    } while (req->remaining_bytes > 0);
+
+    //app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
     err = httpd_send_all_header(req, HTTP_RES_200, strlen(post_back_body), HTTP_CONTENT_JSON_STR);
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
@@ -96,6 +103,7 @@ static int web_send_Post_Request(httpd_request_t *req)
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
     SendElandStateQueue(ELAPPConnected);
     mico_thread_sleep(3); //等待傳輸完成
+    goto exit;
     if (ProcessPostJson(buf) == kNoErr)
     {
         app_httpd_log("Json useful");
