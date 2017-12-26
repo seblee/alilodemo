@@ -34,9 +34,7 @@
 #define NETCLOCK_HTTPD_H_
 #include "mico.h"
 extern const unsigned char wififail[0xAC9];
-
 extern const unsigned char wifisetting[0xD5E];
-
 extern const unsigned char wifisuccess[0x9BC];
 
 extern mico_semaphore_t httpServer_softAP_event_Sem;

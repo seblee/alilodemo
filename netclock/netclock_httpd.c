@@ -47,7 +47,72 @@ static bool is_http_init;
 static bool is_handlers_registered;
 struct httpd_wsgi_call g_app_handlers[];
 mico_semaphore_t wifi_netclock = NULL, wifi_SoftAP_Sem = NULL, httpServer_softAP_event_Sem = NULL;
+static void eland_check_ssid(void)
+{
+    msg_wify_queue received;
+    mico_Context_t *context = NULL;
+    /********清空消息隊列*************/
+    while (!mico_rtos_is_queue_empty(&wifistate_queue))
+    {
+        app_httpd_log("clear wifistate_queue");
+        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+    }
+    app_httpd_log("wifistate_queue is empty");
+    /********驗證wifi  ssid password*************/
+    Start_wifi_Station_SoftSP_Thread(Station);
+    mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+    if (received.value == Wify_Station_Connect_Successed)
+    {
+        app_httpd_log("Wifi parameter is correct");
+        device_state->IsActivate = true;
+        app_httpd_log("save wifi para,update flash"); //save
+        context = mico_system_context_get();
+        strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
+        strncpy(context->micoSystemConfig.key, netclock_des_g->WifiKey, ElandKey_Len);
+        strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
+        context->micoSystemConfig.keyLength = strlen(context->micoSystemConfig.key);
+        context->micoSystemConfig.user_keyLength = strlen(context->micoSystemConfig.key);
+        context->micoSystemConfig.channel = 0;
+        memset(context->micoSystemConfig.bssid, 0x0, 6);
+        context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
+        if (netclock_des_g->dhcp_enabled == 1)
+            context->micoSystemConfig.dhcpEnable = true; /* Fetch Ip address from DHCP server */
+        else
+        {
+            context->micoSystemConfig.dhcpEnable = false; /* Fetch Ip address from DHCP server */
+            memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
+            memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
+            memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
+            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
+        }
 
+        context->micoSystemConfig.configured = allConfigured;
+        //mico_system_context_update(context);
+
+        if (strncmp(ota_url, "\0", 1) != 0)
+        {
+            if (strncmp(ota_md5, "\0", 1) != 0)
+            {
+                start_ota_thread();
+            }
+            else
+            {
+                memset(ota_url, 0, sizeof(ota_url));
+                memset(ota_md5, 0, sizeof(ota_md5));
+            }
+        }
+        //app_httpd_log("system restart");
+        //mico_system_power_perform(context, eState_Software_Reset);
+    }
+    Eland_httpd_stop(); //stop http server mode
+    flagHttpdServerAP = 1;
+    // else
+    // {
+    //     app_httpd_log("connect wifi failed");
+    //     Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    //     SendElandStateQueue(ElandWifyConnectedFailed);
+    // }
+}
 /*****************Get_Request******************************************/
 static int web_send_Get_Request(httpd_request_t *req)
 {
@@ -81,99 +146,72 @@ static int web_send_Post_Request(httpd_request_t *req)
     int ret;
     int buf_size = 1024;
     char *buf = NULL;
-    char post_back_body[20] = {"post response body"};
-    mico_Context_t *context = NULL;
-    msg_wify_queue received;
+
     buf = malloc(buf_size + 1);
+
     memset(buf, 0, buf_size + 1);
     /* read and parse header */
-
-    memset(buf, 0, buf_size + 1);
-    do
+    ret = httpd_get_data(req, buf, buf_size);
+    if (strncasecmp(HTTP_CONTENT_JSON_STR, req->content_type, strlen(HTTP_CONTENT_JSON_STR)) == 0) //json data
     {
-        ret = httpd_get_data(req, buf, buf_size - 1);
+        app_httpd_log("JSON*************");
+        if (req->remaining_bytes == 0)
+        {
+            //app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
+            /**add json process**/
+        }
+        err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
+
+        err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+        SendElandStateQueue(ELAPPConnected);
+        mico_thread_sleep(2); //等待傳輸完成
+        if (ProcessPostJson(buf) == kNoErr)
+        {
+            app_httpd_log("Json useful");
+            eland_check_ssid();
+        }
+        else
+        {
+            app_httpd_log("Json error");
+        }
+    }
+    else if (strncasecmp(HTTP_CONTENT_OCTET_STREAM, req->content_type, strlen(HTTP_CONTENT_OCTET_STREAM)) == 0)
+    {
+        app_httpd_log("OCTET-STREAM*************");
         app_httpd_log("remain_bytes:%d,total_len:%d", req->remaining_bytes, req->body_nbytes);
-    } while (req->remaining_bytes > 0);
+        // sprintf(ota_md5, "%s", "350f677d282dea128fab4bf05a508ea1");
+        strncpy(ota_md5, "350f677d282dea128fab4bf05a508ea1", strlen("350f677d282dea128fab4bf05a508ea1"));
+        app_httpd_log("hash:", req->hash);
 
-    //app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
-    err = httpd_send_all_header(req, HTTP_RES_200, strlen(post_back_body), HTTP_CONTENT_JSON_STR);
-    require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
-
-    err = httpd_send_body(req->sock, (const unsigned char *)post_back_body, strlen(post_back_body));
-    require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-    SendElandStateQueue(ELAPPConnected);
-    mico_thread_sleep(3); //等待傳輸完成
-    goto exit;
-    if (ProcessPostJson(buf) == kNoErr)
-    {
-        app_httpd_log("Json useful");
-        /********清空消息隊列*************/
-        while (!mico_rtos_is_queue_empty(&wifistate_queue))
+        //err = eland_ota_data_init(req->body_nbytes);
+        //err = eland_ota_data_write((uint8_t *)buf, ret);
+        do
         {
-            app_httpd_log("clear wifistate_queue");
-            mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-        }
-        app_httpd_log("wifistate_queue is empty");
-        /********驗證wifi  ssid password*************/
-        Start_wifi_Station_SoftSP_Thread(Station);
-        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
-        if (received.value == Wify_Station_Connect_Successed)
-        {
-            app_httpd_log("Wifi parameter is correct");
-            device_state->IsActivate = true;
-            app_httpd_log("save wifi para,update flash"); //save
-            context = mico_system_context_get();
-            strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
-            strncpy(context->micoSystemConfig.key, netclock_des_g->WifiKey, ElandKey_Len);
-            strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
-            context->micoSystemConfig.keyLength = strlen(context->micoSystemConfig.key);
-            context->micoSystemConfig.user_keyLength = strlen(context->micoSystemConfig.key);
-            context->micoSystemConfig.channel = 0;
-            memset(context->micoSystemConfig.bssid, 0x0, 6);
-            context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
-            if (netclock_des_g->dhcp_enabled == 1)
-                context->micoSystemConfig.dhcpEnable = true; /* Fetch Ip address from DHCP server */
-            else
-            {
-                context->micoSystemConfig.dhcpEnable = false; /* Fetch Ip address from DHCP server */
-                memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
-                memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
-                memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
-                memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
-            }
+            memset(buf, 0, buf_size + 1);
+            ret = httpd_get_data(req, buf, buf_size);
+            // err = eland_ota_data_write((uint8_t *)buf, ret);
+            app_httpd_log("remain_bytes:%d,total_len:%d", req->remaining_bytes, req->body_nbytes);
+        } while (req->remaining_bytes > 0);
+        err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
-            context->micoSystemConfig.configured = allConfigured;
-            //mico_system_context_update(context);
+        err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+        SendElandStateQueue(ELAPPConnected);
 
-            if (strncmp(ota_url, "\0", 1) != 0)
-            {
-                if (strncmp(ota_md5, "\0", 1) != 0)
-                {
-                    start_ota_thread();
-                }
-                else
-                {
-                    memset(ota_url, 0, sizeof(ota_url));
-                    memset(ota_md5, 0, sizeof(ota_md5));
-                }
-            }
-            //app_httpd_log("system restart");
-            //mico_system_power_perform(context, eState_Software_Reset);
-        }
-        Eland_httpd_stop(); //stop http server mode
-        flagHttpdServerAP = 1;
-        // else
-        // {
-        //     app_httpd_log("connect wifi failed");
-        //     Start_wifi_Station_SoftSP_Thread(Soft_AP);
-        //     SendElandStateQueue(ElandWifyConnectedFailed);
-        // }
+        // eland_ota_operation();
     }
     else
     {
-        app_httpd_log("Json error");
-    }
+        err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
+        err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+        SendElandStateQueue(ELAPPConnected);
+    }
     app_httpd_log("POST OVER");
 exit:
     free(buf);
