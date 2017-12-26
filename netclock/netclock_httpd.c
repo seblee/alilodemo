@@ -182,16 +182,16 @@ static int web_send_Post_Request(httpd_request_t *req)
         app_httpd_log("OCTET-STREAM*************");
         app_httpd_log("remain_bytes:%d,total_len:%d", req->remaining_bytes, req->body_nbytes);
         // sprintf(ota_md5, "%s", "350f677d282dea128fab4bf05a508ea1");
-        strncpy(ota_md5, "350f677d282dea128fab4bf05a508ea1", strlen("350f677d282dea128fab4bf05a508ea1"));
-        app_httpd_log("hash:", req->hash);
+        memset(ota_md5, 0, sizeof(ota_md5));
+        strncpy(ota_md5, req->hash, strlen(req->hash));
 
-        //err = eland_ota_data_init(req->body_nbytes);
-        //err = eland_ota_data_write((uint8_t *)buf, ret);
+        err = eland_ota_data_init(req->body_nbytes);
+        err = eland_ota_data_write((uint8_t *)buf, ret);
         do
         {
             memset(buf, 0, buf_size + 1);
             ret = httpd_get_data(req, buf, buf_size);
-            // err = eland_ota_data_write((uint8_t *)buf, ret);
+            err = eland_ota_data_write((uint8_t *)buf, ret);
             app_httpd_log("remain_bytes:%d,total_len:%d", req->remaining_bytes, req->body_nbytes);
         } while (req->remaining_bytes > 0);
         err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
@@ -201,7 +201,7 @@ static int web_send_Post_Request(httpd_request_t *req)
         require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
         SendElandStateQueue(ELAPPConnected);
 
-        // eland_ota_operation();
+        eland_ota_operation();
     }
     else
     {
