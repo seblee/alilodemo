@@ -1,3 +1,18 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2017-12-27 15:50:32
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2017-12-27 17:28:11
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "hal_alilo_rabbit.h"
 #include "netclockconfig.h"
 #include "netclock.h"
@@ -10,9 +25,18 @@
 #include "eland_http_client.h"
 #include "SocketUtils.h"
 #include "flash_kh25.h"
-
+/* Private define ------------------------------------------------------------*/
+#define CONFIG_ELAND_DEBUG
+#ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+#else
+#define Eland_log(...)
+#endif /* ! CONFIG_ELAND_DEBUG */
+/* Private typedef -----------------------------------------------------------*/
 
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 ELAND_DES_S *netclock_des_g = NULL;
 _ELAND_DEVICE_t *device_state = NULL;
 static bool NetclockInitSuccess = false;
@@ -23,7 +47,7 @@ json_object *ElandJsonData = NULL;
 json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
 
-//发送http请求
+/* Private function prototypes -----------------------------------------------*/
 //发送http请求
 OSStatus eland_push_http_req_mutex(ELAND_HTTP_METHOD method,                           //POST 或者 GET
                                    ELAND_HTTP_REQUEST_TYPE request_type,               //eland request type
@@ -52,6 +76,8 @@ OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
 static OSStatus eland_communication_info_get(void);
 //eland 下載數據
 static OSStatus alarm_sound_download(void);
+
+/* Private functions ---------------------------------------------------------*/
 
 //生成一个http回话id
 static uint32_t generate_http_session_id(void)

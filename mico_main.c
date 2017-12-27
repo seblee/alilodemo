@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-10-31 17:42:45
+ * @Last Modified time:2017-12-27 17:28:12
  * @brief   :
  ****************************************************************************
 **/
@@ -76,7 +76,7 @@ int application_start(void)
     start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
-    // err = start_eland_flash_service();
+    err = start_eland_flash_service();
     require_noerr(err, exit);
 
     /* Wait for wlan connection*/

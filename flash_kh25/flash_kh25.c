@@ -1,9 +1,40 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2017-12-27 17:29:25
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2017-12-27 17:30:48
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "flash_kh25.h"
 #include "eland_sound.h"
 
-#define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
+/* Private typedef -----------------------------------------------------------*/
 
+/* Private define ------------------------------------------------------------*/
+//#define CONFIG_FLASH_KH25_DEBUG
+#ifdef CONFIG_FLASH_KH25_DEBUG
+#define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
+#else
+#define flash_kh25_log(...)
+#endif /* ! CONFIG_FLASH_KH25_DEBUG */
+
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 uint8_t *elandSPIBuffer = NULL;
+
+/* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
+
 // Define SPI pins
 Spi_t Spi_eland = {
     .ui_CS = Eland_CS,

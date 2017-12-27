@@ -1,6 +1,12 @@
 #include "mico.h"
 #include "eland_sound.h"
+
+//#define CONFIG_SOUND_DEBUG
+#ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+#else
+#define sound_log(...)
+#endif /* ! CONFIG_SOUND_DEBUG */
 
 static mico_mutex_t eland_sound_mutex = NULL; //flash 調用保護
 mico_queue_t eland_sound_R_W_queue = NULL;    //flash sound 讀寫命令队列
@@ -47,6 +53,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
     OSStatus err = kNoErr;
     uint32_t sector_count = 0;
     SOUND_FILE_SCAN_STATUS get_soundfileflag = FILE_SCAN_START;
+    static uint16_t number_file = 0;
 
     _sound_file_type_t *alarm_file_cache = NULL;
     _sound_read_write_type_t *alarm_w_r_queue = NULL;
@@ -95,21 +102,25 @@ static void eland_flash_service(mico_thread_arg_t arg)
         }
         else //有文件標誌
         {
-            sound_log("%s", alarm_file_cache->alarm_ID);
             switch (get_soundfileflag)
             {
             case FILE_SCAN_START:
+                sound_log("FIND_A_FILE");
                 get_soundfileflag = FIND_A_FILE;
                 break;
             case GET_FILE_SCAN_START:
+                number_file += 1;
+                sound_log("SCAN--%s, number_file:%d, file_address:%ld", alarm_file_cache->alarm_ID, number_file, alarm_file_cache->file_address);
                 get_soundfileflag = GET_FILE_START;
                 sound_sector_start = sector_count * KH25L8006_SECTOR_SIZE;
-                eland_sound_point = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
-                memcpy((uint8_t *)eland_sound_point + sizeof(*eland_sound_point) - sizeof(_sound_file_type_t), alarm_file_cache, sizeof(_sound_file_type_t));
+                eland_sound_point = (_sound_file_type_t *)calloc(number_file, sizeof(_sound_file_type_t));
+                memcpy((uint8_t *)(eland_sound_point + ((number_file - 1) * sizeof(_sound_file_type_t))), alarm_file_cache, sizeof(_sound_file_type_t));
                 break;
             case GET_FILE_START:
-                eland_sound_point = (_sound_file_type_t *)realloc(eland_sound_point, (sizeof(*eland_sound_point) + sizeof(_sound_file_type_t)));
-                memcpy((uint8_t *)eland_sound_point + sizeof(*eland_sound_point) - sizeof(_sound_file_type_t), alarm_file_cache, sizeof(_sound_file_type_t));
+                number_file += 1;
+                sound_log("START-%s, number_file:%d, file_address:%ld", alarm_file_cache->alarm_ID, number_file, alarm_file_cache->file_address);
+                eland_sound_point = (_sound_file_type_t *)realloc(eland_sound_point, (number_file * sizeof(_sound_file_type_t)));
+                memcpy((uint8_t *)eland_sound_point + ((number_file - 1) * sizeof(_sound_file_type_t)), alarm_file_cache, sizeof(_sound_file_type_t));
                 break;
             default:
                 break;
@@ -118,7 +129,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
             sector_count += (((alarm_file_cache->file_len + sizeof(_sound_file_type_t)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
 
             if (sector_count >= KH25_FLASH_FILE_COUNT)
-                sector_count = sector_count - KH25_FLASH_FILE_COUNT;
+                sector_count -= KH25_FLASH_FILE_COUNT;
         }
         memset(alarm_file_cache, 0, sizeof(_sound_file_type_t));
     } while (sector_count < KH25_FLASH_FILE_COUNT);
@@ -183,9 +194,15 @@ static void eland_flash_service(mico_thread_arg_t arg)
             if (alarm_w_r_queue->pos == 0) //文件數據流首次寫入
             {
                 if (eland_sound_point == NULL)
+                {
                     eland_sound_point = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
+                    number_file = 1;
+                }
                 else
-                    eland_sound_point = (_sound_file_type_t *)realloc(eland_sound_point, (sizeof(*eland_sound_point) + sizeof(_sound_file_type_t)));
+                {
+                    number_file += 1;
+                    eland_sound_point = (_sound_file_type_t *)realloc(eland_sound_point, (number_file * sizeof(_sound_file_type_t)));
+                }
 
                 alarm_file_cache = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
                 sprintf((char *)(alarm_file_cache->flag), "%s", ALARM_FILE_FLAG_STRING);
@@ -193,7 +210,8 @@ static void eland_flash_service(mico_thread_arg_t arg)
 
                 alarm_file_cache->file_len = alarm_w_r_queue->total_len;
                 alarm_file_cache->file_address = sound_sector_end + sizeof(_sound_file_type_t);
-                memcpy((uint8_t *)((uint8_t *)eland_sound_point + sizeof(*eland_sound_point) - sizeof(_sound_file_type_t)), (uint8_t *)alarm_file_cache, sizeof(_sound_file_type_t));
+                memcpy((uint8_t *)eland_sound_point + ((number_file - 1) * sizeof(_sound_file_type_t)),
+                       (uint8_t *)alarm_file_cache, sizeof(_sound_file_type_t));
 
                 sound_log("write sound file info address:%ld", sound_sector_end);
                 flash_kh25_write_page((uint8_t *)alarm_file_cache, sound_sector_end, sizeof(_sound_file_type_t)); //寫入文件信息

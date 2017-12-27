@@ -37,7 +37,12 @@
 #include "eland_sound.h"
 #include "netclock.h"
 
-#define client_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+//#define CONFIG_CLIENT_DEBUG
+#ifdef CONFIG_CLIENT_DEBUG
+#define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
+#else
+#define client_log(...)
+#endif /* ! CONFIG_CLIENT_DEBUG */
 
 static bool is_https_connect = false; //HTTPS 是否连接
 
@@ -160,7 +165,7 @@ SdE0WebPo0V0j6bBvtiPEt2q7SLlNk6oCvra2b8tRvZQZC6hIfkk1PtDBgavL87k\n\
 #define SIMPLE_GET_REQUEST                                     \
     "GET /api/download.php?vid=taichi_16_024kbps HTTP/1.1\r\n" \
     "Host: 160.16.237.210\r\n"                                 \
-    "Content-Type: audio/ x-mp3\r\n"                           \
+    "Content-Type: audio/x-mp3\r\n"                            \
     "\r\n"                                                     \
     ""
 /*******************************************************/
@@ -556,7 +561,6 @@ SSL_SEND:
                 //PrintHTTPHeader(httpHeader);
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
                 client_log("data lenth = %ld", (uint32_t)context.content_length);
-                client_log("data lenth = %s", context.content);
                 require_noerr(err, exit);
 #if (HTTP_REQ_LOG == 1)
                 client_log("Content %s0x%08x:[%ld]",
@@ -583,7 +587,7 @@ SSL_SEND:
             break;
         }
     }
-    if (eland_sound_download_pos == eland_sound_download_pos)
+    if (eland_sound_download_pos == eland_sound_download_len)
     {
         sound_download_status = SOUND_DOWNLOAD_IDLE;
     }
@@ -627,84 +631,61 @@ exit_2:
 static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
                                size_t inLen, void *inUserContext)
 {
-    //     OSStatus err = kNoErr;
-    //     http_context_t *context = inUserContext;
-    //     if (inHeader->chunkedData == false)
-    //     { //Extra data with a content length value
-    //         if (inPos == 0 && context->content == NULL)
-    //         {
-    //             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
-    //             require_action(context->content, exit, err = kNoMemoryErr);
-    //             context->content_length = inHeader->contentLength;
-    //         }
-    //         memcpy(context->content + inPos, inData, inLen);
-    //     }
-    //     else
-    //     { //extra data use a chunked data protocol
-    //         //client_log("This is a chunked data%ld, %d", inPos, inLen);
-    //         if (inPos == 0)
-    //         {
-    //             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
-    //             require_action(context->content, exit, err = kNoMemoryErr);
-    //             context->content_length = inHeader->contentLength;
-    //         }
-    //         else
-    //         {
-    //             context->content_length += inLen;
-    //             context->content = realloc(context->content, context->content_length + 1);
-    //             require_action_string(context->content, exit, err = kNoMemoryErr, "mem ex err");
-    //         }
-    //         memcpy(context->content + inPos, inData, inLen);
-    //         //client_log("context->content %s,0x%08x", context->content, context->content);
-    //         // client_log("Content 0x%08x:[%ld]%s", context->content, context->content_length, context->content); /*get data and print*/
-    //     }
-    // exit:
-    //     return err;
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
     _sound_read_write_type_t *alarm_w_r_queue = NULL;
     _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
     static uint32_t sound_flash_pos = 0;
+    static bool is_sound_data = false;
 
     if (inHeader->chunkedData == false)
-    { //Extra data with a content length value
+    {
+        //Extra data with a content length value
         if (inPos == 0 && context->content == NULL)
         {
             client_log("This is not a chunked data");
-            if (inHeader->contentLength < 1500)
-                context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+            if (strstr(inHeader->buf, "audio/x-mp3"))
+                is_sound_data = true;
             else
+                is_sound_data = false;
+
+            if (is_sound_data)
+            {
                 context->content = calloc(1501, sizeof(uint8_t));
+                sound_flash_pos = 0;
+            }
+            else
+                context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
+
             require_action(context->content, exit, err = kNoMemoryErr);
             context->content_length = inHeader->contentLength;
-
-            sound_flash_pos = 0;
         }
+        if (is_sound_data)
+        {
+            client_log("sound data");
+            alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
+            memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
+            alarm_w_r_queue->is_read = false;
+            alarm_w_r_queue->total_len = inHeader->contentLength;
+            memcpy(context->content, inData, inLen);
 
-        alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-        memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
-        alarm_w_r_queue->is_read = false;
-        alarm_w_r_queue->total_len = inHeader->contentLength;
-        //memcpy(context->content + inPos, inData, inLen);
-        memcpy(context->content, inData, inLen);
-        // flash_kh25_write_page((uint8_t *)context->content, sound_flash_address, inLen);
-        //sound_flash_address += inLen;
+            alarm_w_r_queue->len = inLen;
+            alarm_w_r_queue->pos = sound_flash_pos;
 
-        alarm_w_r_queue->len = inLen;
-        alarm_w_r_queue->pos = sound_flash_pos;
-
-        alarm_w_r_queue->sound_data = (uint8_t *)context->content;
-        client_log("send queue");
-        client_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
-        err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
-        require_noerr(err, exit);
-        client_log("wait callback");
-        err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
-        require_noerr(err, exit);
-        sound_flash_pos += inLen;
-        free(alarm_w_r_queue);
-        free(alarm_r_w_callbcke_queue);
-        client_log("free queue");
+            alarm_w_r_queue->sound_data = (uint8_t *)context->content;
+            client_log("send_queue:inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
+            err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
+            require_noerr(err, exit);
+            err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+            require_noerr(err, exit);
+            client_log("write_done");
+            sound_flash_pos += inLen;
+            free(alarm_w_r_queue);
+            free(alarm_r_w_callbcke_queue);
+            client_log("free queue");
+        }
+        else
+            memcpy(context->content + inPos, inData, inLen);
     }
     else
     { //extra data use a chunked data protocol

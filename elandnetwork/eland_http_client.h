@@ -1,6 +1,22 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2017-12-27 15:48:50
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2017-12-27 15:49:54
+ * @brief   :
+ ****************************************************************************
+**/
 #ifndef __ELAND_HTTP_CLIENT_H_
 #define __ELAND_HTTP_CLIENT_H_
 
+/* Private include -----------------------------------------------------------*/
+
+/* Private define ------------------------------------------------------------*/
 #define ELAND_HTTP_SEND_TIME_OUT (3000)
 #define ELAND_HTTP_RECV_TIME_OUT (3000)
 #define ELAND_HTTP_KEEP_IDLE_TIME (6)
@@ -24,6 +40,7 @@
 
 #define WAIT_HTTP_RES_MAX_TIME (7 * 1000) //http等待返回最大超时时间为7s
 #define HTTP_MAX_RETRY_TIMES (4)          //最大重试次数
+/* Private typedef -----------------------------------------------------------*/
 
 typedef enum {
     HTTP_POST = 1,
@@ -73,15 +90,19 @@ typedef enum __SOUND_DOWNLOAD_STATUS {
     SOUND_DOWNLOAD_CONTINUE,
     SOUND_DOWNLOAD_STOP,
 } SOUND_DOWNLOAD_STATUS;
-/********************************************/
 
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 extern mico_queue_t eland_http_request_queue;  //eland HTTP的发送请求队列
 extern mico_queue_t eland_http_response_queue; //eland HTTP的接收响应队列
-
 extern char *certificate;
 extern char *private_key;
 extern char *capem;
 
+/* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
 OSStatus start_client_serrvice(void);
 bool get_https_connect_status(void);
 //域名域名DNS解析

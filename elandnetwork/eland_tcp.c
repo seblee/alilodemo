@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-11-24 17:21:09
+ * @Last Modified time:2017-12-27 17:45:23
  * @brief   :
  ****************************************************************************
 **/
@@ -22,8 +22,13 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define elan_tcp_log(M, ...) custom_log("elan_tcp", M, ##__VA_ARGS__)
-//#define elan_tcp(M, ...)
+#define CONFIG_TCP_DEBUG
+#ifdef CONFIG_TCP_DEBUG
+#define elan_tcp_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+#else
+#define elan_tcp_log(...)
+#endif /* ! CONFIG_TCP_DEBUG */
+
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
@@ -52,13 +57,11 @@ const char CommandTable[TCPCMD_MAX][COMMAND_LEN] = {
 /* Private function prototypes -----------------------------------------------*/
 static void TCP_thread_main(mico_thread_arg_t arg);
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams);
-/*need back function*/
-static TCP_Error_t eland_IF_connection_request(_Client_t *pClient);
-static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient);
-static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient);
-static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient);
-static TCP_Error_t eland_IF_health_check(_Client_t *pClient);
-
+static TCP_Error_t eland_IF_connection_request(_Client_t *pClient); /*need back function*/
+static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient);   /*need back function*/
+static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient);       /*need back function*/
+static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient);     /*need back function*/
+static TCP_Error_t eland_IF_health_check(_Client_t *pClient);       /*need back function*/
 static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type);
 static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _time_t *timer);
 static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer);
@@ -742,6 +745,9 @@ static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer)
                                     pClient->clientData.readBuf,
                                     timer,
                                     &readed_len);
+
+    if (rc = TCP_SUCCESS)
+        TCP_Operate(pClient->clientData.readBuf);
     return rc;
 }
 
@@ -783,4 +789,16 @@ static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expe
         return MUTEX_UNLOCK_ERROR;
 
     return rc;
+}
+static TCP_Error_t TCP_Operate(const uint8_t *buff)
+{
+    _TELEGRAM_t *telegram;
+    if (NULL == buff)
+    {
+        return NULL_VALUE_ERROR;
+    }
+    telegram = (_TELEGRAM_t *)buff;
+    switch (telegram.command)
+    {
+    }
 }

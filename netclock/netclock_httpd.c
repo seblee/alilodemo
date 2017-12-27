@@ -40,7 +40,13 @@
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
 #include "netclock_ota.h"
+
+//#define CONFIG_APPHTTPD_DEBUG
+#ifdef CONFIG_APPHTTPD_DEBUG
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
+#else
+#define app_httpd_log(...)
+#endif /* ! CONFIG_APPHTTPD_DEBUG */
 
 #define HTTPD_HDR_DEFORT (HTTPD_HDR_ADD_CONN_CLOSE)
 static bool is_http_init;
