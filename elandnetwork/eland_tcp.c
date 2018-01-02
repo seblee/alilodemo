@@ -18,8 +18,22 @@
 #include "netclock.h"
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
+#include <time.h>
 //#include "timer_platform.h"
 /* Private typedef -----------------------------------------------------------*/
+typedef struct healthcheck
+{
+    mico_utc_time_ms_t eland_send_time;
+    mico_utc_time_ms_t elsv_receive_time;
+    mico_utc_time_ms_t elsv_send_time;
+    mico_utc_time_ms_t eland_receive_time;
+} Healthcheck_t;
+typedef enum TIME_RECORD_T {
+    SET_ELAND_SEND_TIME,
+    SET_ELAND_RECE_TIME,
+    SET_ELSV_SEND_TIME,
+    SET_ELSV_RECE_TIME,
+} TIME_RECORD_T_t;
 
 /* Private define ------------------------------------------------------------*/
 #define CONFIG_TCP_DEBUG
@@ -54,8 +68,10 @@ const char CommandTable[TCPCMD_MAX][COMMAND_LEN] = {
     {'F', 'W', '0', '0'}, //firmware update start request
     {'F', 'W', '0', '1'}, //firmwart update start response
 };
+Healthcheck_t healthche_time;
 /* Private function prototypes -----------------------------------------------*/
-static void TCP_thread_main(mico_thread_arg_t arg);
+static void
+TCP_thread_main(mico_thread_arg_t arg);
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams);
 static TCP_Error_t eland_IF_connection_request(_Client_t *pClient); /*need back function*/
 static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient);   /*need back function*/
@@ -66,8 +82,31 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type);
 static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _time_t *timer);
 static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer);
 static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expectedCurrentState, ClientState_t newState);
-
+static TCP_Error_t TCP_Operate(const char *buff);
+static TCP_Error_t TCP_Operate_HC01(char *buf);
+static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
+static void eland_set_time(void);
 /* Private functions ---------------------------------------------------------*/
+static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t value)
+{
+    switch (type)
+    {
+    case SET_ELAND_SEND_TIME:
+        mico_time_get_utc_time_ms(&healthche_time.eland_send_time);
+        break;
+    case SET_ELAND_RECE_TIME:
+        mico_time_get_utc_time_ms(&healthche_time.eland_receive_time);
+        break;
+    case SET_ELSV_SEND_TIME:
+        healthche_time.elsv_send_time = value;
+        break;
+    case SET_ELSV_RECE_TIME:
+        healthche_time.elsv_receive_time = value;
+        break;
+    default:
+        break;
+    }
+}
 
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
 {
@@ -232,7 +271,7 @@ TCP_Error_t TCP_Write(Network_t *pNetwork,
 
     gettimeofday(&current_temp, NULL);
     timeradd(&current_temp, timer, &timeforward);
-
+    time_record(SET_ELAND_SEND_TIME, 0);
     for (written_so_far = 0, frags = 0; written_so_far < len && !has_timer_expired(&timeforward); written_so_far += ret, frags++)
     {
         while ((!has_timer_expired(&timeforward)) && ((ret = ssl_send(pNetwork->tlsDataParams.ssl, pMsg + written_so_far, len - written_so_far)) <= 0))
@@ -337,6 +376,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
     {
         *read_len = rxlen;
         return TCP_SUCCESS;
+        time_record(SET_ELAND_RECE_TIME, 0);
     }
     if (rxlen == 0)
     {
@@ -458,7 +498,7 @@ cycle_loop:
     if (tcp_write_flag[0] > 0)
     {
         tcp_write_flag[0]--;
-        eland_IF_connection_request(&Eland_Client);
+        rc = eland_IF_connection_request(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
@@ -468,7 +508,7 @@ cycle_loop:
     if (tcp_write_flag[1] > 0)
     {
         tcp_write_flag[1]--;
-        eland_IF_update_elandinfo(&Eland_Client);
+        rc = eland_IF_update_elandinfo(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
@@ -478,7 +518,7 @@ cycle_loop:
     if (tcp_write_flag[2] > 0)
     {
         tcp_write_flag[2]--;
-        eland_IF_update_alarm(&Eland_Client);
+        rc = eland_IF_update_alarm(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
@@ -488,7 +528,7 @@ cycle_loop:
     if (tcp_write_flag[3] > 0)
     {
         tcp_write_flag[3]--;
-        eland_IF_update_holiday(&Eland_Client);
+        rc = eland_IF_update_holiday(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
@@ -498,7 +538,7 @@ cycle_loop:
     if (tcp_HC_flag++ > 5)
     {
         tcp_HC_flag = 0;
-        eland_IF_health_check(&Eland_Client);
+        rc = eland_IF_health_check(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
@@ -684,6 +724,10 @@ static TCP_Error_t eland_IF_health_check(_Client_t *pClient)
     rc = eland_IF_receive_packet(pClient, &timer);
     if (rc != TCP_SUCCESS)
         return rc;
+    else
+    {
+        eland_set_time();
+    }
 
     elan_tcp_log("health_check:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
@@ -745,15 +789,13 @@ static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer)
                                     pClient->clientData.readBuf,
                                     timer,
                                     &readed_len);
-
-    if (rc = TCP_SUCCESS)
-        TCP_Operate(pClient->clientData.readBuf);
+    if (rc == TCP_SUCCESS)
+        TCP_Operate((const char *)pClient->clientData.readBuf);
     return rc;
 }
 
 ClientState_t eland_get_client_state(_Client_t *pClient)
 {
-
     if (NULL == pClient)
     {
         return CLIENT_STATE_INVALID;
@@ -790,15 +832,181 @@ static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expe
 
     return rc;
 }
-static TCP_Error_t TCP_Operate(const uint8_t *buff)
+static TCP_Error_t TCP_Operate(const char *buff)
 {
+    TCP_Error_t rc = TCP_SUCCESS;
     _TELEGRAM_t *telegram;
+    _TCP_CMD_t tep_cmd = TCPCMD_NONE;
+    uint8_t i;
     if (NULL == buff)
     {
         return NULL_VALUE_ERROR;
     }
     telegram = (_TELEGRAM_t *)buff;
-    switch (telegram.command)
+
+    for (i = CN00; i < TCPCMD_MAX; i++)
     {
+        if (strncmp(telegram->command, CommandTable[i], COMMAND_LEN) == 0)
+            break;
     }
+    tep_cmd = (_TCP_CMD_t)i;
+    switch (tep_cmd)
+    {
+    case CN00: //00 Connection Request
+        break;
+    case CN01: //01 Connection Response
+        break;
+    case HC00: //02 health check request
+        break;
+    case HC01: //03 health check response
+        rc = TCP_Operate_HC01((char *)(buff + sizeof(_TELEGRAM_t)));
+        break;
+    case DV00: //04 eland info request
+        break;
+    case DV01: //05 eland info response
+        break;
+    case DV02: //06 eland info change Notification
+        break;
+    case DV03: //07 eland info remove Notification
+        break;
+    case AL00: //08 alarm info request
+        break;
+    case AL01: //09 alarm info response
+        break;
+    case AL02: //10 alarm info add Notification
+        break;
+    case AL03: //11 alarm info change Notification
+        break;
+    case AL04: //12 alarm info delete notification
+        break;
+    case HD00: //13 holiday data request
+        break;
+    case HD01: //14 holiday data response
+        break;
+    case HD02: //15 holiday data change notice
+        break;
+    case HT00: //16 alarm on notification
+        break;
+    case HT01: //17 alarm off notification
+        break;
+    case FW00: //18 firmware update start request
+        break;
+    case FW01: //19 firmwart update start response
+        break;
+    case TCPCMD_MAX: //20
+        break;
+    default:
+        break;
+    }
+    return rc;
+}
+
+static TCP_Error_t TCP_Operate_HC01(char *buf)
+{
+    json_object *ReceivedJsonCache = NULL;
+    char time_str_cache[30];
+    DATE_TIME_t datetimeTemp;
+    mico_utc_time_ms_t iMsecond;
+
+    memset(time_str_cache, 0, 30);
+    if (*buf != '{')
+    {
+        elan_tcp_log("error:received err json format data");
+        return JSON_PARSE_ERROR;
+    }
+    ReceivedJsonCache = json_tokener_parse((const char *)(buf));
+    if (ReceivedJsonCache == NULL)
+    {
+        elan_tcp_log("json_tokener_parse error");
+        return JSON_PARSE_ERROR;
+    }
+    json_object_object_foreach(ReceivedJsonCache, key, val)
+    {
+        if (!strcmp(key, "received_at"))
+        {
+            sprintf(time_str_cache, "%s", json_object_get_string(val));
+            sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
+            iMsecond = GetSecondTime(&datetimeTemp);
+            iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
+            time_record(SET_ELSV_RECE_TIME, iMsecond);
+        }
+        else if (!strcmp(key, "send_at"))
+        {
+            sprintf(time_str_cache, "%s", json_object_get_string(val));
+            sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
+            iMsecond = GetSecondTime(&datetimeTemp);
+            iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
+            time_record(SET_ELSV_SEND_TIME, iMsecond);
+        }
+    }
+    return TCP_SUCCESS;
+}
+static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
+{
+    int16_t iYear, iMon, iDay, iHour, iMin, iSec; //, iMsec;
+    uint8_t DayOfMon[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int16_t i, Cyear = 0;
+    mico_utc_time_ms_t count_MS;
+    unsigned long CountDay = 0;
+
+    iYear = date_time->iYear;
+    iMon = date_time->iMon;
+    iDay = date_time->iDay;
+    iHour = date_time->iHour;
+    iMin = date_time->iMin;
+    iSec = date_time->iSec;
+    // iMsec = date_time->iMsec;
+
+    for (i = 1970; i < iYear; i++) /* 1970-20xx 年的閏年*/
+    {
+        if (((i % 4 == 0) && (i % 100 != 0)) || (i % 400 == 0))
+            Cyear++;
+    }
+    CountDay = Cyear * 366 + (iYear - 1970 - Cyear) * 365;
+    for (i = 1; i < iMon; i++)
+    {
+        if ((i == 2) && (((iYear % 4 == 0) && (iYear % 100 != 0)) || (iYear % 400 == 0)))
+            CountDay += 29;
+        else
+            CountDay += DayOfMon[i - 1];
+    }
+    CountDay += (iDay - 1);
+
+    CountDay = CountDay * 86400 + (unsigned long)iHour * 3600 + (unsigned long)iMin * 60 + iSec;
+    count_MS = CountDay; //*1000 + iMsec;
+    return count_MS;
+}
+
+static void eland_set_time(void)
+{
+    mico_utc_time_ms_t utc_time_ms;
+    eland_usart_cmd_t eland_cmd = ELAND_SEND_CMD_03H;
+    struct tm *currentTime;
+    iso8601_time_t iso8601_time;
+    mico_utc_time_t utc_time;
+    mico_rtc_time_t rtc_time;
+
+    long offset_time;
+    offset_time = ((healthche_time.elsv_receive_time - healthche_time.eland_send_time) +
+                   (healthche_time.elsv_send_time - healthche_time.eland_receive_time)) /
+                  2;
+    mico_time_get_utc_time_ms(&utc_time_ms);
+    utc_time_ms += offset_time;
+    mico_time_set_utc_time_ms(&utc_time_ms);
+    mico_time_get_iso8601_time(&iso8601_time);
+    elan_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
+
+    mico_time_get_utc_time(&utc_time);
+    currentTime = localtime((const time_t *)&utc_time);
+    rtc_time.sec = currentTime->tm_sec;
+    rtc_time.min = currentTime->tm_min;
+    rtc_time.hr = currentTime->tm_hour;
+
+    rtc_time.date = currentTime->tm_mday;
+    rtc_time.weekday = currentTime->tm_wday;
+    rtc_time.month = currentTime->tm_mon + 1;
+    rtc_time.year = (currentTime->tm_year + 1900) % 100;
+    MicoRtcSetTime(&rtc_time);
+
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 10);
 }

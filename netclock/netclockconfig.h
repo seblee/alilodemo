@@ -99,7 +99,7 @@ typedef struct _ELAND_DEVICE //设备状态结构
     bool IsActivate;   //是否已激活设备
     bool IsAlreadySet; //是否已經寫入設備碼 eg.
 
-    int32_t eland_id;                      //Eland唯一识别的ID
+    uint32_t eland_id;                     //Eland唯一识别的ID
     char serial_number[serial_number_len]; //Eland的串口番号。
 
     /*APP/tcpIP通信時獲取*/

@@ -75,7 +75,7 @@ typedef enum {
 #define Uart_Packet_Trail (uint8_t)(0xaa)
 #define Usart_Packet_Resend_time 5
 /* Private macro -------------------------------------------------------------*/
-
+extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
 void start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);

@@ -166,6 +166,7 @@ typedef enum _TCP_CMD {
     FW00,       //18 firmware update start request
     FW01,       //19 firmwart update start response
     TCPCMD_MAX, //20
+    TCPCMD_NONE,
 } _TCP_CMD_t;
 /**
  * @brief MQTT Client State Type
@@ -325,6 +326,18 @@ typedef struct _TELEGRAM
 } _TELEGRAM_t;
 
 typedef struct timeval _time_t;
+typedef struct date_time
+{
+    int16_t iYear;
+    int16_t iMon;
+    int16_t iDay;
+
+    int16_t iHour;
+    int16_t iMin;
+    int16_t iSec;
+    int16_t iMsec;
+} DATE_TIME_t;
+
 /* Private define ------------------------------------------------------------*/
 #define TELEGRAMHEADER "EL"
 #define COMMAND_LEN 4

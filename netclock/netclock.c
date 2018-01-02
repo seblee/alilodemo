@@ -171,10 +171,11 @@ start_Check:
     Eland_log("CheckNetclockDESSetting");
     if (device_state->IsAlreadySet == true) //have already set factory info
     {
-        if (device_state->eland_id == 0)
+        if ((device_state->eland_id == 0) || (device_state->eland_id == 0xffffffff))
         {
             Eland_log("eland_id wrong");
-            goto exit;
+            err = Netclock_des_recovery();
+            goto start_Check;
         }
         if (strlen(device_state->serial_number) == 0)
         {
@@ -229,7 +230,8 @@ OSStatus Netclock_des_recovery(void)
     memcpy(&des_g_Temp, netclock_des_g, sizeof(ELAND_DES_S));
     memset(netclock_des_g, 0, sizeof(ELAND_DES_S)); //全局变量清空
 
-    //mico_system_context_update(mico_system_context_get());
+    memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
+    mico_system_context_update(mico_system_context_get());
 
     return kNoErr;
 }

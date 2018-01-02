@@ -56,7 +56,7 @@ int application_start(void)
     err = Eland_Rtc_Init();
 
     /*start init system context*/
-    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t) + 1);
+    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t) + 100);
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);

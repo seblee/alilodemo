@@ -50,3 +50,6 @@
         "night_mode_end_time": 6
     }
 }
+Host: 192.168.0.1
+Content-Type: application/json
+Content-Length: 730
