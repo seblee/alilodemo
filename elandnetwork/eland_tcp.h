@@ -338,6 +338,12 @@ typedef struct date_time
     int16_t iMsec;
 } DATE_TIME_t;
 
+typedef enum TIME_RECORD_T {
+    SET_ELAND_SEND_TIME,
+    SET_ELAND_RECE_TIME,
+    SET_ELSV_SEND_TIME,
+    SET_ELSV_RECE_TIME,
+} TIME_RECORD_T_t;
 /* Private define ------------------------------------------------------------*/
 #define TELEGRAMHEADER "EL"
 #define COMMAND_LEN 4

@@ -59,7 +59,9 @@ typedef enum {
     TIME_SET_03,
     TIME_READ_04,
     ELAND_STATES_05,
-    FIRM_WARE_06,
+    SEAD_FIRM_WARE_06,
+    REND_FIRM_WARE_07,
+    SEND_LINK_STATE_08,
 } __msg_function_t;
 
 typedef enum {
@@ -69,11 +71,13 @@ typedef enum {
     ELAND_SEND_CMD_04H, /*發送04H命令*/
     ELAND_SEND_CMD_05H, /*發送05H命令*/
     ELAND_SEND_CMD_06H, /*發送05H命令*/
+    ELAND_SEND_CMD_07H, /*發送05H命令*/
+    ELAND_SEND_CMD_08H, /*發送05H命令*/
 } eland_usart_cmd_t;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
-#define Usart_Packet_Resend_time 5
+#define USART_RESEND_MAX_TIMES 5
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/

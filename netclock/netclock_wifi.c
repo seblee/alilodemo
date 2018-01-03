@@ -14,6 +14,8 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 {
     msg_wify_queue my_message;
     IPStatusTypedef *IPStatus_Cache = NULL;
+    eland_usart_cmd_t eland_cmd = ELAND_SEND_CMD_08H;
+
     switch (status)
     {
     case NOTIFY_STATION_UP:
@@ -29,11 +31,15 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
         sprintf(netclock_des_g->default_gateway, IPStatus_Cache->gate);
         free(IPStatus_Cache);
+
         /*Send wifi state station*/
         my_message.value = Wify_Station_Connect_Successed;
+        mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+
         SendElandStateQueue(WifyConnected);
         if (wifistate_queue != NULL)
             mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
+        /*send cmd to lcd*/
         break;
     case NOTIFY_STATION_DOWN:
         WifiSet_log("Wi-Fi STATION disconnected.");
@@ -88,7 +94,6 @@ void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
 void Wifi_station_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_adv_st wNetConfigAdv;
-
     mico_rtos_lock_mutex(&WifiConfigMutex);
 
     micoWlanSuspend();

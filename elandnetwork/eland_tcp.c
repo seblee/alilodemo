@@ -21,19 +21,6 @@
 #include <time.h>
 //#include "timer_platform.h"
 /* Private typedef -----------------------------------------------------------*/
-typedef struct healthcheck
-{
-    mico_utc_time_ms_t eland_send_time;
-    mico_utc_time_ms_t elsv_receive_time;
-    mico_utc_time_ms_t elsv_send_time;
-    mico_utc_time_ms_t eland_receive_time;
-} Healthcheck_t;
-typedef enum TIME_RECORD_T {
-    SET_ELAND_SEND_TIME,
-    SET_ELAND_RECE_TIME,
-    SET_ELSV_SEND_TIME,
-    SET_ELSV_RECE_TIME,
-} TIME_RECORD_T_t;
 
 /* Private define ------------------------------------------------------------*/
 #define CONFIG_TCP_DEBUG
@@ -68,7 +55,12 @@ const char CommandTable[TCPCMD_MAX][COMMAND_LEN] = {
     {'F', 'W', '0', '0'}, //firmware update start request
     {'F', 'W', '0', '1'}, //firmwart update start response
 };
-Healthcheck_t healthche_time;
+
+mico_utc_time_ms_t eland_send_time;
+mico_utc_time_ms_t elsv_receive_time;
+mico_utc_time_ms_t elsv_send_time;
+mico_utc_time_ms_t eland_receive_time;
+
 /* Private function prototypes -----------------------------------------------*/
 static void
 TCP_thread_main(mico_thread_arg_t arg);
@@ -85,28 +77,9 @@ static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expe
 static TCP_Error_t TCP_Operate(const char *buff);
 static TCP_Error_t TCP_Operate_HC01(char *buf);
 static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
+static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t *value);
 static void eland_set_time(void);
 /* Private functions ---------------------------------------------------------*/
-static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t value)
-{
-    switch (type)
-    {
-    case SET_ELAND_SEND_TIME:
-        mico_time_get_utc_time_ms(&healthche_time.eland_send_time);
-        break;
-    case SET_ELAND_RECE_TIME:
-        mico_time_get_utc_time_ms(&healthche_time.eland_receive_time);
-        break;
-    case SET_ELSV_SEND_TIME:
-        healthche_time.elsv_send_time = value;
-        break;
-    case SET_ELSV_RECE_TIME:
-        healthche_time.elsv_receive_time = value;
-        break;
-    default:
-        break;
-    }
-}
 
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
 {
@@ -271,7 +244,7 @@ TCP_Error_t TCP_Write(Network_t *pNetwork,
 
     gettimeofday(&current_temp, NULL);
     timeradd(&current_temp, timer, &timeforward);
-    time_record(SET_ELAND_SEND_TIME, 0);
+    time_record(SET_ELAND_SEND_TIME, NULL);
     for (written_so_far = 0, frags = 0; written_so_far < len && !has_timer_expired(&timeforward); written_so_far += ret, frags++)
     {
         while ((!has_timer_expired(&timeforward)) && ((ret = ssl_send(pNetwork->tlsDataParams.ssl, pMsg + written_so_far, len - written_so_far)) <= 0))
@@ -375,8 +348,8 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
     if (len == 0)
     {
         *read_len = rxlen;
+        time_record(SET_ELAND_RECE_TIME, NULL);
         return TCP_SUCCESS;
-        time_record(SET_ELAND_RECE_TIME, 0);
     }
     if (rxlen == 0)
     {
@@ -928,7 +901,7 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
             sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
             iMsecond = GetSecondTime(&datetimeTemp);
             iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
-            time_record(SET_ELSV_RECE_TIME, iMsecond);
+            time_record(SET_ELSV_RECE_TIME, &iMsecond);
         }
         else if (!strcmp(key, "send_at"))
         {
@@ -936,7 +909,7 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
             sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
             iMsecond = GetSecondTime(&datetimeTemp);
             iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
-            time_record(SET_ELSV_SEND_TIME, iMsecond);
+            time_record(SET_ELSV_SEND_TIME, &iMsecond);
         }
     }
     return TCP_SUCCESS;
@@ -957,7 +930,7 @@ static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
     iSec = date_time->iSec;
     // iMsec = date_time->iMsec;
 
-    for (i = 1970; i < iYear; i++) /* 1970-20xx 年的閏年*/
+    for (i = 1970; i < iYear; i++) /* 1970-20xx 年的閝年*/
     {
         if (((i % 4 == 0) && (i % 100 != 0)) || (i % 400 == 0))
             Cyear++;
@@ -976,6 +949,26 @@ static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
     count_MS = CountDay; //*1000 + iMsec;
     return count_MS;
 }
+static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t *value)
+{
+    switch (type)
+    {
+    case SET_ELAND_SEND_TIME:
+        mico_time_get_utc_time_ms(&eland_send_time);
+        break;
+    case SET_ELAND_RECE_TIME:
+        mico_time_get_utc_time_ms(&eland_receive_time);
+        break;
+    case SET_ELSV_SEND_TIME:
+        elsv_send_time = *value;
+        break;
+    case SET_ELSV_RECE_TIME:
+        elsv_receive_time = *value;
+        break;
+    default:
+        break;
+    }
+}
 
 static void eland_set_time(void)
 {
@@ -985,14 +978,16 @@ static void eland_set_time(void)
     iso8601_time_t iso8601_time;
     mico_utc_time_t utc_time;
     mico_rtc_time_t rtc_time;
+    long long offset_time, offset_time1, offset_time2;
 
-    long offset_time;
-    offset_time = ((healthche_time.elsv_receive_time - healthche_time.eland_send_time) +
-                   (healthche_time.elsv_send_time - healthche_time.eland_receive_time)) /
-                  2;
+    offset_time1 = elsv_receive_time - eland_send_time;
+    offset_time2 = elsv_send_time - eland_receive_time;
+    offset_time = (offset_time1 + offset_time2) / 2;
+
     mico_time_get_utc_time_ms(&utc_time_ms);
-    utc_time_ms += offset_time;
+    utc_time_ms = utc_time_ms + offset_time;
     mico_time_set_utc_time_ms(&utc_time_ms);
+
     mico_time_get_iso8601_time(&iso8601_time);
     elan_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
 
@@ -1007,6 +1002,6 @@ static void eland_set_time(void)
     rtc_time.month = currentTime->tm_mon + 1;
     rtc_time.year = (currentTime->tm_year + 1900) % 100;
     MicoRtcSetTime(&rtc_time);
-
-    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 10);
+    /*send cmd to lcd*/
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
 }
