@@ -912,6 +912,7 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
             time_record(SET_ELSV_SEND_TIME, &iMsecond);
         }
     }
+    free_json_obj(&ReceivedJsonCache);
     return TCP_SUCCESS;
 }
 static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)

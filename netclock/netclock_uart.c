@@ -42,15 +42,14 @@ mico_queue_t eland_state_queue = NULL;        //eland usart
 mico_semaphore_t Is_usart_complete_sem = NULL;
 
 mico_timer_t timer100_key;
-uint8_t count_key_time = 0;
 
 /* Private function prototypes -----------------------------------------------*/
-static void Eland_H02_Send(void);
-static void Eland_H03_Send(void);
-static void Eland_H04_Send(void);
-static void ELAND_H05_Send(void);
-static void ELAND_H06_Send(void);
-static void ELAND_H08_Send(void);
+static void Eland_H02_Send(uint8_t *Cache);
+static void Eland_H03_Send(uint8_t *Cache);
+static void Eland_H04_Send(uint8_t *Cache);
+static void ELAND_H05_Send(uint8_t *Cache);
+static void ELAND_H06_Send(uint8_t *Cache);
+static void ELAND_H08_Send(uint8_t *Cache);
 static void MODH_Opration_02H(uint8_t *usart_rec);
 static void MODH_Opration_03H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
@@ -223,6 +222,13 @@ static void uart_thread_DDE(uint32_t arg)
 {
     OSStatus err = kNoErr;
     eland_usart_cmd_t eland_cmd = ELAND_CMD_NONE;
+
+    uint8_t *inDataBuffer;
+
+    inDataBuffer = malloc(UART_ONE_PACKAGE_LENGTH);
+    require(inDataBuffer, exit);
+    memset(inDataBuffer, 0, UART_ONE_PACKAGE_LENGTH);
+
     mico_rtos_set_semaphore(&Is_usart_complete_sem);
     while (1)
     {
@@ -234,28 +240,29 @@ static void uart_thread_DDE(uint32_t arg)
         switch (eland_cmd)
         {
         case ELAND_SEND_CMD_02H: //read key value
-            Eland_H02_Send();
+            Eland_H02_Send(inDataBuffer);
             break;
         case ELAND_SEND_CMD_03H: //set MCU_RTC time
-            Eland_H03_Send();
+            Eland_H03_Send(inDataBuffer);
             break;
         case ELAND_SEND_CMD_04H: //
-            Eland_H04_Send();
+            Eland_H04_Send(inDataBuffer);
             break;
         case ELAND_SEND_CMD_05H: //
-            ELAND_H05_Send();
+            ELAND_H05_Send(inDataBuffer);
             break;
         case ELAND_SEND_CMD_06H: //
-            ELAND_H06_Send();
+            ELAND_H06_Send(inDataBuffer);
             break;
         case ELAND_SEND_CMD_08H: //
-            ELAND_H08_Send();
+            ELAND_H08_Send(inDataBuffer);
             break;
         default:
             break;
         }
         mico_rtos_thread_msleep(5);
     }
+exit:
     mico_rtos_delete_thread(NULL);
 }
 
@@ -305,22 +312,41 @@ exit:
 }
 
 //read key 02
-static void Eland_H02_Send(void)
+static void Eland_H02_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
-    uint8_t *Cache;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
-    Cache = calloc(5, sizeof(uint8_t));
+    micoMemInfo_t *memory_info;
+    static uint8_t timesend02 = 0;
+    uint8_t len;
 
-    *Cache = Uart_Packet_Header;
-    *(Cache + 1) = KEY_READ_02;
-    *(Cache + 2) = 1;
-    *(Cache + 3) = count_key_time;
-    *(Cache + 4) = Uart_Packet_Trail;
+    if (timesend02 > 5)
+    {
+        //timesend02 = 0;
+        memory_info = MicoGetMemoryInfo();
+        *Cache = Uart_Packet_Header;
+        *(Cache + 1) = KEY_READ_02;
+        *(Cache + 2) = sizeof(int) + sizeof(int);
+        *((int *)(Cache + 3)) = memory_info->num_of_chunks;
+        *((int *)(Cache + 3 + sizeof(int))) = memory_info->free_memory;
+        *(Cache + 3 + sizeof(int) + sizeof(int)) = Uart_Packet_Trail;
+        len = 4 + sizeof(int) + sizeof(int);
+    }
+    else
+    {
+        timesend02++;
+        *Cache = Uart_Packet_Header;
+        *(Cache + 1) = KEY_READ_02;
+        *(Cache + 2) = 1;
+        *(Cache + 3) = 0;
+        *(Cache + 4) = Uart_Packet_Trail;
+        len = 4 + 1;
+    }
+
 start_send:
     sended_times--;
-    err = elandUsartSendData(Cache, 5);
+    err = elandUsartSendData(Cache, len);
     require_noerr(err, exit);
 
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
@@ -333,21 +359,18 @@ start_send:
         if (sended_times > 0)
             goto start_send;
     }
-
+    //client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 exit:
-    if (Cache != NULL)
-        free(Cache);
+    return;
 }
 //time set 03
-static void Eland_H03_Send(void)
+static void Eland_H03_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
-    uint8_t *Cache;
     mico_rtc_time_t cur_time;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
 
-    Cache = calloc(4 + sizeof(mico_rtc_time_t), sizeof(uint8_t));
     MicoRtcGetTime(&cur_time); //返回新的时间值
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = TIME_SET_03;
@@ -370,22 +393,19 @@ start_send:
             goto start_send;
     }
 exit:
-    if (Cache != NULL)
-        free(Cache);
+    return;
 }
 //read time 04
-static void Eland_H04_Send(void)
+static void Eland_H04_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
-    uint8_t *Cache;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
 
-    Cache = calloc(5, sizeof(uint8_t));
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = TIME_READ_04;
     *(Cache + 2) = 1;
-    *(Cache + 3) = count_key_time;
+    *(Cache + 3) = 0;
     *(Cache + 4) = Uart_Packet_Trail;
 start_send:
     sended_times--;
@@ -403,14 +423,12 @@ start_send:
             goto start_send;
     }
 exit:
-    if (Cache != NULL)
-        free(Cache);
+    return;
 }
 //ELAND_STATES_05
-static void ELAND_H05_Send(void)
+static void ELAND_H05_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
-    uint8_t *Cache;
     Eland_Status_type_t state = ElandNone;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
@@ -418,7 +436,6 @@ static void ELAND_H05_Send(void)
     if (err != kNoErr)
         return;
 
-    Cache = calloc(5, sizeof(uint8_t));
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = ELAND_STATES_05;
     *(Cache + 2) = 1;
@@ -439,17 +456,14 @@ start_send:
             goto start_send;
     }
 exit:
-    if (Cache != NULL)
-        free(Cache);
+    return;
 }
-static void ELAND_H06_Send(void)
+static void ELAND_H06_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
-    uint8_t *Cache;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
 
-    Cache = calloc(4 + strlen(Eland_Firmware_Version), sizeof(uint8_t));
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEAD_FIRM_WARE_06;
     *(Cache + 2) = strlen(Eland_Firmware_Version);
@@ -472,18 +486,15 @@ start_send:
             goto start_send;
     }
 exit:
-    if (Cache != NULL)
-        free(Cache);
+    return;
 }
-static void ELAND_H08_Send(void)
+static void ELAND_H08_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
-    uint8_t *Cache;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
     LinkStatusTypeDef LinkStatus_Cache;
     micoWlanGetLinkStatus(&LinkStatus_Cache);
-    Cache = calloc(4 + sizeof(LinkStatus_Cache.wifi_strength), sizeof(uint8_t));
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_LINK_STATE_08;
     *(Cache + 2) = sizeof(LinkStatus_Cache.wifi_strength);
@@ -505,8 +516,7 @@ start_send:
             goto start_send;
     }
 exit:
-    if (Cache != NULL)
-        free(Cache);
+    return;
 }
 extern void PlatformEasyLinkButtonLongPressedCallback(void);
 static void MODH_Opration_02H(uint8_t *usart_rec)
@@ -532,7 +542,6 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     KEY_Add_Count_count = ReadData;
     if (KEY_Add_Count_Trg)
     {
-        count_key_time++;
         mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     }
 
@@ -545,7 +554,6 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus))
     {
         mico_rtos_set_semaphore(&httpServer_softAP_event_Sem); //start Soft_AP mode
-        count_key_time++;
     }
 }
 static void MODH_Opration_03H(uint8_t *usart_rec)
