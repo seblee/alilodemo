@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-11-01 10:47:31
+ * @Last Modified time:2018-01-04 14:49:42
  * @brief   :
  ****************************************************************************
 **/
@@ -85,7 +85,6 @@ void start_uart_service(void)
     Eland_uart_log("start uart");
 
     /*Register uart thread*/
-
     mico_context = mico_system_context_get();
     uart_config.baud_rate = 115200;
     uart_config.data_width = DATA_WIDTH_8BIT;

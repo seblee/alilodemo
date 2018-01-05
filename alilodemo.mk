@@ -34,7 +34,8 @@ $(NAME)_SOURCES := mico_main.c \
 				   flash_kh25/flash_kh25.c \
 				   elandnetwork/eland_http_client.c \
 				   elandnetwork/eland_tcp.c \
-				   elandsound/eland_sound.c 
+				   elandsound/eland_sound.c \
+				   eland_mcu_ota/eland_mcu_ota.c 
 				   
 $(NAME)_COMPONENTS := utilities/url \
 					  utilities \
@@ -52,5 +53,5 @@ $(NAME)_INCLUDES := inc \
 					netclockota \
 					flash_kh25 \
 					elandnetwork \
-					elandsound
-					#../mico-os/template/includes \
+					elandsound \
+					eland_mcu_ota 
