@@ -974,7 +974,7 @@ static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t *value)
 static void eland_set_time(void)
 {
     mico_utc_time_ms_t utc_time_ms;
-    eland_usart_cmd_t eland_cmd = ELAND_SEND_CMD_03H;
+    __msg_function_t eland_cmd = TIME_SET_03;
     struct tm *currentTime;
     iso8601_time_t iso8601_time;
     mico_utc_time_t utc_time;

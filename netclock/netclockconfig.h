@@ -57,6 +57,7 @@ typedef struct _ElandAlarmData //闹钟情報结构体
     int32_t VolumeStepupEnabled;         //音量升高功能是否有效
     int32_t AlarmContinueMin;            //闹钟自动停止为止的时间。 単位は「分」
 } ElandAlarmData;
+
 typedef struct _AlarmOffHistoryData //闹钟履历结构体
 {
     int32_t AlarmID;                 //闹钟唯一识别的ID ELSV是闹钟设定时自动取号

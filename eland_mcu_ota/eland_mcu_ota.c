@@ -14,17 +14,19 @@
 
 /* Private include -----------------------------------------------------------*/
 #include "eland_mcu_ota.h"
+#include "stm8_bin.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
 #define mcu_ota_log(M, ...) custom_log("mcu_ota", M, ##__VA_ARGS__)
 
 #define OTA_SEND_BUFFER_LEN 150
+#define USER_UART_BUFFER_LENGTH 256
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
+mico_thread_t MCU_OTA_thread = NULL;
 //new add
-#define USER_UART_BUFFER_LENGTH 256
 volatile ring_buffer_t user_rx_buffer;
 volatile uint8_t user_rx_data[USER_UART_BUFFER_LENGTH] = {0};
 /* Private function prototypes -----------------------------------------------*/
@@ -105,13 +107,15 @@ static uint8_t stm8_ota_Checksum(uint8_t *inBuf, int inBufLen)
     return Checksum;
 }
 
-static OSStatus stm8_ota_start_command(void)
+static int stm8_ota_start_command(void)
 {
     uint8_t inDatabuf[50];
     uint8_t outDatabuf[50];
     uint8_t times = 10;
     int recv_len;
     mico_uart_config_t uart_config;
+    int version_major_cache = 0;
+    int version_minor_cache = 0;
 
     memset(&uart_config, 0, sizeof(mico_uart_config_t));
     memset(&inDatabuf, 0, sizeof(inDatabuf));
@@ -125,7 +129,37 @@ static OSStatus stm8_ota_start_command(void)
 
     ring_buffer_init((ring_buffer_t *)&user_rx_buffer, (uint8_t *)user_rx_data, USER_UART_BUFFER_LENGTH);
     MicoUartInitialize(MICO_UART_2, &uart_config, (ring_buffer_t *)&user_rx_buffer);
+    /*check firmware version*/
+    inDatabuf[0] = 0x55;
+    inDatabuf[1] = 0x07;
+    inDatabuf[2] = 0x00;
+    inDatabuf[3] = 0xaa;
+    do
+    {
+        times--;
+        MicoUartSend(MICO_UART_2, inDatabuf, 4);
+        recv_len = OTA_uart_get_one_packet(outDatabuf, OTA_SEND_BUFFER_LEN, 2);
+        if (recv_len > 0)
+        {
+            if ((outDatabuf[0] == 0x55) &&
+                (outDatabuf[1] == 0x07) &&
+                (outDatabuf[8] == 0xaa))
+            {
+                sscanf((char const *)&outDatabuf[3], "%02d.%02d", &version_major_cache, &version_minor_cache);
+                if ((version_major_cache == MCU_VERSION_MAJOR) && (version_minor_cache == MCU_VERSION_MINOR))
+                    return kNoErr;
+                else
+                    break;
+            }
+            else
+                memset(&outDatabuf, 0, sizeof(outDatabuf));
+        }
+        mico_rtos_thread_msleep(10);
+    } while (times > 0);
 
+    if (times == 0)
+        return kGeneralErr;
+    /*start update firmware*/
     inDatabuf[0] = 0x55;
     inDatabuf[1] = 0x09;
     inDatabuf[2] = 0x00;
@@ -154,10 +188,11 @@ static OSStatus stm8_ota_start_command(void)
 /*
  * Thread fun
  */
-void mcu_ota_thread(mico_thread_arg_t *arg)
+void mcu_ota_thread(mico_thread_arg_t arg)
 {
     int i, stm8FW_len, stm8FW_page, OTA_Step_No = 0;
     uint8_t *inDataBuffer;
+    int *err = (int *)arg;
 
     inDataBuffer = malloc(OTA_SEND_BUFFER_LEN);
     require(inDataBuffer, exit);
@@ -180,7 +215,11 @@ void mcu_ota_thread(mico_thread_arg_t *arg)
             // mico_rtos_delay_milliseconds(200);
             // MicoGpioOutputHigh((mico_gpio_t)MICO_ADF7030_POWER);
             // mico_rtos_delay_milliseconds(200);
-            stm8_ota_start_command();
+            *err = stm8_ota_start_command();
+            if (*err == 2)
+                goto exit;
+            else if (*err == kGeneralErr)
+                goto exit_err;
             OTA_uart_init();
             mico_rtos_thread_msleep(50);
             inDataBuffer[0] = 0x7f; //Synchronization byte
@@ -274,6 +313,7 @@ void mcu_ota_thread(mico_thread_arg_t *arg)
             if (kNoErr != stm8_ota_command_once(inDataBuffer, 5, 2))
                 goto exit_err;
             OTA_Step_No = 4;
+            mico_rtos_thread_msleep(10);
             break;
         case 4:
             goto exit;
@@ -284,10 +324,12 @@ void mcu_ota_thread(mico_thread_arg_t *arg)
     }
 
 exit_err:
+    *err = kGeneralErr;
     mcu_ota_log("stm8 flash program Fail ....");
 exit:
     mcu_ota_log("stm8 flash program OK ....");
     if (inDataBuffer)
         free(inDataBuffer);
+
     mico_rtos_delete_thread(NULL);
 }

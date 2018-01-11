@@ -15,17 +15,18 @@
 #define __ELAND_MCU_OTA_H_
 /* Private include -----------------------------------------------------------*/
 #include "mico.h"
-#include "stm8_bin.h"
+
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-
+#define MCU_VERSION_MAJOR 1
+#define MCU_VERSION_MINOR 2
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-
+extern mico_thread_t MCU_OTA_thread;
 /* Private function prototypes -----------------------------------------------*/
-
+void mcu_ota_thread(mico_thread_arg_t arg);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /*__ELAND_MCU_OTA_H_*/

@@ -56,7 +56,7 @@ int application_start(void)
     err = Eland_Rtc_Init();
 
     /*start init system context*/
-    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t) + 100);
+    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
 
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
@@ -73,7 +73,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /****start softAP event wait******/
-    start_HttpServer_softAP_thread();
+    //start_HttpServer_softAP_thread();
 
     /*start init eland SPI*/
     err = start_eland_flash_service();

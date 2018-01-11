@@ -32,7 +32,7 @@
 
 #pragma once
 
-#define APP_INFO "MiCO BASIC Demo"
+#define APP_INFO "Eland Demo"
 
 #define FIRMWARE_REVISION "MICO_BASIC_1_0"
 #define MANUFACTURER "MXCHIP Inc."
@@ -40,8 +40,6 @@
 #define PROTOCOL "com.mxchip.basic"
 
 #define EasyLink_Needs_Reboot
-
-//#define MICO_SYSTEM_LOG_INFO_DISABLE
 
 /************************************************************************
  * Application thread stack size */
@@ -51,12 +49,12 @@
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */
 #define MICO_WLAN_CONNECTION_ENABLE
 
-#define MICO_CONFIG_MODE CONFIG_MODE_NONE // CONFIG_MODE_EASYLINK
+#define MICO_CONFIG_MODE CONFIG_MODE_EASYLINK
 
 #define EasyLink_TimeOut 60000 /**< EasyLink timeout 60 seconds. */
-// Connect to wlan after configured by easylink.
-// Restart easylink after timeout: 20 seconds.
-#define EasyLink_ConnectWlan_Timeout 20000
+
+#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \
+                                                Restart easylink after timeout: 20 seconds. */
 
 /************************************************************************
  * Device enter MFG mode if MICO settings are erased. */

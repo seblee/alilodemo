@@ -54,26 +54,26 @@ typedef enum {
 } KEY_State_TypeDef;
 
 typedef enum {
-    KEY_FUN_NONE = 0x00, /*空命令*/
-    KEY_READ_02 = 0X02,
-    TIME_SET_03,
-    TIME_READ_04,
-    ELAND_STATES_05,
-    SEAD_FIRM_WARE_06,
-    REND_FIRM_WARE_07,
-    SEND_LINK_STATE_08,
+    KEY_FUN_NONE = 0x00, /* 空命令*/
+    KEY_READ_02 = 0X02,  /* READ MCU KEY STATE*/
+    TIME_SET_03,         /* SEND ELAND TIME*/
+    TIME_READ_04,        /* READ MCU TIME*/
+    ELAND_STATES_05,     /* SEND ELAND STATES*/
+    SEND_FIRM_WARE_06,   /* SEND ELAND FIRMWARE VERSION*/
+    REND_FIRM_WARE_07,   /* READ MUC FIRMWARE VERSION*/
+    SEND_LINK_STATE_08,  /* SEND WIFI LINK STATE*/
+    MCU_FIRM_WARE_09,    /* START MCU FIRM WARE UPDATE*/
+    ALARM_READ_10,       /* READ MCU ALARM*/
+    ALARM_SEND_11,       /* SEND NEXT ALARM STATE*/
 } __msg_function_t;
 
 typedef enum {
-    ELAND_CMD_NONE,     /*空命令*/
-    ELAND_SEND_CMD_02H, /*發送02H命令*/
-    ELAND_SEND_CMD_03H, /*發送03H命令*/
-    ELAND_SEND_CMD_04H, /*發送04H命令*/
-    ELAND_SEND_CMD_05H, /*發送05H命令*/
-    ELAND_SEND_CMD_06H, /*發送05H命令*/
-    ELAND_SEND_CMD_07H, /*發送05H命令*/
-    ELAND_SEND_CMD_08H, /*發送05H命令*/
-} eland_usart_cmd_t;
+    REFRESH_NONE = 0,
+    REFRESH_TIME,
+    REFRESH_ALARM,
+    REFRESH_MAX,
+} MCU_Refresh_type_t;
+
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
@@ -81,7 +81,7 @@ typedef enum {
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
-void start_uart_service(void);
+OSStatus start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void StateReceivethread(mico_thread_arg_t arg);
