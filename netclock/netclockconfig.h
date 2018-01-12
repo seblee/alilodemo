@@ -31,9 +31,6 @@
 #define Date_formate_len 11     //日期为"yyyy-MM-dd"的形式
 #define URL_Len 128             //URL长度
 
-#define alarm_id_len 37   //闹钟唯一识别的ID。
-#define alarm_color_len 8 //闹钟颜色的RGB字符串。"#RRGGBB"的形式。
-
 typedef struct _TIME_FORMAT_
 {
     char hour[2];
@@ -41,30 +38,7 @@ typedef struct _TIME_FORMAT_
     char minute[2];
     char colon2;
     char second[2];
-} TIME_FORMAT;
-
-typedef struct _ElandAlarmData //闹钟情報结构体
-{
-    int32_t AlarmID;                     //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
-    iso8601_time_t AlarmDateTime;        //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
-    int32_t SnoozeEnabled;               //继续响铃 有效标志  0：无效   1：有效
-    int32_t SnoozeCount;                 //继续响铃的次数
-    int32_t SnoozeIntervalMin;           //继续响铃的间隔。単位「分」
-    int32_t AlarmPattern;                //闹钟的播放样式。 1 : 只有闹钟音 2 : 只有语音 3 : digital音和语音（交互播放） 4 : 闹钟OFF后的语音
-    char AlarmSoundDownloadURL[URL_Len]; //从ELSV下载闹钟音的URL
-    char AlarmVoiceDownloadURL[URL_Len]; //从ELSV下载语音的URL
-    int32_t AlarmVolume;                 //闹钟的音量
-    int32_t VolumeStepupEnabled;         //音量升高功能是否有效
-    int32_t AlarmContinueMin;            //闹钟自动停止为止的时间。 単位は「分」
-} ElandAlarmData;
-
-typedef struct _AlarmOffHistoryData //闹钟履历结构体
-{
-    int32_t AlarmID;                 //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
-    iso8601_time_t AlarmOnDateTime;  //闹钟播放时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
-    iso8601_time_t AlarmOffDateTime; //闹钟停止时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
-    int32_t AlarmOffReason;          //闹钟停止的理由。 1 : 用户操作 2 : 自動停止
-} AlarmOffHistoryData;
+} __time_format_t;
 
 typedef struct _ELAND_DES_S //设备状态结构
 {

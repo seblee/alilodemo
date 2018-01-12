@@ -649,4 +649,6 @@ static void MODH_Opration_08H(uint8_t *usart_rec)
 }
 static void MODH_Opration_10H(uint8_t *usart_rec)
 {
+    _alarm_MCU_data_t cache;
+    memcpy(&cache, (rec_data + 3), sizeof(_alarm_MCU_data_t));
 }
