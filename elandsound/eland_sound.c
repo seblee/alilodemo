@@ -1,6 +1,5 @@
 #include "mico.h"
 #include "eland_sound.h"
-
 //#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)

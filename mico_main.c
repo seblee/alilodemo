@@ -24,7 +24,7 @@
 #include "flash_kh25.h"
 #include "eland_sound.h"
 #include "eland_tcp.h"
-
+#include "eland_alarm.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -62,6 +62,8 @@ int application_start(void)
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
 
+    err = Start_Alarm_service();
+    require_noerr(err, exit);
     /*init fog v2 service*/
     err = netclock_desInit();
     require_noerr(err, exit);

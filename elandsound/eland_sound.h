@@ -2,7 +2,7 @@
 #define __ELAND_SOUND_H_
 
 #include "flash_kh25.h"
-
+#include "eland_alarm.h"
 #define ALARM_ID_LEN 36
 #define ALARM_SIZE_LEN 4
 #define ALARM_FILE_FLAG_LEN 9

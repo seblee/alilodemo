@@ -11,11 +11,12 @@
  * @brief   :
  ****************************************************************************
 **/
-
+#ifndef __ELAND_ALARM_H_
+#define __ELAND_ALARM_H_
 /* Private include -----------------------------------------------------------*/
 #include "mico.h"
 /* Private define ------------------------------------------------------------*/
-#define ALARM_ID_LEN 37             //闹钟唯一识别的ID。
+#define ALARM_ID_LEN 36             //闹钟唯一识别的ID。
 #define ALARM_TIME_LEN 8            //時刻是"HH:mm:ss"的形式。
 #define ALARM_OFF_DATES_LEN 11      //日期是"yyyy-MM-dd"的形式
 #define VOICE_ALARM_ID_LEN 37       //语音闹钟的ID
@@ -28,7 +29,7 @@ typedef struct
     int8_t color;
     int8_t snooze_count;
     uint8_t alarm_on_days_of_week;
-} _alarm_MCU_data_t;
+} _alarm_mcu_data_t;
 
 typedef struct
 {
@@ -40,7 +41,7 @@ typedef struct
 
 typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
 {
-    char alarm_id[ALARM_ID_LEN];                           //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
+    char alarm_id[ALARM_ID_LEN + 1];                       //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
     int8_t alarm_color;                                    //鬧鐘顏色
     char alarm_time[ALARM_TIME_LEN];                       //闹钟播放时刻
     char alarm_off_dates[ALARM_OFF_DATES_LEN];             //不播放闹钟的日期的排列 暫定一個
@@ -58,12 +59,26 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     char alarm_on_dates[ALARM_OFF_DATES_LEN];              //鬧鐘日期排列
     char alarm_on_days_of_week[ALARM_ON_DAYS_OF_WEEK_LEN]; //鬧鐘播放的星期幾
     _alarm_eland_data_t alarm_data_for_eland;
-    _alarm_MCU_data_t alarm_data_for_mcu;
+    _alarm_mcu_data_t alarm_data_for_mcu;
 } __elsv_alarm_data_t;
+
+typedef enum {
+    ALARM_IDEL,
+    ALARM_ADD,
+    ALARM_MINUS,
+    ALARM_SORT,
+    ALARM_ING,
+    ALARM_SNOOZ_STOP,
+    ALARM_STOP,
+} _alarm_list_state_t;
+
 typedef struct
 {
     bool list_refreshed;
+    bool alarm_stoped;
     uint8_t alarm_number;
+    mico_mutex_t AlarmListMutex;
+    _alarm_list_state_t state;
     __elsv_alarm_data_t *alarm_lib;
 } _eland_alarm_list_t;
 typedef struct _AlarmOffHistoryData //闹钟履历结构体
@@ -78,5 +93,9 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 /* Private variables ---------------------------------------------------------*/
 
 /* Private function prototypes -----------------------------------------------*/
-
+void alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
+void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
+OSStatus Start_Alarm_service(void);
 /* Private functions ---------------------------------------------------------*/
+
+#endif

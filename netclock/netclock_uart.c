@@ -19,6 +19,7 @@
 #include "netclockconfig.h"
 #include "../alilodemo/inc/audio_service.h"
 #include "eland_mcu_ota.h"
+#include "eland_alarm.c"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -649,6 +650,6 @@ static void MODH_Opration_08H(uint8_t *usart_rec)
 }
 static void MODH_Opration_10H(uint8_t *usart_rec)
 {
-    _alarm_MCU_data_t cache;
-    memcpy(&cache, (rec_data + 3), sizeof(_alarm_MCU_data_t));
+    _alarm_mcu_data_t cache;
+    memcpy(&cache, (usart_rec + 3), sizeof(_alarm_mcu_data_t));
 }
