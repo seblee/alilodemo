@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-04 14:49:42
+ * @Last Modified time:2018-01-17 17:26:32
  * @brief   :
  ****************************************************************************
 **/
@@ -19,7 +19,9 @@
 #include "netclockconfig.h"
 #include "../alilodemo/inc/audio_service.h"
 #include "eland_mcu_ota.h"
-#include "eland_alarm.c"
+#include "eland_alarm.h"
+#include "netclock_wifi.h"
+#include "eland_alarm.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -27,7 +29,7 @@
 
 #define UART_BUFFER_LENGTH 2048
 #define UART_ONE_PACKAGE_LENGTH 1024
-#define STACK_SIZE_UART_RECV_THREAD 0x500
+#define STACK_SIZE_UART_RECV_THREAD 0x1500
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -93,7 +95,7 @@ static void uart_service(uint32_t arg)
 
     if (ota_arg == kGeneralErr)
         Eland_uart_log("mcu ota err");
-    goto exit;
+    // goto exit;
     //eland 状态数据互锁
     err = mico_rtos_init_semaphore(&Is_usart_complete_sem, 2);
     //初始化eland_uart_CMD_queue 發送 CMD 消息 初始化eland uart 發送 send 消息
@@ -297,6 +299,7 @@ void SendElandStateQueue(Eland_Status_type_t value)
 {
     Eland_Status_type_t state = value;
     __msg_function_t eland_cmd = ELAND_STATES_05;
+    mscp_result_t result;
     if (eland_state_queue == NULL)
         return;
     if (mico_rtos_is_queue_full(&eland_state_queue)) //if full pick out data then update state
@@ -306,7 +309,7 @@ void SendElandStateQueue(Eland_Status_type_t value)
         state = value;
         mico_rtos_push_to_queue(&eland_state_queue, &state, 10);
     }
-
+    audio_service_sound_remind_start(&result, 12); //門鈴蝲音 “坮噔”
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
 }
 static void timer100_key_handle(void *arg)
@@ -344,32 +347,38 @@ static void Eland_H02_Send(uint8_t *Cache)
     OSStatus err = kGeneralErr;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
-    micoMemInfo_t *memory_info;
+    //micoMemInfo_t *memory_info;
     static uint8_t timesend02 = 0;
     uint8_t len;
 
-    if (timesend02 > 5)
-    {
-        //timesend02 = 0;
-        memory_info = MicoGetMemoryInfo();
-        *Cache = Uart_Packet_Header;
-        *(Cache + 1) = KEY_READ_02;
-        *(Cache + 2) = sizeof(int) + sizeof(int);
-        *((int *)(Cache + 3)) = memory_info->num_of_chunks;
-        *((int *)(Cache + 3 + sizeof(int))) = memory_info->free_memory;
-        *(Cache + 3 + sizeof(int) + sizeof(int)) = Uart_Packet_Trail;
-        len = 4 + sizeof(int) + sizeof(int);
-    }
-    else
-    {
-        timesend02++;
-        *Cache = Uart_Packet_Header;
-        *(Cache + 1) = KEY_READ_02;
-        *(Cache + 2) = 1;
-        *(Cache + 3) = 0;
-        *(Cache + 4) = Uart_Packet_Trail;
-        len = 4 + 1;
-    }
+    // if (timesend02 > 5)
+    // {
+    //     //timesend02 = 0;
+    //     memory_info = MicoGetMemoryInfo();
+    //     *Cache = Uart_Packet_Header;
+    //     *(Cache + 1) = KEY_READ_02;
+    //     *(Cache + 2) = sizeof(int) + sizeof(int);
+    //     *((int *)(Cache + 3)) = memory_info->num_of_chunks;
+    //     *((int *)(Cache + 3 + sizeof(int))) = memory_info->free_memory;
+    //     *(Cache + 3 + sizeof(int) + sizeof(int)) = Uart_Packet_Trail;
+    //     len = 4 + sizeof(int) + sizeof(int);
+    // }
+    // else
+    // {
+    //     timesend02++;
+    //     *Cache = Uart_Packet_Header;
+    //     *(Cache + 1) = KEY_READ_02;
+    //     *(Cache + 2) = 1;
+    //     *(Cache + 3) = timesend02;
+    //     *(Cache + 4) = Uart_Packet_Trail;
+    //     len = 4 + 1;
+    // }
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = KEY_READ_02;
+    *(Cache + 2) = 1;
+    *(Cache + 3) = timesend02++;
+    *(Cache + 4) = Uart_Packet_Trail;
+    len = 4 + 1;
 
 start_send:
     sended_times--;
@@ -386,7 +395,6 @@ start_send:
         if (sended_times > 0)
             goto start_send;
     }
-    //client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 exit:
     return;
 }
@@ -525,12 +533,12 @@ static void ELAND_H08_Send(uint8_t *Cache)
     micoWlanGetLinkStatus(&LinkStatus_Cache);
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_LINK_STATE_08;
-    *(Cache + 2) = sizeof(LinkStatus_Cache.wifi_strength);
-    memcpy(Cache + 3, &(LinkStatus_Cache.wifi_strength), sizeof(LinkStatus_Cache.wifi_strength));
-    *(Cache + 3 + sizeof(LinkStatus_Cache.wifi_strength)) = Uart_Packet_Trail;
+    *(Cache + 2) = sizeof(LinkStatus_Cache.rssi);
+    memcpy(Cache + 3, &(LinkStatus_Cache.rssi), sizeof(LinkStatus_Cache.rssi));
+    *(Cache + 3 + sizeof(LinkStatus_Cache.rssi)) = Uart_Packet_Trail;
 start_send:
     sended_times--;
-    err = elandUsartSendData(Cache, 4 + sizeof(LinkStatus_Cache.wifi_strength));
+    err = elandUsartSendData(Cache, 4 + sizeof(LinkStatus_Cache.rssi));
     require_noerr(err, exit);
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
@@ -587,7 +595,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
 
-    switch ((MCU_Refresh_type_t)(*(usart_rec + 6)))
+    switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
     {
     case REFRESH_TIME:
         eland_cmd = TIME_READ_04;
@@ -613,7 +621,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     if (KEY_Add_Count_Trg)
     {
         eland_cmd = SEND_FIRM_WARE_06;
-        mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+        // mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     }
 
     if ((Key_Restain & KEY_Set) && (Key_Restain & KEY_Minus))
@@ -624,7 +632,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     Set_Minus_Restain_count = ReadData;
     if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus))
     {
-        mico_rtos_set_semaphore(&httpServer_softAP_event_Sem); //start Soft_AP mode
+        // Wifi_SoftAP_fun();
+        Start_wifi_Station_SoftSP_Thread(Soft_AP);
+        //start Soft_AP mode
     }
 }
 static void MODH_Opration_03H(uint8_t *usart_rec)
@@ -651,5 +661,7 @@ static void MODH_Opration_08H(uint8_t *usart_rec)
 static void MODH_Opration_10H(uint8_t *usart_rec)
 {
     _alarm_mcu_data_t cache;
+    __elsv_alarm_data_t elsv_alarm_data;
     memcpy(&cache, (usart_rec + 3), sizeof(_alarm_mcu_data_t));
+    elsv_alarm_data_init_MCU(&elsv_alarm_data, &cache);
 }

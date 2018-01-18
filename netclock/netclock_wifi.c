@@ -1,3 +1,18 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-01-17 17:12:26
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-01-17 17:27:49
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/inc/audio_service.h"
 #include "../alilodemo/inc/http_file_download.h"
@@ -6,9 +21,21 @@
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
 #include "netclock_httpd.h"
+
+/* Private typedef -----------------------------------------------------------*/
+
+/* Private define ------------------------------------------------------------*/
 #define WifiSet_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 mico_queue_t wifistate_queue = NULL;
+
+/* Private function prototypes -----------------------------------------------*/
+static void Wifi_SoftAP_threed(mico_thread_arg_t arg);
+
+/* Private functions ---------------------------------------------------------*/
 
 void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 {
@@ -86,8 +113,9 @@ void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
     }
     else if (wifi_Mode == Soft_AP)
     {
+        //Wifi_SoftAP_fun(); //
         mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
-                                Wifi_SoftAP_threed, 0x500, (mico_thread_arg_t)NULL);
+                                Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
     }
 }
 
@@ -96,7 +124,7 @@ void Wifi_station_threed(mico_thread_arg_t arg)
     network_InitTypeDef_adv_st wNetConfigAdv;
     mico_rtos_lock_mutex(&WifiConfigMutex);
 
-    micoWlanSuspend();
+    micoWlanSuspendStation();
     /* Initialize wlan parameters */
     memset(&wNetConfigAdv, 0x0, sizeof(wNetConfigAdv));
     strcpy((char *)wNetConfigAdv.ap_info.ssid, netclock_des_g->Wifissid); /* wlan ssid string */
@@ -124,14 +152,13 @@ void Wifi_station_threed(mico_thread_arg_t arg)
     mico_rtos_unlock_mutex(&WifiConfigMutex);
     mico_rtos_delete_thread(NULL);
 }
-void Wifi_SoftAP_threed(mico_thread_arg_t arg)
+static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_st wNetConfig;
 
     mico_rtos_lock_mutex(&WifiConfigMutex);
+    micoWlanSuspendSoftAP();
     WifiSet_log("Soft_ap_Server");
-
-    micoWlanSuspend();
     memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
     strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
     strcpy((char *)wNetConfig.wifi_key, ELAND_AP_KEY);
@@ -148,6 +175,28 @@ void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     mico_rtos_delete_thread(NULL);
 }
 
+void Wifi_SoftAP_fun(void)
+{
+    network_InitTypeDef_st wNetConfig;
+
+    mico_rtos_lock_mutex(&WifiConfigMutex);
+    //micoWlanSuspendSoftAP();
+    WifiSet_log("Soft_ap_Server");
+    memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
+    strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
+    strcpy((char *)wNetConfig.wifi_key, ELAND_AP_KEY);
+    wNetConfig.wifi_mode = Soft_AP;
+    wNetConfig.dhcpMode = DHCP_Server;
+    wNetConfig.wifi_retry_interval = 100;
+    strcpy((char *)wNetConfig.local_ip_addr, "192.168.0.1");
+    strcpy((char *)wNetConfig.net_mask, "255.255.255.0");
+    strcpy((char *)wNetConfig.dnsServer_ip_addr, "192.168.0.1");
+    WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
+    micoWlanStart(&wNetConfig);
+    mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
+    mico_rtos_unlock_mutex(&WifiConfigMutex);
+}
+
 OSStatus ElandWifyStateNotifyInit(void)
 {
     OSStatus err;
@@ -157,10 +206,6 @@ OSStatus ElandWifyStateNotifyInit(void)
     /*wifi softAP 信號針*/
     err = mico_rtos_init_semaphore(&wifi_SoftAP_Sem, 1);
     require_noerr(err, exit);
-    /*httpServer_softAP_event_Sem 信號量*/
-    err = mico_rtos_init_semaphore(&httpServer_softAP_event_Sem, 1);
-    require_noerr(err, exit);
-    mico_rtos_set_semaphore(&httpServer_softAP_event_Sem);
     /*wifi state 消杯隊列*/
     err = mico_rtos_init_queue(&wifistate_queue, "wifistate_queue", sizeof(msg_wify_queue), 3);
     require_noerr(err, exit);

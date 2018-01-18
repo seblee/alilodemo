@@ -49,11 +49,11 @@
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */
 #define MICO_WLAN_CONNECTION_ENABLE
 
-#define MICO_CONFIG_MODE CONFIG_MODE_EASYLINK
+#define MICO_CONFIG_MODE CONFIG_MODE_NONE
 
 #define EasyLink_TimeOut 60000 /**< EasyLink timeout 60 seconds. */
 
-#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \
+#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \
                                                 Restart easylink after timeout: 20 seconds. */
 
 /************************************************************************
@@ -67,7 +67,7 @@
  * Start a system monitor daemon, application can register some monitor  
  * points, If one of these points is not executed in a predefined period, 
  * a watchdog reset will occur. */
-#define MICO_SYSTEM_MONITOR_ENABLE
+//#define MICO_SYSTEM_MONITOR_ENABLE
 
 /************************************************************************
  * Add service _easylink._tcp._local. for discovery */

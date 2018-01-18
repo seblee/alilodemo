@@ -74,11 +74,28 @@ typedef enum {
 
 typedef struct
 {
-    bool list_refreshed;
+    _alarm_list_state_t state;
     bool alarm_stoped;
+    mico_mutex_t AlarmStateMutex;
+} _alarm_state_t;
+typedef struct
+{
+    bool stream_done;
+    mico_mutex_t stream_Mutex;
+    uint8_t stream_id;
+    uint32_t data_pos;
+    char alarm_id[ALARM_ID_LEN + 1];
+} _alarm_stream_t;
+
+typedef struct
+{
+    bool list_refreshed;
     uint8_t alarm_number;
     mico_mutex_t AlarmListMutex;
-    _alarm_list_state_t state;
+    _alarm_state_t state;
+    /*******************/
+
+    /**********************************************/
     __elsv_alarm_data_t *alarm_lib;
 } _eland_alarm_list_t;
 typedef struct _AlarmOffHistoryData //闹钟履历结构体
@@ -94,8 +111,10 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 
 /* Private function prototypes -----------------------------------------------*/
 void alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
+void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
 OSStatus Start_Alarm_service(void);
+void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

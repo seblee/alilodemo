@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-05 15:22:48
+ * @Last Modified time:2018-01-17 13:37:01
  * @brief   :
  ****************************************************************************
 **/
@@ -21,14 +21,14 @@
 #define mcu_ota_log(M, ...) custom_log("mcu_ota", M, ##__VA_ARGS__)
 
 #define OTA_SEND_BUFFER_LEN 150
-#define USER_UART_BUFFER_LENGTH 256
+#define OTA_UART_BUFFER_LENGTH 256
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 mico_thread_t MCU_OTA_thread = NULL;
 //new add
 volatile ring_buffer_t user_rx_buffer;
-volatile uint8_t user_rx_data[USER_UART_BUFFER_LENGTH] = {0};
+volatile uint8_t user_rx_data[OTA_UART_BUFFER_LENGTH] = {0};
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
@@ -48,7 +48,7 @@ static OSStatus OTA_uart_init(void)
     uart_config.flow_control = FLOW_CONTROL_DISABLED;
     uart_config.flags = UART_WAKEUP_DISABLE;
 
-    ring_buffer_init((ring_buffer_t *)&user_rx_buffer, (uint8_t *)user_rx_data, USER_UART_BUFFER_LENGTH);
+    ring_buffer_init((ring_buffer_t *)&user_rx_buffer, (uint8_t *)user_rx_data, OTA_UART_BUFFER_LENGTH);
     MicoUartInitialize(MICO_UART_2, &uart_config, (ring_buffer_t *)&user_rx_buffer);
     return kNoErr;
 }
@@ -59,7 +59,7 @@ static OSStatus OTA_uart_init(void)
 static size_t OTA_uart_get_one_packet(uint8_t *inBuf, int inBufLen, uint8_t timeout)
 {
     int datalen;
-
+    char *p = inBuf;
     while (1)
     {
         if (MicoUartRecv(MICO_UART_2, inBuf, inBufLen, timeout) == kNoErr)
@@ -107,7 +107,7 @@ static uint8_t stm8_ota_Checksum(uint8_t *inBuf, int inBufLen)
     return Checksum;
 }
 
-static int stm8_ota_start_command(void)
+static int ota_start_command(void)
 {
     uint8_t inDatabuf[50];
     uint8_t outDatabuf[50];
@@ -127,18 +127,23 @@ static int stm8_ota_start_command(void)
     uart_config.stop_bits = STOP_BITS_1;
     uart_config.flow_control = FLOW_CONTROL_DISABLED;
 
-    ring_buffer_init((ring_buffer_t *)&user_rx_buffer, (uint8_t *)user_rx_data, USER_UART_BUFFER_LENGTH);
+    ring_buffer_init((ring_buffer_t *)&user_rx_buffer, (uint8_t *)user_rx_data, OTA_UART_BUFFER_LENGTH);
     MicoUartInitialize(MICO_UART_2, &uart_config, (ring_buffer_t *)&user_rx_buffer);
     /*check firmware version*/
     inDatabuf[0] = 0x55;
     inDatabuf[1] = 0x07;
-    inDatabuf[2] = 0x00;
-    inDatabuf[3] = 0xaa;
+    inDatabuf[2] = 0x01;
+    inDatabuf[3] = 0x00;
+    inDatabuf[4] = 0xaa;
     do
     {
         times--;
-        MicoUartSend(MICO_UART_2, inDatabuf, 4);
-        recv_len = OTA_uart_get_one_packet(outDatabuf, OTA_SEND_BUFFER_LEN, 2);
+        MicoUartSend(MICO_UART_2, inDatabuf, 5);
+        mico_rtos_thread_msleep(2);
+        recv_len = MicoUartGetLengthInBuffer(MICO_UART_2);
+        if (recv_len)
+            MicoUartRecv(MICO_UART_2, outDatabuf, recv_len, 2);
+        inDatabuf[3] = recv_len;
         if (recv_len > 0)
         {
             if ((outDatabuf[0] == 0x55) &&
@@ -215,7 +220,7 @@ void mcu_ota_thread(mico_thread_arg_t arg)
             // mico_rtos_delay_milliseconds(200);
             // MicoGpioOutputHigh((mico_gpio_t)MICO_ADF7030_POWER);
             // mico_rtos_delay_milliseconds(200);
-            *err = stm8_ota_start_command();
+            *err = ota_start_command();
             if (*err == 2)
                 goto exit;
             else if (*err == kGeneralErr)

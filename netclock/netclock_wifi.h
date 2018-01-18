@@ -19,9 +19,8 @@ extern mico_queue_t wifistate_queue;
 
 void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode);
 void Wifi_station_threed(mico_thread_arg_t arg);
-void Wifi_SoftAP_threed(mico_thread_arg_t arg);
 void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg);
 void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext);
 OSStatus ElandWifyStateNotifyInit(void);
-
+void Wifi_SoftAP_fun(void);
 #endif /* ALILODEMO_NETCLOCK_NETCLOCK_WIFI_H_ */

@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-04 16:56:47
+ * @Last Modified time:2018-01-17 17:24:19
  * @brief   :
  ****************************************************************************
 **/
@@ -62,6 +62,9 @@ int application_start(void)
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
 
+    err = hal_alilo_rabbit_init();
+    require_noerr(err, exit);
+
     err = Start_Alarm_service();
     require_noerr(err, exit);
     /*init fog v2 service*/
@@ -69,14 +72,10 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
-
-    err = hal_alilo_rabbit_init();
-    require_noerr(err, exit);
+    //start_uart_service();
 
     /****start softAP event wait******/
-    //start_HttpServer_softAP_thread();
-
+    // Start_wifi_Station_SoftSP_Thread(Soft_AP);
     /*start init eland SPI*/
     err = start_eland_flash_service();
     require_noerr(err, exit);

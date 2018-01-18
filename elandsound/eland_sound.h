@@ -38,7 +38,7 @@ typedef enum {
 } SOUND_FILE_ERR_TYPE;
 typedef struct __SOUND_CALLBACK_TYPE_
 {
-    char alarm_ID[ALARM_ID_LEN];
+    char alarm_ID[ALARM_ID_LEN + 1];
     SOUND_FILE_ERR_TYPE read_write_err;
 } _sound_callback_type_t;
 

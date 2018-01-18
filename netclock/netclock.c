@@ -235,31 +235,7 @@ OSStatus Netclock_des_recovery(void)
 
     return kNoErr;
 }
-/****start softAP event wait******/
-void start_HttpServer_softAP_thread(void)
-{
-    mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Para_config",
-                            ElandParameterConfiguration, 0x1000, (uint32_t)NULL);
-}
 
-void ElandParameterConfiguration(mico_thread_arg_t args)
-{
-    flagHttpdServerAP = 1;
-    while (1)
-    {
-        /*********wait for softap event***********/
-        mico_rtos_get_semaphore(&httpServer_softAP_event_Sem, MICO_WAIT_FOREVER);
-        if (flagHttpdServerAP == 2)
-            continue;
-        else
-            flagHttpdServerAP = 2;
-        Eland_log("Soft_ap_Server start");
-        Start_wifi_Station_SoftSP_Thread(Soft_AP);
-        /* start http server thread */
-        Eland_httpd_start();
-    }
-    mico_rtos_delete_thread(NULL);
-}
 //获取网络连接状态
 bool get_wifi_status(void)
 {
@@ -846,13 +822,13 @@ OSStatus Eland_Rtc_Init(void)
 {
     OSStatus status = kNoErr;
     mico_rtc_time_t cur_time = {0};
-    cur_time.year = 17; //设置时间
-    cur_time.month = 11;
-    cur_time.date = 15;
+    cur_time.year = 18; //设置时间
+    cur_time.month = 1;
+    cur_time.date = 18;
     cur_time.weekday = 4;
-    cur_time.hr = 15;
-    cur_time.min = 10;
-    cur_time.sec = 7;
+    cur_time.hr = 14;
+    cur_time.min = 29;
+    cur_time.sec = 50;
     status = MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
     return status;
 }

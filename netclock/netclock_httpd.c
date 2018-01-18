@@ -52,7 +52,7 @@
 static bool is_http_init;
 static bool is_handlers_registered;
 struct httpd_wsgi_call g_app_handlers[];
-mico_semaphore_t wifi_netclock = NULL, wifi_SoftAP_Sem = NULL, httpServer_softAP_event_Sem = NULL;
+mico_semaphore_t wifi_netclock = NULL, wifi_SoftAP_Sem = NULL;
 static void eland_check_ssid(void)
 {
     msg_wify_queue received;

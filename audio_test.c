@@ -27,7 +27,6 @@
 
 #include "../alilodemo/audio_test.h"
 #include "../alilodemo/hal_alilo_rabbit.h"
-#include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/inc/http_file_download.h"
 #include "mico.h"
 #include "netclock_uart.h"
