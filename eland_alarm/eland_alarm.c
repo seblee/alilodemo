@@ -37,7 +37,7 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD);
 static void set_alarm_stream_pos(uint32_t pos);
 static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
-static void alarm_print(__elsv_alarm_data_t *alarm_data);
+
 /* Private functions ---------------------------------------------------------*/
 OSStatus Start_Alarm_service(void)
 {
@@ -56,7 +56,7 @@ OSStatus Start_Alarm_service(void)
     elsv_alarm_data_init_MCU(&elsv_alarm_data, (_alarm_mcu_data_t *)cache);
     elsv_alarm_data_sort_out(&elsv_alarm_data);
     alarm_list_add(&alarm_list, &elsv_alarm_data);
-    alarm_print(&elsv_alarm_data);
+
     alarm_stream.stream_id = audio_service_system_generate_stream_id();
     set_alarm_stream_pos(0);
 
@@ -244,23 +244,23 @@ void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_d
     elsv_alarm_data->alarm_data_for_eland.snooze_count = 0;
     elsv_alarm_data->alarm_data_for_eland.alarm_on_days_of_week = 0x7f;
 
-    alarm_log("alarm_id:%s", elsv_alarm_data->alarm_id);
-    alarm_log("alarm_color:%d", elsv_alarm_data->alarm_color);
-    alarm_log("alarm_time:%s", elsv_alarm_data->alarm_time);
-    alarm_log("alarm_off_dates:%s", elsv_alarm_data->alarm_off_dates);
-    alarm_log("snooze_enabled:%d", elsv_alarm_data->snooze_enabled);
-    alarm_log("snooze_count:%d", elsv_alarm_data->snooze_count);
-    alarm_log("snooze_interval_min:%d", elsv_alarm_data->snooze_interval_min);
-    alarm_log("alarm_pattern:%d", elsv_alarm_data->alarm_pattern);
-    alarm_log("alarm_sound_id:%ld", elsv_alarm_data->alarm_sound_id);
-    alarm_log("voice_alarm_id:%s", elsv_alarm_data->voice_alarm_id);
-    alarm_log("alarm_off_voice_alarm_id:%s", elsv_alarm_data->alarm_off_voice_alarm_id);
-    alarm_log("alarm_volume:%d", elsv_alarm_data->alarm_volume);
-    alarm_log("volume_stepup_enable:%d", elsv_alarm_data->volume_stepup_enable);
-    alarm_log("alarm_continue_min:%d", elsv_alarm_data->alarm_continue_min);
-    alarm_log("alarm_repeat:%d", elsv_alarm_data->alarm_repeat);
-    alarm_log("alarm_on_dates:%s", elsv_alarm_data->alarm_on_dates);
-    alarm_log("alarm_on_days_of_week:%s", elsv_alarm_data->alarm_on_days_of_week);
+    // alarm_log("alarm_id:%s", elsv_alarm_data->alarm_id);
+    // alarm_log("alarm_color:%d", elsv_alarm_data->alarm_color);
+    // alarm_log("alarm_time:%s", elsv_alarm_data->alarm_time);
+    // alarm_log("alarm_off_dates:%s", elsv_alarm_data->alarm_off_dates);
+    // alarm_log("snooze_enabled:%d", elsv_alarm_data->snooze_enabled);
+    // alarm_log("snooze_count:%d", elsv_alarm_data->snooze_count);
+    // alarm_log("snooze_interval_min:%d", elsv_alarm_data->snooze_interval_min);
+    // alarm_log("alarm_pattern:%d", elsv_alarm_data->alarm_pattern);
+    // alarm_log("alarm_sound_id:%ld", elsv_alarm_data->alarm_sound_id);
+    // alarm_log("voice_alarm_id:%s", elsv_alarm_data->voice_alarm_id);
+    // alarm_log("alarm_off_voice_alarm_id:%s", elsv_alarm_data->alarm_off_voice_alarm_id);
+    // alarm_log("alarm_volume:%d", elsv_alarm_data->alarm_volume);
+    // alarm_log("volume_stepup_enabled:%d", elsv_alarm_data->volume_stepup_enabled);
+    // alarm_log("alarm_continue_min:%d", elsv_alarm_data->alarm_continue_min);
+    // alarm_log("alarm_repeat:%d", elsv_alarm_data->alarm_repeat);
+    // alarm_log("alarm_on_dates:%s", elsv_alarm_data->alarm_on_dates);
+    // alarm_log("alarm_on_days_of_week:%s", elsv_alarm_data->alarm_on_days_of_week);
 }
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 {
@@ -292,15 +292,19 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     else
         return NULL;
 }
-void alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
+OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
+    OSStatus err = kNoErr;
     uint8_t i;
+    __elsv_alarm_data_t *p = AlarmList->alarm_lib;
     mico_rtos_lock_mutex(&alarm_list.AlarmListMutex);
     set_alarm_state(ALARM_ADD);
+
     if (AlarmList->alarm_number == 0)
     {
         alarm_log("alarm is first");
         AlarmList->alarm_lib = calloc(sizeof(__elsv_alarm_data_t), sizeof(uint8_t));
+        require_action((AlarmList->alarm_lib != NULL), exit, err = kNoMemoryErr);
         memcpy(AlarmList->alarm_lib, inData, sizeof(__elsv_alarm_data_t));
         AlarmList->list_refreshed = true;
         AlarmList->alarm_number++;
@@ -312,22 +316,32 @@ void alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
             if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
             {
                 alarm_log("alarm_id is repeated");
-                memcpy((AlarmList->alarm_lib + i), inData, sizeof(__elsv_alarm_data_t));
+                memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
                 AlarmList->list_refreshed = true;
                 goto exit;
             }
         }
         /**a new alarm**/
+        alarm_log("alarm_id is new");
         if (i == AlarmList->alarm_number)
         {
-            realloc(AlarmList->alarm_lib, (AlarmList->alarm_number + 1) * sizeof(__elsv_alarm_data_t));
-            memcpy((AlarmList->alarm_lib + i), inData, sizeof(__elsv_alarm_data_t));
-            AlarmList->list_refreshed = true;
-            AlarmList->alarm_number++;
+            AlarmList->alarm_lib = realloc(AlarmList->alarm_lib, (AlarmList->alarm_number + 1) * sizeof(__elsv_alarm_data_t));
+            if (AlarmList->alarm_lib)
+            {
+                memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
+                AlarmList->list_refreshed = true;
+                AlarmList->alarm_number++;
+            }
+            else
+            {
+                AlarmList->alarm_lib = p;
+                err = kNoMemoryErr;
+            }
         }
     }
 exit:
     mico_rtos_unlock_mutex(&alarm_list.AlarmListMutex);
+    return err;
 }
 void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
@@ -553,7 +567,7 @@ exit:
     free(alarm_w_r_queue);
 }
 
-static void alarm_print(__elsv_alarm_data_t *alarm_data)
+void alarm_print(__elsv_alarm_data_t *alarm_data)
 {
     alarm_log("alarm_list number:%d", alarm_list.alarm_number);
     alarm_log("\r\n__elsv_alarm_data_t");
@@ -569,7 +583,7 @@ static void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("voice_alarm_id:%s", alarm_data->voice_alarm_id);
     alarm_log("alarm_off_voice_alarm_id:%s", alarm_data->alarm_off_voice_alarm_id);
     alarm_log("alarm_volume:%d", alarm_data->alarm_volume);
-    alarm_log("volume_stepup_enable:%d", alarm_data->volume_stepup_enable);
+    alarm_log("volume_stepup_enabled:%d", alarm_data->volume_stepup_enabled);
     alarm_log("alarm_continue_min:%d", alarm_data->alarm_continue_min);
     alarm_log("alarm_repeat:%d", alarm_data->alarm_repeat);
     alarm_log("alarm_on_dates:%s", alarm_data->alarm_on_dates);

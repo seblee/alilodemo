@@ -43,8 +43,8 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
 {
     char alarm_id[ALARM_ID_LEN + 1];                       //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
     int8_t alarm_color;                                    //鬧鐘顏色
-    char alarm_time[ALARM_TIME_LEN];                       //闹钟播放时刻
-    char alarm_off_dates[ALARM_OFF_DATES_LEN];             //不播放闹钟的日期的排列 暫定一個
+    char alarm_time[ALARM_TIME_LEN + 1];                   //闹钟播放时刻
+    char alarm_off_dates[ALARM_OFF_DATES_LEN + 1];         //不播放闹钟的日期的排列 暫定一個
     int8_t snooze_enabled;                                 //继续响铃 有效标志  0：无效   1：有效
     int8_t snooze_count;                                   //继续响铃的次数
     int8_t snooze_interval_min;                            //继续响铃的间隔。単位「分」
@@ -53,7 +53,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     char voice_alarm_id[VOICE_ALARM_ID_LEN];               //语音闹钟的ID
     char alarm_off_voice_alarm_id[VOICE_ALARM_ID_LEN];     //Alarm off 後语音闹钟的ID
     int8_t alarm_volume;                                   //the volume of voice when alarming
-    int8_t volume_stepup_enable;                           //音量升高功能是否有效的标志
+    int8_t volume_stepup_enabled;                          //音量升高功能是否有效的标志
     int8_t alarm_continue_min;                             //鬧鐘自動停止的時間
     int8_t alarm_repeat;                                   //鬧鐘反復條件
     char alarm_on_dates[ALARM_OFF_DATES_LEN];              //鬧鐘日期排列
@@ -108,13 +108,14 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-
+extern _eland_alarm_list_t alarm_list;
 /* Private function prototypes -----------------------------------------------*/
-void alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
+OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
 OSStatus Start_Alarm_service(void);
 void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data);
+void alarm_print(__elsv_alarm_data_t *alarm_data);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

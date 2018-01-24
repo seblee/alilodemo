@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-12-27 17:28:11
+ * @Last Modified time:2018-01-19 14:32:54
  * @brief   :
  ****************************************************************************
 **/
@@ -99,12 +99,15 @@ OSStatus netclock_desInit(void)
     netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S));
     require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
 
+    err = mico_rtos_init_mutex(&netclock_des_g->des_mutex);
+    require_noerr(err, exit);
+    mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
     //数据结构体初始化
     err = CheckNetclockDESSetting();
     require_noerr(err, exit);
 
     Eland_log("local firmware version:%s", Eland_Firmware_Version);
-
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     return kNoErr;
 exit:
     if (device_state != NULL)
@@ -117,6 +120,7 @@ exit:
         memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
     }
     Eland_log("netclock_des_g init err");
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     return kGeneralErr;
 }
 
@@ -200,11 +204,11 @@ start_Check:
         Eland_log("device not set");
         memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
         device_state->eland_id = 5;
-        sprintf(device_state->serial_number, "ALML7%06ld", device_state->eland_id);
+        sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
         device_state->IsAlreadySet = true;
 
         Eland_log("eland_id %ld", device_state->eland_id);
-        Eland_log("eland_id %s", device_state->serial_number);
+        Eland_log("serial_number %s", device_state->serial_number);
         goto start_Check;
     }
 
@@ -215,6 +219,7 @@ start_Check:
     wlan_get_mac_address(mac);                                                                        //MAC地址
     memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
     sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); //MAC地址
+
     Eland_log("device_mac:%s", netclock_des_g->mac_address);
 
     return kNoErr;
@@ -351,6 +356,7 @@ OSStatus ProcessPostJson(char *InputJson)
 {
     bool needupdateflash = false;
     json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL;
+    mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
     if (*InputJson != '{')
     {
         Eland_log("error:received err json format data");
@@ -437,6 +443,16 @@ OSStatus ProcessPostJson(char *InputJson)
             memset(netclock_des_g->default_gateway, 0, ip_address_Len);
             sprintf(netclock_des_g->default_gateway, "%s", json_object_get_string(val));
         }
+        else if (!strcmp(key, "night_mode_end_time"))
+        {
+            memset(netclock_des_g->night_mode_end_time, 0, sizeof(netclock_des_g->night_mode_end_time));
+            sprintf(netclock_des_g->night_mode_end_time, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "night_mode_begin_time"))
+        {
+            memset(netclock_des_g->night_mode_begin_time, 0, sizeof(netclock_des_g->night_mode_begin_time));
+            sprintf(netclock_des_g->night_mode_begin_time, "%s", json_object_get_string(val));
+        }
     }
 
     if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
@@ -461,8 +477,10 @@ OSStatus ProcessPostJson(char *InputJson)
         mico_system_context_update(mico_system_context_get());
 
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     return kNoErr;
 exit:
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     free_json_obj(&ReceivedJsonCache);
     return kGeneralErr;
 }
@@ -822,6 +840,7 @@ OSStatus Eland_Rtc_Init(void)
 {
     OSStatus status = kNoErr;
     mico_rtc_time_t cur_time = {0};
+    iso8601_time_t iso8601_time;
     cur_time.year = 18; //设置时间
     cur_time.month = 1;
     cur_time.date = 18;
@@ -830,5 +849,8 @@ OSStatus Eland_Rtc_Init(void)
     cur_time.min = 29;
     cur_time.sec = 50;
     status = MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
+
+    mico_time_get_iso8601_time(&iso8601_time);
+    Eland_log("Current time: %.26s", (char *)&iso8601_time);
     return status;
 }

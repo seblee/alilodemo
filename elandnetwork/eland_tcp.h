@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-11-24 15:56:30
+ * @Last Modified time:2018-01-19 14:51:21
  * @brief   :
  ****************************************************************************
 **/
@@ -360,6 +360,7 @@ TCP_Error_t TCP_tls_destroy(Network_t *pNetwork);
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork);
 OSStatus TCP_Service_Start(void);
 ClientState_t eland_get_client_state(_Client_t *pClient);
+mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

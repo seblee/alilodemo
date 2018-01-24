@@ -156,6 +156,7 @@ static int web_send_Post_Request(httpd_request_t *req)
     buf = malloc(buf_size + 1);
 
     memset(buf, 0, buf_size + 1);
+    app_httpd_log("post");
     /* read and parse header */
     ret = httpd_get_data(req, buf, buf_size);
     if (strncasecmp(HTTP_CONTENT_JSON_STR, req->content_type, strlen(HTTP_CONTENT_JSON_STR)) == 0) //json data

@@ -101,7 +101,12 @@ void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
     WifiSet_log("Wi-Fi STATION connecte failed");
     my_message.value = Wify_Station_Connect_Failed;
     if (wifistate_queue != NULL)
-        mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
+    {
+        if (!mico_rtos_is_queue_empty(&wifistate_queue))
+            mico_rtos_pop_from_queue(&wifistate_queue, &my_message, 20);
+        my_message.value = Wify_Station_Connect_Failed;
+        mico_rtos_push_to_queue(&wifistate_queue, &my_message, 20);
+    }
 }
 
 void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
@@ -113,6 +118,7 @@ void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
     }
     else if (wifi_Mode == Soft_AP)
     {
+        Eland_httpd_start();
         //Wifi_SoftAP_fun(); //
         mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
                                 Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
@@ -124,7 +130,7 @@ void Wifi_station_threed(mico_thread_arg_t arg)
     network_InitTypeDef_adv_st wNetConfigAdv;
     mico_rtos_lock_mutex(&WifiConfigMutex);
 
-    micoWlanSuspendStation();
+    micoWlanSuspend();
     /* Initialize wlan parameters */
     memset(&wNetConfigAdv, 0x0, sizeof(wNetConfigAdv));
     strcpy((char *)wNetConfigAdv.ap_info.ssid, netclock_des_g->Wifissid); /* wlan ssid string */

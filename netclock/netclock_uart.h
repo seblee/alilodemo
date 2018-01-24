@@ -73,11 +73,39 @@ typedef enum {
     REFRESH_ALARM,
     REFRESH_MAX,
 } MCU_Refresh_type_t;
+typedef enum {
+    LEVEL0 = (uint8_t)0x00,
+    LEVEL1 = (uint8_t)0x08,
+    LEVEL2 = (uint8_t)0x0C,
+    LEVEL3 = (uint8_t)0x0E,
+    LEVEL4 = (uint8_t)0x0F,
+    LEVELNUM = (uint8_t)0xFF,
+} LCD_Wifi_Rssi_t;
 
+typedef enum _eland_mode {
+    ELAND_MODE_NONE,
+    ELAND_CLOCK_MON,
+    ELAND_CLOCK_ALARM,
+    ELAND_NC,
+    ELAND_NA,
+    ELAND_MODE_MAX,
+} _ELAND_MODE_t;
+
+typedef struct eland_mode_state
+{
+    _ELAND_MODE_t eland_mode;
+    mico_mutex_t state_mutex;
+} __ELAND_MODE_STATE_t;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
 #define USART_RESEND_MAX_TIMES 5
+
+#define RSSI_STATE_STAGE0 (int)(-85)
+#define RSSI_STATE_STAGE1 (int)(-70)
+#define RSSI_STATE_STAGE2 (int)(-60)
+#define RSSI_STATE_STAGE3 (int)(-50)
+#define RSSI_STATE_STAGE4 (int)(-40)
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/

@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-12-27 17:45:23
+ * @Last Modified time:2018-01-19 14:51:07
  * @brief   :
  ****************************************************************************
 **/
@@ -19,6 +19,7 @@
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
 #include <time.h>
+#include "eland_alarm.h"
 //#include "timer_platform.h"
 /* Private typedef -----------------------------------------------------------*/
 
@@ -76,7 +77,8 @@ static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer);
 static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expectedCurrentState, ClientState_t newState);
 static TCP_Error_t TCP_Operate(const char *buff);
 static TCP_Error_t TCP_Operate_HC01(char *buf);
-static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
+static TCP_Error_t TCP_Operate_DV01(char *buf);
+static TCP_Error_t TCP_Operate_AL01(char *buf);
 static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t *value);
 static void eland_set_time(void);
 /* Private functions ---------------------------------------------------------*/
@@ -287,7 +289,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
     fd_set readfds;
     _time_t time, current_temp, timeforward = {0, 0};
     size_t len = sizeof(_TELEGRAM_t);
-
+startread:
     FD_ZERO(&readfds);
     FD_SET(fd, &readfds);
 
@@ -309,7 +311,7 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
             else
             {
                 ret = select(fd + 1, &readfds, NULL, NULL, &time);
-                elan_tcp_log("select ret %d", ret);
+                elan_tcp_log("select ret %d fd %d", ret, fd);
                 if (ret <= 0)
                 {
                     break;
@@ -324,6 +326,8 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
         }
         if (ret >= 0)
         {
+            if (ret == 0)
+                goto startread;
             if (rxlen == 0) //set len at first time
             {
                 memcpy(&telegram, pMsg, sizeof(_TELEGRAM_t));
@@ -375,7 +379,7 @@ TCP_Error_t TCP_disconnect(Network_t *pNetwork)
         close(pNetwork->tlsDataParams.server_fd);
         pNetwork->tlsDataParams.server_fd = -1;
     }
-    return kNoErr;
+    return TCP_SUCCESS;
 }
 TCP_Error_t TCP_tls_destroy(Network_t *pNetwork)
 {
@@ -439,8 +443,9 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     // ServerParams_t *serverPara = (ServerParams_t *)arg;
     ServerParams_t serverPara;
     _time_t timer;
-    memset(tcp_write_flag, 1, 5);
+    mico_rtc_time_t cur_time = {0};
 
+    memset(tcp_write_flag, 1, 5);
     if ((netclock_des_g == NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
     {
         serverPara.pDestinationURL = netclock_des_g->tcpIP_host;
@@ -463,19 +468,29 @@ RECONN:
     rc = eland_tcp_connect(&Eland_Client, NULL);
     if (TCP_SUCCESS != rc)
     {
-        mico_thread_sleep(1);
         elan_tcp_log("Server Connection Error,Delay 1s then retry");
-        goto RECONN;
+        mico_thread_sleep(3);
+        goto exit;
     }
 cycle_loop:
     if (tcp_write_flag[0] > 0)
     {
         tcp_write_flag[0]--;
+        elan_tcp_log("eland_IF_connection_request");
         rc = eland_IF_connection_request(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
             elan_tcp_log("Connection Error rc = %d", rc);
+            if (rc == NETWORK_SSL_READ_ERROR)
+            {
+                goto exit;
+            }
+            else if (rc == NETWORK_SSL_NOTHING_TO_READ)
+            {
+                tcp_write_flag[0]++;
+                goto cycle_loop;
+            }
         }
     }
     if (tcp_write_flag[1] > 0)
@@ -486,6 +501,11 @@ cycle_loop:
         {
             mico_thread_sleep(1);
             elan_tcp_log("Connection Error rc = %d", rc);
+            if (rc == NETWORK_SSL_READ_ERROR)
+            {
+                tcp_write_flag[1]++;
+                goto exit;
+            }
         }
     }
     if (tcp_write_flag[2] > 0)
@@ -496,6 +516,11 @@ cycle_loop:
         {
             mico_thread_sleep(1);
             elan_tcp_log("Connection Error rc = %d", rc);
+            if (rc == NETWORK_SSL_READ_ERROR)
+            {
+                tcp_write_flag[2]++;
+                goto exit;
+            }
         }
     }
     if (tcp_write_flag[3] > 0)
@@ -506,6 +531,11 @@ cycle_loop:
         {
             mico_thread_sleep(1);
             elan_tcp_log("Connection Error rc = %d", rc);
+            if (rc == NETWORK_SSL_READ_ERROR)
+            {
+                tcp_write_flag[3]++;
+                goto exit;
+            }
         }
     }
     if (tcp_HC_flag++ > 5)
@@ -518,8 +548,8 @@ cycle_loop:
             elan_tcp_log("Connection Error rc = %d", rc);
         }
     }
-    timer.tv_sec = 0;
-    timer.tv_usec = 10;
+    timer.tv_sec = 1;
+    timer.tv_usec = 1000;
     rc = eland_IF_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
@@ -528,12 +558,15 @@ cycle_loop:
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit; //reconnect
     }
+    MicoRtcGetTime(&cur_time);
     goto cycle_loop;
 
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
     elan_tcp_log("TCP/IP out");
+    tcp_write_flag[0]++;
+    tcp_write_flag[1]++;
     goto RECONN;
     mico_rtos_delete_thread(NULL);
 }
@@ -586,7 +619,7 @@ static TCP_Error_t eland_IF_connection_request(_Client_t *pClient)
     rc = eland_IF_receive_packet(pClient, &timer);
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("connection_request:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
+    elan_tcp_log("connection_request:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -614,7 +647,7 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_elandinfo:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
+    elan_tcp_log("update_elandinfo:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[DV01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -642,7 +675,7 @@ static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_alarm:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
+    elan_tcp_log("update_alarm:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -670,7 +703,7 @@ static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_holiday:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
+    elan_tcp_log("update_holiday:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HD01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -701,8 +734,7 @@ static TCP_Error_t eland_IF_health_check(_Client_t *pClient)
     {
         eland_set_time();
     }
-
-    elan_tcp_log("health_check:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
+    elan_tcp_log("health_check:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HC01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -733,10 +765,11 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
 {
     _TELEGRAM_t *telegram = (_TELEGRAM_t *)pMsg;
     char *telegram_data = NULL;
+    static uint16_t telegram_squence_num = 0;
     memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
 
     memcpy(telegram->head, TELEGRAMHEADER, 2);
-    telegram->squence_num++;
+    telegram->squence_num = telegram_squence_num++;
     memcpy(telegram->command, CommandTable[cmd_type], 4);
     telegram->reserved = 0;
     telegram->lenth = 0;
@@ -745,7 +778,6 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     {
         telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
         InitUpLoadData(telegram_data);
-        elan_tcp_log("%s", telegram_data);
         telegram->lenth = strlen(telegram_data);
     }
 }
@@ -837,6 +869,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case DV00: //04 eland info request
         break;
     case DV01: //05 eland info response
+        rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
         break;
     case DV02: //06 eland info change Notification
         break;
@@ -845,6 +878,9 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case AL00: //08 alarm info request
         break;
     case AL01: //09 alarm info response
+        elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        rc = TCP_Operate_AL01((char *)(buff + sizeof(_TELEGRAM_t)));
+        elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case AL02: //10 alarm info add Notification
         break;
@@ -915,7 +951,252 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
     free_json_obj(&ReceivedJsonCache);
     return TCP_SUCCESS;
 }
-static mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
+static TCP_Error_t TCP_Operate_DV01(char *buf)
+{
+    TCP_Error_t rc = TCP_SUCCESS;
+    json_object *ReceivedJsonCache = NULL,
+                *device_JSON = NULL;
+    ELAND_DES_S des_data_cache;
+    memset(&des_data_cache, 0, sizeof(ELAND_DES_S));
+    memcpy(&des_data_cache, netclock_des_g, sizeof(ELAND_DES_S));
+
+    if (*buf != '{')
+    {
+        elan_tcp_log("error:received err json format data");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    ReceivedJsonCache = json_tokener_parse((const char *)(buf));
+    if (ReceivedJsonCache == NULL)
+    {
+        elan_tcp_log("json_tokener_parse error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    device_JSON = json_object_object_get(ReceivedJsonCache, "device");
+    if ((device_JSON == NULL) || ((json_object_get_object(device_JSON)->head) == NULL))
+    {
+        elan_tcp_log("get device_JSON error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+
+    json_object_object_foreach(device_JSON, key, val)
+    {
+        if (!strcmp(key, "eland_id"))
+        {
+            if (des_data_cache.eland_id != json_object_get_int(val))
+            {
+                elan_tcp_log("get eland_id error");
+                rc = JSON_PARSE_ERROR;
+                goto exit;
+            }
+        }
+        else if (!strcmp(key, "user_id"))
+        {
+            memset(des_data_cache.user_id, 0, sizeof(des_data_cache.user_id));
+            sprintf(des_data_cache.user_id, "%s", json_object_get_string(val));
+            if (!strncmp(des_data_cache.user_id, "\0", 1))
+            {
+                elan_tcp_log("user_id  = %s", des_data_cache.user_id);
+                goto exit;
+            }
+        }
+        else if (!strcmp(key, "eland_name"))
+        {
+            memset(des_data_cache.eland_name, 0, sizeof(des_data_cache.eland_name));
+            sprintf(des_data_cache.eland_name, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "timezone_offset_sec"))
+        {
+            des_data_cache.timezone_offset_sec = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "serial_number"))
+        {
+            if (strcmp(des_data_cache.serial_number, json_object_get_string(val)))
+            {
+                elan_tcp_log("serial des:%s", des_data_cache.serial_number);
+                elan_tcp_log("serial elsv:%s", json_object_get_string(val));
+                rc = JSON_PARSE_ERROR;
+                goto exit;
+            }
+        }
+        else if (!strcmp(key, "dhcp_enabled"))
+        {
+            des_data_cache.dhcp_enabled = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "time_display_format"))
+        {
+            des_data_cache.time_display_format = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "brightness_normal"))
+        {
+            des_data_cache.brightness_normal = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "brightness_night"))
+        {
+            des_data_cache.brightness_night = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "night_mode_enabled"))
+        {
+            des_data_cache.night_mode_enabled = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "night_mode_begin_time"))
+        {
+            //des_data_cache.night_mode_begin_time = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "night_mode_end_time"))
+        {
+            //des_data_cache.night_mode_end_time = json_object_get_int(val);
+        }
+    }
+    free_json_obj(&ReceivedJsonCache);
+    mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
+    memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
+exit:
+    free_json_obj(&ReceivedJsonCache);
+    return rc;
+}
+
+static TCP_Error_t TCP_Operate_AL01(char *buf)
+{
+    json_object *ReceivedJsonCache = NULL, *alarm_array = NULL, *alarm = NULL;
+    TCP_Error_t rc = TCP_SUCCESS;
+    uint8_t list_len = 0, i;
+    __elsv_alarm_data_t alarm_data_cache;
+    if (*buf != '{')
+    {
+        elan_tcp_log("error:received err json format data");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    ReceivedJsonCache = json_tokener_parse((const char *)(buf));
+    if (ReceivedJsonCache == NULL)
+    {
+        elan_tcp_log("json_tokener_parse error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    alarm_array = json_object_object_get(ReceivedJsonCache, "alarms");
+    if ((alarm_array == NULL) || ((json_object_get_object(alarm_array)->head) == NULL))
+    {
+        elan_tcp_log("get alarm_array error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    list_len = json_object_array_length(alarm_array);
+    elan_tcp_log("alarm_array list_len:%d", list_len);
+    for (i = 0; i < list_len; i++)
+    {
+        alarm = json_object_array_get_idx(alarm_array, i);
+        memset(&alarm_data_cache, 0, sizeof(__elsv_alarm_data_t));
+        json_object_object_foreach(alarm, key, val)
+        {
+            if (!strcmp(key, "alarm_id"))
+            {
+                sprintf(alarm_data_cache.alarm_id, "%s", json_object_get_string(val));
+                if (!strncmp(alarm_data_cache.alarm_id, "\0", 1))
+                {
+                    elan_tcp_log("alarm_id:%s", alarm_data_cache.alarm_id);
+                    continue;
+                }
+            }
+            if (!strcmp(key, "alarm_color"))
+            {
+                alarm_data_cache.alarm_color = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "alarm_time"))
+            {
+                sprintf(alarm_data_cache.alarm_time, "%s", json_object_get_string(val));
+                if (!strncmp(alarm_data_cache.alarm_time, "\0", 1))
+                {
+                    elan_tcp_log("alarm_time = %s", alarm_data_cache.alarm_time);
+                    continue;
+                }
+            }
+            else if (!strcmp(key, "alarm_off_dates"))
+            {
+                memcpy(alarm_data_cache.alarm_off_dates, json_object_get_string(val), sizeof(alarm_data_cache.alarm_off_dates));
+            }
+            else if (!strcmp(key, "snooze_enabled"))
+            {
+                alarm_data_cache.snooze_enabled = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "snooze_count"))
+            {
+                alarm_data_cache.snooze_count = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "snooze_interval_min"))
+            {
+                alarm_data_cache.snooze_interval_min = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "alarm_pattern"))
+            {
+                alarm_data_cache.alarm_pattern = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "alarm_sound_id"))
+            {
+                alarm_data_cache.alarm_sound_id = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "voice_alarm_id"))
+            {
+                sprintf(alarm_data_cache.voice_alarm_id, "%s", json_object_get_string(val));
+                if (!strncmp(alarm_data_cache.voice_alarm_id, "\0", 1))
+                {
+                    elan_tcp_log("voice_alarm_id = %s", alarm_data_cache.voice_alarm_id);
+                }
+            }
+            else if (!strcmp(key, "alarm_off_voice_alarm_id"))
+            {
+                sprintf(alarm_data_cache.alarm_off_voice_alarm_id, "%s", json_object_get_string(val));
+                if (!strncmp(alarm_data_cache.alarm_off_voice_alarm_id, "\0", 1))
+                {
+                    elan_tcp_log("alarm_off_voice_alarm_id = %s", alarm_data_cache.alarm_off_voice_alarm_id);
+                }
+            }
+            else if (!strcmp(key, "alarm_volume"))
+            {
+                alarm_data_cache.alarm_volume = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "volume_stepup_enabled"))
+            {
+                alarm_data_cache.volume_stepup_enabled = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "alarm_continue_min"))
+            {
+                alarm_data_cache.alarm_continue_min = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "alarm_repeat"))
+            {
+                alarm_data_cache.alarm_repeat = json_object_get_int(val);
+            }
+            else if (!strcmp(key, "alarm_on_dates"))
+            {
+                sprintf(alarm_data_cache.alarm_on_dates, "%s", json_object_get_string(val));
+                if (!strncmp(alarm_data_cache.alarm_on_dates, "\0", 1))
+                {
+                    elan_tcp_log("alarm_on_dates = %s", alarm_data_cache.alarm_on_dates);
+                }
+            }
+            else if (!strcmp(key, "alarm_on_days_of_week"))
+            {
+                sprintf(alarm_data_cache.alarm_on_days_of_week, "%s", json_object_get_string(val));
+                if (!strncmp(alarm_data_cache.alarm_on_days_of_week, "\0", 1))
+                {
+                    elan_tcp_log("alarm_on_days_of_week = %s", alarm_data_cache.alarm_on_days_of_week);
+                }
+            }
+        }
+        elsv_alarm_data_sort_out(&alarm_data_cache);
+        alarm_list_add(&alarm_list, &alarm_data_cache);
+        //alarm_print(&alarm_data_cache);
+    }
+exit:
+    free_json_obj(&ReceivedJsonCache);
+    return rc;
+}
+mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
 {
     int16_t iYear, iMon, iDay, iHour, iMin, iSec; //, iMsec;
     uint8_t DayOfMon[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};

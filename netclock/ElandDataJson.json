@@ -28,14 +28,14 @@
 //ota_op start
 //2017年12月18日17: 11: 34
 {
-    "ssid": "TP-LINK_4850",
-    "password": "cq68794850",
+    "ssid": "TP-LINK_eland",
+    "password": "eland1234",
     "device": {
         "eland_id": 5,
-        "user_id": "20dfd19c-61b0-4dc9-ab1a-d451027c4ede",
-        "eland_name": "test",
+        "user_id": "e5c18be0-82f2-44cb-abd5-2550323decf1",
+        "eland_name": "seblee_test",
         "timezone_offset_sec": 32400,
-        "serial_number": "ALML7000005",
+        "serial_number": "ALMA0000005",
         "firmware_version": "01.00",
         "mac_address": "B0:F8:93:15:25:B2",
         "dhcp_enabled": 1,
@@ -46,10 +46,21 @@
         "brightness_normal": 80,
         "brightness_night": 20,
         "night_mode_enabled": 0,
-        "night_mode_begin_time": 22,
-        "night_mode_end_time": 6
+        "night_mode_begin_time": "22:00:00",
+        "night_mode_end_time": "06:00:00"
     }
 }
 Host: 192.168.0.1
-Content-Type: application/json
+Content-Type: application/json; charset=utf-8
 Content-Length: 730
+
+{
+    "user_id": [
+        "20dfd19c-61b0-4dc9-ab1a-d451027c4ede"
+    ],
+    "alarm_ids": [
+        "6a388330-fbe1-4691-8aaf-415e3dde23a6",
+        "bb4856bc-615b-4aa8-9463-5ce05c21deb5",
+        "e5c18be0-82f2-44cb-abd5-2550323decf1"
+    ]
+}

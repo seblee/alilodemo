@@ -67,6 +67,8 @@ typedef struct _ELAND_DES_S //设备状态结构
 
     char tcpIP_host[ip_address_Len];
     uint16_t tcpIP_port;
+
+    mico_mutex_t des_mutex;
 } ELAND_DES_S;
 
 typedef struct _ELAND_DEVICE //设备状态结构

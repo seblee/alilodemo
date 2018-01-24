@@ -75,7 +75,7 @@ int application_start(void)
     //start_uart_service();
 
     /****start softAP event wait******/
-    // Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    Start_wifi_Station_SoftSP_Thread(Soft_AP);
     /*start init eland SPI*/
     err = start_eland_flash_service();
     require_noerr(err, exit);
