@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-19 14:32:54
+ * @Last Modified time:2018-01-27 17:21:49
  * @brief   :
  ****************************************************************************
 **/
@@ -175,7 +175,7 @@ start_Check:
     Eland_log("CheckNetclockDESSetting");
     if (device_state->IsAlreadySet == true) //have already set factory info
     {
-        if ((device_state->eland_id == 0) || (device_state->eland_id == 0xffffffff))
+        if ((device_state->eland_id == 0) || (device_state->eland_id > 999999))
         {
             Eland_log("eland_id wrong");
             err = Netclock_des_recovery();
@@ -189,14 +189,21 @@ start_Check:
 
         if (device_state->IsActivate == true) //设备已激活
         {
+            Eland_log("IsActivate");
             if (strlen(device_state->user_id) == 0)
             {
                 device_state->IsActivate = false;
-                {
-                    Eland_log("serial_number wrong");
-                    goto exit;
-                }
+                Eland_log("user_id wrong");
+                goto exit;
             }
+        }
+        else
+        {
+            mico_Context_t *context = NULL;
+            Eland_log("Is not Activate chear the wifi para");
+            context = mico_system_context_get();
+            context->micoSystemConfig.configured = unConfigured;
+            mico_system_context_update(context);
         }
     }
     else
@@ -211,17 +218,30 @@ start_Check:
         Eland_log("serial_number %s", device_state->serial_number);
         goto start_Check;
     }
-
+    /***initialize by device flash***/
     netclock_des_g->eland_id = device_state->eland_id; // des_g_Temp.eland_id; //Eland唯一识别的ID
     memcpy(netclock_des_g->user_id, device_state->user_id, user_id_len);
     memcpy(netclock_des_g->serial_number, device_state->serial_number, serial_number_len);
+    /***initialization to default value***/
+    netclock_des_g->timezone_offset_sec = 32400;
+    /***initialize by device flash***/
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
     wlan_get_mac_address(mac);                                                                        //MAC地址
     memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
-    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); //MAC地址
-
-    Eland_log("device_mac:%s", netclock_des_g->mac_address);
-
+    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    netclock_des_g->dhcp_enabled = device_state->dhcp_enabled;
+    memcpy(netclock_des_g->ip_address, device_state->ip_address, ip_address_Len);
+    memcpy(netclock_des_g->subnet_mask, device_state->subnet_mask, ip_address_Len);
+    memcpy(netclock_des_g->default_gateway, device_state->default_gateway, ip_address_Len);
+    memcpy(netclock_des_g->dnsServer, device_state->dnsServer, ip_address_Len);
+    /***initialization to default value***/
+    netclock_des_g->time_display_format = 1;
+    netclock_des_g->brightness_normal = 80;
+    netclock_des_g->brightness_night = 20;
+    netclock_des_g->night_mode_enabled = 0;
+    strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
+    strncpy(netclock_des_g->night_mode_end_time, "06:00:00", Time_Format_Len);
+    netclock_des_g->health_check_moment = (netclock_des_g->eland_id) % 100 % 60;
     return kNoErr;
 exit:
     err = Netclock_des_recovery();
@@ -230,14 +250,23 @@ exit:
 }
 OSStatus Netclock_des_recovery(void)
 {
-    ELAND_DES_S des_g_Temp;
-
-    memcpy(&des_g_Temp, netclock_des_g, sizeof(ELAND_DES_S));
-    memset(netclock_des_g, 0, sizeof(ELAND_DES_S)); //全局变量清空
-
+    _ELAND_DEVICE_t device_temp;
+    mico_Context_t *context = NULL;
+    /***clear netclock_des_g***/
+    memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
+    /***backup device data***/
+    memcpy(&device_temp, device_state, sizeof(_ELAND_DEVICE_t));
+    /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
-    mico_system_context_update(mico_system_context_get());
+    device_state->IsAlreadySet = device_temp.IsAlreadySet;
+    device_state->eland_id = device_temp.eland_id;
+    memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
+    context = mico_system_context_get();
+    /***clear wifi para***/
+    if (context->micoSystemConfig.configured != unConfigured)
+        context->micoSystemConfig.configured = unConfigured;
+    mico_system_context_update(context);
     return kNoErr;
 }
 
@@ -426,7 +455,11 @@ OSStatus ProcessPostJson(char *InputJson)
         else if (!strcmp(key, "dhcp_enabled"))
         {
             netclock_des_g->dhcp_enabled = json_object_get_int(val);
-            device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
+            if (device_state->dhcp_enabled != netclock_des_g->dhcp_enabled)
+            {
+                device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
+                needupdateflash = true;
+            }
         }
         else if (!strcmp(key, "ip_address"))
         {
@@ -455,13 +488,13 @@ OSStatus ProcessPostJson(char *InputJson)
         }
     }
 
-    if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
-    {
-        needupdateflash = true;
-        memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
-    }
     if (device_state->dhcp_enabled == 0)
     {
+        if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
+        {
+            needupdateflash = true;
+            memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
+        }
         if ((strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0) ||
             (strncmp(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len) != 0) ||
             (strncmp(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len) != 0) ||
@@ -473,6 +506,17 @@ OSStatus ProcessPostJson(char *InputJson)
             memcpy(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len);
         }
     }
+    if (strncmp(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len) != 0)
+    {
+        needupdateflash = true;
+        memcpy(device_state->eland_name, netclock_des_g->eland_name, eland_name_Len);
+    }
+    if (strncmp(netclock_des_g->user_id, device_state->user_id, user_id_len) != 0)
+    {
+        needupdateflash = true;
+        memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
+    }
+
     if (needupdateflash == true)
         mico_system_context_update(mico_system_context_get());
 

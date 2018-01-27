@@ -460,7 +460,7 @@ HTTP_SSL_START:
                                  ELAND_HTTP_KEEP_COUNT);     // 尝试探测的次数.如果第1次探测包就收到响应了,则后2次的不再发
     if (ret < 0)
     {
-        client_log("user_set_tcp_keepalive() error");
+        client_log("user_set_tcp_keepalive() error ret:%d", ret);
         goto exit;
     }
 

@@ -36,7 +36,8 @@ $(NAME)_SOURCES := mico_main.c \
 				   elandnetwork/eland_tcp.c \
 				   elandsound/eland_sound.c \
 				   eland_mcu_ota/eland_mcu_ota.c \
-				   eland_alarm/eland_alarm.c 
+				   eland_alarm/eland_alarm.c \
+				   eland_alarm/eland_control.c 
 				   
 $(NAME)_COMPONENTS := utilities/url \
 					  utilities \

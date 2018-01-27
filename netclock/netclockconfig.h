@@ -13,7 +13,9 @@
 
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
-#define DEVICE_MAC_LEN (17)                       //MAC地址长度
+#define Timezone_offset_elsv ((int32_t)32400)     //elsv time zone
+
+#define DEVICE_MAC_LEN (17) //MAC地址长度
 
 #define ELAND_AP_SSID ("Eland")   //配置模式ssid
 #define ELAND_AP_KEY ("12345678") //配置模式key
@@ -64,6 +66,7 @@ typedef struct _ELAND_DES_S //设备状态结构
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
     char Wifissid[ElandSsid_Len];                //wifi 賬號
     char WifiKey[ElandKey_Len];                  //wifi 密碼
+    uint8_t health_check_moment;
 
     char tcpIP_host[ip_address_Len];
     uint16_t tcpIP_port;
@@ -78,6 +81,7 @@ typedef struct _ELAND_DEVICE //设备状态结构
 
     uint32_t eland_id;                     //Eland唯一识别的ID
     char serial_number[serial_number_len]; //Eland的串口番号。
+    char eland_name[eland_name_Len];       //Eland名称，用户输入
 
     /*APP/tcpIP通信時獲取*/
     char user_id[user_id_len];            //用户唯一识别ID

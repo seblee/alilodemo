@@ -41,7 +41,7 @@
 #include "netclock_uart.h"
 #include "netclock_ota.h"
 
-//#define CONFIG_APPHTTPD_DEBUG
+#define CONFIG_APPHTTPD_DEBUG
 #ifdef CONFIG_APPHTTPD_DEBUG
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
 #else
@@ -93,20 +93,8 @@ static void eland_check_ssid(void)
         }
 
         context->micoSystemConfig.configured = allConfigured;
-        //mico_system_context_update(context);
+        mico_system_context_update(context);
 
-        if (strncmp(ota_url, "\0", 1) != 0)
-        {
-            if (strncmp(ota_md5, "\0", 1) != 0)
-            {
-                start_ota_thread();
-            }
-            else
-            {
-                memset(ota_url, 0, sizeof(ota_url));
-                memset(ota_md5, 0, sizeof(ota_md5));
-            }
-        }
         //app_httpd_log("system restart");
         //mico_system_power_perform(context, eState_Software_Reset);
     }
@@ -212,6 +200,8 @@ static int web_send_Post_Request(httpd_request_t *req)
     }
     else
     {
+        app_httpd_log("Content-Type: %s", req->content_type);
+        app_httpd_log("data: %s", buf);
         err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
         require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
@@ -278,7 +268,7 @@ int Eland_httpd_start(void)
         app_http_register_handlers();
         is_handlers_registered = true;
     }
-    SendElandStateQueue(HttpServerStatus);
+
 exit:
     return err;
 }

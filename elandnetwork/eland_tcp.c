@@ -61,10 +61,8 @@ mico_utc_time_ms_t eland_send_time;
 mico_utc_time_ms_t elsv_receive_time;
 mico_utc_time_ms_t elsv_send_time;
 mico_utc_time_ms_t eland_receive_time;
-
 /* Private function prototypes -----------------------------------------------*/
-static void
-TCP_thread_main(mico_thread_arg_t arg);
+static void TCP_thread_main(mico_thread_arg_t arg);
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams);
 static TCP_Error_t eland_IF_connection_request(_Client_t *pClient); /*need back function*/
 static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient);   /*need back function*/
@@ -143,6 +141,7 @@ static void TCP_tls_set_connect_params(Network_t *pNetwork,
 
 TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
 {
+    TCP_Error_t rc = TCP_SUCCESS;
     OSStatus err = kGeneralErr;
     char ipstr[16] = {0};
     struct sockaddr_in addr;
@@ -151,9 +150,11 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
     int errno;
     int root_ca_len = 0;
     if (pNetwork == NULL)
-        return NULL_VALUE_ERROR;
-
-    if (Params != NULL)
+    {
+        rc = NULL_VALUE_ERROR;
+        goto exit;
+    }
+    if (Params)
     {
         TCP_tls_set_connect_params(pNetwork,
                                    Params->pDestinationURL,
@@ -165,28 +166,32 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
     if (err != kNoErr)
     {
         elan_tcp_log("ERROR: Unable to resolute the host address.");
-        return TCP_CONNECTION_ERROR;
+        rc = TCP_CONNECTION_ERROR;
+        goto exit;
     }
     elan_tcp_log("host:%s, ip:%s", pNetwork->tlsConnectParams.pDestinationURL, ipstr);
 
     socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    ret = user_set_tcp_keepalive(socket_fd, 5000, 1000, 10, 5, 3);
-    if (ret < 0)
-    {
-        elan_tcp_log("ERROR: Unable to resolute the tcp connect");
-        return TCP_SETUP_ERROR;
-    }
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(ipstr);
     addr.sin_port = htons(pNetwork->tlsConnectParams.DestinationPort); //
+
+    ret = user_set_tcp_keepalive(socket_fd, 3000, 3000, 6, 3, 3);
+    if (ret < 0)
+    {
+        elan_tcp_log("ERROR: Unable to resolute the tcp connect");
+        rc = TCP_SETUP_ERROR;
+        goto exit;
+    }
 
     elan_tcp_log("start connect");
     err = connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr));
     if (err != kNoErr)
     {
         elan_tcp_log("ERROR: Unable to resolute the tcp connect");
-        return TCP_CONNECTION_ERROR;
+        rc = TCP_CONNECTION_ERROR;
+        goto exit;
     }
 
     if (pNetwork->tlsConnectParams.isUseSSL == true)
@@ -222,12 +227,19 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
             close(socket_fd);
             pNetwork->tlsDataParams.server_fd = -1;
             err = kGeneralErr;
-            return SSL_CONNECTION_ERROR;
+            rc = SSL_CONNECTION_ERROR;
+            goto exit;
         }
         elan_tcp_log("ssl connected");
     }
     pNetwork->tlsDataParams.server_fd = socket_fd;
+    elan_tcp_log("##### TCP/IP out #####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     return TCP_SUCCESS;
+exit:
+    if (socket_fd > 0)
+        close(socket_fd);
+    elan_tcp_log("##### TCP/IP out #####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    return rc;
 }
 TCP_Error_t TCP_Write(Network_t *pNetwork,
                       uint8_t *pMsg,
@@ -431,7 +443,7 @@ TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
 OSStatus TCP_Service_Start(void)
 {
     return mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP Thread", TCP_thread_main,
-                                   0x3000,
+                                   0x3500,
                                    (mico_thread_arg_t)NULL);
 }
 static void TCP_thread_main(mico_thread_arg_t arg)
@@ -439,11 +451,12 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     TCP_Error_t rc = TCP_SUCCESS;
     _Client_t Eland_Client;
     uint8_t tcp_write_flag[5];
-    uint16_t tcp_HC_flag = 1000;
-    // ServerParams_t *serverPara = (ServerParams_t *)arg;
+    bool tcp_HC_flag = true;
+    uint8_t HC00_moment_sec = 61, HC00_moment_min = 61;
     ServerParams_t serverPara;
     _time_t timer;
     mico_rtc_time_t cur_time = {0};
+    HC00_moment_sec = netclock_des_g->health_check_moment;
 
     memset(tcp_write_flag, 1, 5);
     if ((netclock_des_g == NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
@@ -466,11 +479,15 @@ static void TCP_thread_main(mico_thread_arg_t arg)
 RECONN:
     elan_tcp_log("Shadow Connect...");
     rc = eland_tcp_connect(&Eland_Client, NULL);
+    elan_tcp_log("Connect.over..");
     if (TCP_SUCCESS != rc)
     {
-        elan_tcp_log("Server Connection Error,Delay 1s then retry");
-        mico_thread_sleep(3);
-        goto exit;
+        elan_tcp_log("Server Connection Error,rc = %d", rc);
+        if (rc == NETWORK_MANUALLY_DISCONNECTED)
+            mico_thread_sleep(5);
+        else
+            mico_thread_sleep(3);
+        goto RECONN;
     }
 cycle_loop:
     if (tcp_write_flag[0] > 0)
@@ -491,6 +508,9 @@ cycle_loop:
                 tcp_write_flag[0]++;
                 goto cycle_loop;
             }
+        }
+        else
+        {
         }
     }
     if (tcp_write_flag[1] > 0)
@@ -538,35 +558,43 @@ cycle_loop:
             }
         }
     }
-    if (tcp_HC_flag++ > 5)
+    if (tcp_HC_flag)
     {
-        tcp_HC_flag = 0;
         rc = eland_IF_health_check(&Eland_Client);
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
             elan_tcp_log("Connection Error rc = %d", rc);
         }
+        else
+            tcp_HC_flag = false;
     }
     timer.tv_sec = 1;
-    timer.tv_usec = 1000;
+    timer.tv_usec = 100;
     rc = eland_IF_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
-        mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit; //reconnect
     }
     MicoRtcGetTime(&cur_time);
-    goto cycle_loop;
+    elan_tcp_log("cur_time.sec:%d", cur_time.sec);
+    if ((cur_time.sec == HC00_moment_sec) && (cur_time.min != HC00_moment_min))
+    {
+        tcp_HC_flag = true;
+        HC00_moment_min = cur_time.min;
+    }
 
+    goto cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
-    elan_tcp_log("TCP/IP out");
-    tcp_write_flag[0]++;
-    tcp_write_flag[1]++;
+    elan_tcp_log("##### TCP/IP out #####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    if (tcp_write_flag[0] == 0)
+        tcp_write_flag[0]++;
+    if (tcp_write_flag[1] == 0)
+        tcp_write_flag[1]++;
     goto RECONN;
     mico_rtos_delete_thread(NULL);
 }
@@ -581,7 +609,7 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
     if (rc != NETWORK_PHYSICAL_LAYER_CONNECTED)
     {
         elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
-        mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
+        // mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
         return rc;
     }
 
@@ -603,8 +631,9 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
 static TCP_Error_t eland_IF_connection_request(_Client_t *pClient)
 {
     TCP_Error_t rc = TCP_SUCCESS;
-    _time_t timer;
+    ClientState_t clientState;
     _TELEGRAM_t *telegram;
+    _time_t timer;
     if (NULL == pClient)
         return NULL_VALUE_ERROR;
 
@@ -624,7 +653,11 @@ static TCP_Error_t eland_IF_connection_request(_Client_t *pClient)
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
+    {
         SendElandStateQueue(TCP_CN00);
+        clientState = eland_get_client_state(pClient);
+        eland_set_client_state(pClient, clientState, CLIENT_STATE_CONNECTING);
+    }
     return rc;
 }
 static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
@@ -648,6 +681,7 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
     if (rc != TCP_SUCCESS)
         return rc;
     elan_tcp_log("update_elandinfo:OK");
+    elan_tcp_log("update_elandinfo:%s", (char *)(pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[DV01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -778,6 +812,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     {
         telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
         InitUpLoadData(telegram_data);
+        elan_tcp_log("CN00:%s", telegram_data);
         telegram->lenth = strlen(telegram_data);
     }
 }
@@ -878,9 +913,8 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case AL00: //08 alarm info request
         break;
     case AL01: //09 alarm info response
-        elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        //elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         rc = TCP_Operate_AL01((char *)(buff + sizeof(_TELEGRAM_t)));
-        elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case AL02: //10 alarm info add Notification
         break;
@@ -1043,14 +1077,13 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         }
         else if (!strcmp(key, "night_mode_begin_time"))
         {
-            //des_data_cache.night_mode_begin_time = json_object_get_int(val);
+            sprintf(des_data_cache.night_mode_begin_time, "%s", json_object_get_string(val));
         }
         else if (!strcmp(key, "night_mode_end_time"))
         {
-            //des_data_cache.night_mode_end_time = json_object_get_int(val);
+            sprintf(des_data_cache.night_mode_end_time, "%s", json_object_get_string(val));
         }
     }
-    free_json_obj(&ReceivedJsonCache);
     mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
     memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
@@ -1266,12 +1299,12 @@ static void eland_set_time(void)
     offset_time2 = elsv_send_time - eland_receive_time;
     offset_time = (offset_time1 + offset_time2) / 2;
 
+    offset_time1 = offset_time - (long long)(Timezone_offset_elsv * 1000);
+    offset_time = offset_time1 + (long long)(netclock_des_g->timezone_offset_sec * 1000);
+
     mico_time_get_utc_time_ms(&utc_time_ms);
     utc_time_ms = utc_time_ms + offset_time;
     mico_time_set_utc_time_ms(&utc_time_ms);
-
-    mico_time_get_iso8601_time(&iso8601_time);
-    elan_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
 
     mico_time_get_utc_time(&utc_time);
     currentTime = localtime((const time_t *)&utc_time);
@@ -1284,6 +1317,8 @@ static void eland_set_time(void)
     rtc_time.month = currentTime->tm_mon + 1;
     rtc_time.year = (currentTime->tm_year + 1900) % 100;
     MicoRtcSetTime(&rtc_time);
+    mico_time_get_iso8601_time(&iso8601_time);
+    elan_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
     /*send cmd to lcd*/
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
 }

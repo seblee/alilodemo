@@ -59,7 +59,6 @@ static OSStatus OTA_uart_init(void)
 static size_t OTA_uart_get_one_packet(uint8_t *inBuf, int inBufLen, uint8_t timeout)
 {
     int datalen;
-    char *p = inBuf;
     while (1)
     {
         if (MicoUartRecv(MICO_UART_2, inBuf, inBufLen, timeout) == kNoErr)

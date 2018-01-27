@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-12 10:00:02
+ * @Last Modified time:2018-01-27 16:43:34
  * @brief   :
  ****************************************************************************
 **/
@@ -23,9 +23,9 @@
 typedef enum {
     ElandNone = 0,
     ElandBegin,
-    APStatus,
+    APStatusStart,
     APStatusClosed,
-    HttpServerStatus,
+    APServerStart,
     HttpServerStop,
     ELAPPConnected,
     WifyConnected,
@@ -83,7 +83,7 @@ typedef enum {
 } LCD_Wifi_Rssi_t;
 
 typedef enum _eland_mode {
-    ELAND_MODE_NONE,
+    ELAND_MODE_NONE = (uint8_t)0x00,
     ELAND_CLOCK_MON,
     ELAND_CLOCK_ALARM,
     ELAND_NC,
@@ -94,6 +94,7 @@ typedef enum _eland_mode {
 typedef struct eland_mode_state
 {
     _ELAND_MODE_t eland_mode;
+    Eland_Status_type_t eland_status;
     mico_mutex_t state_mutex;
 } __ELAND_MODE_STATE_t;
 /* Private define ------------------------------------------------------------*/

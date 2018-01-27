@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-17 17:24:19
+ * @Last Modified time:2018-01-27 17:21:38
  * @brief   :
  ****************************************************************************
 **/
@@ -53,11 +53,15 @@ int application_start(void)
     app_netclock_log(">>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
+    require_noerr(err, exit);
+    /*init RTC*/
     err = Eland_Rtc_Init();
-
+    require_noerr(err, exit);
     /*start init system context*/
     mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
-
+    /*init fog v2 service*/
+    err = netclock_desInit();
+    require_noerr(err, exit);
     /* Start MiCO system functions according to mico_config.h*/
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
@@ -67,15 +71,10 @@ int application_start(void)
 
     err = Start_Alarm_service();
     require_noerr(err, exit);
-    /*init fog v2 service*/
-    err = netclock_desInit();
-    require_noerr(err, exit);
 
     /*start init uart & start service*/
-    //start_uart_service();
+    start_uart_service();
 
-    /****start softAP event wait******/
-    Start_wifi_Station_SoftSP_Thread(Soft_AP);
     /*start init eland SPI*/
     err = start_eland_flash_service();
     require_noerr(err, exit);
@@ -96,6 +95,10 @@ int application_start(void)
     require_noerr(err, exit);
 
 exit:
+    if (err != kNoErr)
+    {
+        MicoSystemReboot();
+    }
     mico_rtos_delete_thread(NULL);
     return err;
 }

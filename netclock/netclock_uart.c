@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-19 16:26:16
+ * @Last Modified time:2018-01-27 17:59:53
  * @brief   :
  ****************************************************************************
 **/
@@ -30,7 +30,7 @@
 
 #define UART_BUFFER_LENGTH 2048
 #define UART_ONE_PACKAGE_LENGTH 1024
-#define STACK_SIZE_UART_RECV_THREAD 0x1500
+#define STACK_SIZE_UART_RECV_THREAD 0x2000
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -43,7 +43,7 @@ mico_queue_t eland_uart_CMD_queue = NULL;     //eland usart
 mico_queue_t eland_state_queue = NULL;        //eland usart
 mico_semaphore_t Is_usart_complete_sem = NULL;
 mico_timer_t timer100_key;
-__ELAND_MODE_STATE_t eland_mode_state = {ELAND_MODE_NONE, NULL};
+__ELAND_MODE_STATE_t eland_mode_state = {ELAND_MODE_NONE, ElandNone, NULL};
 /* Private function prototypes -----------------------------------------------*/
 static void uart_service(uint32_t arg);
 static void Eland_H02_Send(uint8_t *Cache);
@@ -54,19 +54,18 @@ static void ELAND_H06_Send(uint8_t *Cache);
 static void ELAND_H08_Send(uint8_t *Cache);
 static void ELAND_H10_Send(uint8_t *Cache);
 static void MODH_Opration_02H(uint8_t *usart_rec);
-static void MODH_Opration_03H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
-static void MODH_Opration_05H(uint8_t *usart_rec);
-static void MODH_Opration_06H(uint8_t *usart_rec);
-static void MODH_Opration_08H(uint8_t *usart_rec);
+static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec);
 static void MODH_Opration_10H(uint8_t *usart_rec);
 static void timer100_key_handle(void *arg);
 static void uart_thread_DDE(uint32_t arg);
 static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
 static void Opration_Packet(uint8_t *data);
 
-static _ELAND_MODE_t get_eland_mode(void);
+static uint16_t get_eland_mode_state(void);
 static void set_eland_mode(_ELAND_MODE_t mode);
+static void set_eland_state(Eland_Status_type_t state);
+static void reset_eland_flash_para(void);
 /* Private functions ---------------------------------------------------------*/
 
 OSStatus start_uart_service(void)
@@ -88,6 +87,7 @@ static void uart_service(uint32_t arg)
     mico_uart_config_t uart_config;
     mico_Context_t *mico_context;
     uint32_t ota_arg;
+    __msg_function_t eland_cmd = KEY_FUN_NONE;
     /*wait mcu passed bootloader*/
     mico_rtos_thread_msleep(1100);
     /*creat mcu_ota thread*/
@@ -140,11 +140,14 @@ static void uart_service(uint32_t arg)
 
     err = mico_rtos_deinit_semaphore(&Is_usart_complete_sem);
     require_noerr(err, exit);
-
+    /*read mcu rtc time*/
+    eland_cmd = TIME_READ_04;
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     Eland_uart_log("start usart timer");
+    /*configuration usart timer*/
     err = mico_init_timer(&timer100_key, 100, timer100_key_handle, NULL); //100ms 讀取一次
     require_noerr(err, exit);
-
+    /*start key read timer*/
     err = mico_start_timer(&timer100_key); //開始定時器
     require_noerr(err, exit);
     //Eland 设置状态
@@ -227,19 +230,19 @@ static void Opration_Packet(uint8_t *data)
         MODH_Opration_02H(data);
         break;
     case TIME_SET_03:
-        MODH_Opration_03H(data);
+        MODH_Opration_xxH(TIME_SET_03, data);
         break;
     case TIME_READ_04:
         MODH_Opration_04H(data);
         break;
     case ELAND_STATES_05:
-        MODH_Opration_05H(data);
+        MODH_Opration_xxH(ELAND_STATES_05, data);
         break;
     case SEND_FIRM_WARE_06:
-        MODH_Opration_06H(data);
+        MODH_Opration_xxH(SEND_FIRM_WARE_06, data);
         break;
     case SEND_LINK_STATE_08:
-        MODH_Opration_08H(data);
+        MODH_Opration_xxH(SEND_LINK_STATE_08, data);
         break;
     case ALARM_READ_10:
         MODH_Opration_10H(data);
@@ -303,7 +306,8 @@ void SendElandStateQueue(Eland_Status_type_t value)
 {
     Eland_Status_type_t state = value;
     __msg_function_t eland_cmd = ELAND_STATES_05;
-    mscp_result_t result;
+    set_eland_state(value);
+
     if (eland_state_queue == NULL)
         return;
     if (mico_rtos_is_queue_full(&eland_state_queue)) //if full pick out data then update state
@@ -313,7 +317,6 @@ void SendElandStateQueue(Eland_Status_type_t value)
         state = value;
         mico_rtos_push_to_queue(&eland_state_queue, &state, 10);
     }
-    audio_service_sound_remind_start(&result, 12); //門鈴蝲音 “坮噔”
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
 }
 static void timer100_key_handle(void *arg)
@@ -539,6 +542,7 @@ exit:
 static void ELAND_H08_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
+    uint16_t mode_state_temp = 0;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
     LCD_Wifi_Rssi_t rssi_level = LEVELNUM;
@@ -555,15 +559,17 @@ static void ELAND_H08_Send(uint8_t *Cache)
         rssi_level = LEVEL1;
     else
         rssi_level = LEVEL0;
-
+    mode_state_temp = get_eland_mode_state();
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_LINK_STATE_08;
-    *(Cache + 2) = 1;
+    *(Cache + 2) = 2;
     *(Cache + 3) = rssi_level;
-    *(Cache + 4) = Uart_Packet_Trail;
+    *(Cache + 4) = (uint8_t)(mode_state_temp >> 8);
+    *(Cache + 5) = (uint8_t)(mode_state_temp & 0xff);
+    *(Cache + 6) = Uart_Packet_Trail;
 start_send:
     sended_times--;
-    err = elandUsartSendData(Cache, 5);
+    err = elandUsartSendData(Cache, 7);
     require_noerr(err, exit);
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
@@ -607,7 +613,6 @@ start_send:
 exit:
     return;
 }
-extern void PlatformEasyLinkButtonLongPressedCallback(void);
 static void MODH_Opration_02H(uint8_t *usart_rec)
 {
     static uint16_t Key_Count = 0, Key_Restain = 0;
@@ -619,6 +624,22 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
+
+    /*analysis key NA mode key value*/
+    if ((Key_Restain & KEY_Set) && (Key_Restain & KEY_Minus))
+        ReadData = (KEY_Set | KEY_Minus);
+    else
+        ReadData = 0;
+    Set_Minus_Restain_Trg = ReadData & (ReadData ^ Set_Minus_Restain_count);
+    Set_Minus_Restain_count = ReadData;
+    /*analysis key reset mode key value*/
+    ReadData = Key_Restain & KEY_Reset;
+    Reset_key_Restain_Trg = ReadData & (ReadData ^ Reset_key_Restain_count);
+    Reset_key_Restain_count = ReadData;
+    if (Reset_key_Restain_Trg)
+    {
+        reset_eland_flash_para();
+    }
 
     if (Key_Count & 0x0030) //ELAND_CLOCK_MON or ELAND_CLOCK_ALARM
     {
@@ -636,12 +657,14 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             break;
         }
     }
-
-    ReadData = Key_Restain & KEY_Reset;
-    Reset_key_Restain_Trg = ReadData & (ReadData ^ Reset_key_Restain_count);
-    Reset_key_Restain_count = ReadData;
-    if (Reset_key_Restain_Trg)
-        PlatformEasyLinkButtonLongPressedCallback();
+    else //eland net clock mode
+    {
+        if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus))
+        {
+            Start_wifi_Station_SoftSP_Thread(Soft_AP);
+            set_eland_mode(ELAND_NA);
+        }
+    }
 
     ReadData = Key_Count & KEY_Add;
     KEY_Add_Count_Trg = ReadData & (ReadData ^ KEY_Add_Count_count);
@@ -651,19 +674,8 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         eland_cmd = SEND_FIRM_WARE_06;
         // mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     }
+}
 
-    if ((Key_Restain & KEY_Set) && (Key_Restain & KEY_Minus))
-        ReadData = (KEY_Set | KEY_Minus);
-    else
-        ReadData = 0;
-    Set_Minus_Restain_Trg = ReadData & (ReadData ^ Set_Minus_Restain_count);
-    Set_Minus_Restain_count = ReadData;
-    if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus))
-        Start_wifi_Station_SoftSP_Thread(Soft_AP);
-}
-static void MODH_Opration_03H(uint8_t *usart_rec)
-{
-}
 static void MODH_Opration_04H(uint8_t *usart_rec)
 {
     mico_rtc_time_t cur_time = {0};
@@ -686,14 +698,8 @@ static void MODH_Opration_04H(uint8_t *usart_rec)
     MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
     mico_time_set_utc_time_ms(&current_utc);
 }
-static void MODH_Opration_05H(uint8_t *usart_rec)
-{
-}
-static void MODH_Opration_06H(uint8_t *usart_rec)
-{
-}
 
-static void MODH_Opration_08H(uint8_t *usart_rec)
+static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec)
 {
 }
 static void MODH_Opration_10H(uint8_t *usart_rec)
@@ -704,13 +710,29 @@ static void MODH_Opration_10H(uint8_t *usart_rec)
     elsv_alarm_data_init_MCU(&elsv_alarm_data, &cache);
 }
 
-static _ELAND_MODE_t get_eland_mode(void)
+static uint16_t get_eland_mode_state(void)
 {
-    return eland_mode_state.eland_mode;
+    uint16_t Cache = 0;
+    Cache = eland_mode_state.eland_mode << 16;
+    Cache |= eland_mode_state.eland_status;
 }
 static void set_eland_mode(_ELAND_MODE_t mode)
 {
     mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
     eland_mode_state.eland_mode = mode;
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
+}
+static void set_eland_state(Eland_Status_type_t state)
+{
+    mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
+    eland_mode_state.eland_status = mode;
+    mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
+}
+
+static void reset_eland_flash_para(void)
+{
+    OSStatus err = kNoErr;
+    err = Netclock_des_recovery();
+    err = err;
+    //MicoSystemReboot();
 }

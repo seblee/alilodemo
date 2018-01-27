@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-17 17:27:49
+ * @Last Modified time:2018-01-27 15:49:11
  * @brief   :
  ****************************************************************************
 **/
@@ -34,13 +34,12 @@ mico_queue_t wifistate_queue = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
 static void Wifi_SoftAP_threed(mico_thread_arg_t arg);
-
+static void recorde_IPStatus(wlanInterfaceTypedef type);
 /* Private functions ---------------------------------------------------------*/
 
 void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 {
     msg_wify_queue my_message;
-    IPStatusTypedef *IPStatus_Cache = NULL;
     __msg_function_t eland_cmd = SEND_LINK_STATE_08;
 
     switch (status)
@@ -48,24 +47,12 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
     case NOTIFY_STATION_UP:
         WifiSet_log("Wi-Fi STATION connected.");
         mico_rtos_set_semaphore(&wifi_netclock);
-        IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
-        micoWlanGetIPStatus(IPStatus_Cache, Station);
-        memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
-        sprintf(netclock_des_g->ip_address, IPStatus_Cache->ip);
-        netclock_des_g->dhcp_enabled = IPStatus_Cache->dhcp;
-        memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));
-        sprintf(netclock_des_g->subnet_mask, IPStatus_Cache->mask);
-        memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
-        sprintf(netclock_des_g->default_gateway, IPStatus_Cache->gate);
-        free(IPStatus_Cache);
-
+        recorde_IPStatus(Station);
+        mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+        SendElandStateQueue(WifyConnected);
         /*Send wifi state station*/
         my_message.value = Wify_Station_Connect_Successed;
-        mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
-
-        SendElandStateQueue(WifyConnected);
-        if (wifistate_queue != NULL)
-            mico_rtos_push_to_queue(&wifistate_queue, &my_message, MICO_WAIT_FOREVER);
+        mico_rtos_push_to_queue(&wifistate_queue, &my_message, 20);
         /*send cmd to lcd*/
         break;
     case NOTIFY_STATION_DOWN:
@@ -75,17 +62,8 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
     case NOTIFY_AP_UP:
         WifiSet_log("Wi-Fi Soft_AP ready!");
         mico_rtos_set_semaphore(&wifi_SoftAP_Sem);
-        IPStatus_Cache = malloc(sizeof(IPStatusTypedef));
-        micoWlanGetIPStatus(IPStatus_Cache, Soft_AP);
-        memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
-        sprintf(netclock_des_g->ip_address, IPStatus_Cache->ip);
-        netclock_des_g->dhcp_enabled = IPStatus_Cache->dhcp;
-        memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));
-        sprintf(netclock_des_g->subnet_mask, IPStatus_Cache->mask);
-        memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
-        sprintf(netclock_des_g->default_gateway, IPStatus_Cache->gate);
-        free(IPStatus_Cache);
-        SendElandStateQueue(APStatus);
+        recorde_IPStatus(Soft_AP);
+        SendElandStateQueue(APStatusStart);
         break;
     case NOTIFY_AP_DOWN:
         SendElandStateQueue(APStatusClosed);
@@ -108,21 +86,36 @@ void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
         mico_rtos_push_to_queue(&wifistate_queue, &my_message, 20);
     }
 }
-
-void Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
+static void recorde_IPStatus(wlanInterfaceTypedef type)
 {
+    IPStatusTypedef IPStatus_Cache;
+    micoWlanGetIPStatus(&IPStatus_Cache, type);
+    memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
+    sprintf(netclock_des_g->ip_address, IPStatus_Cache.ip);
+    netclock_des_g->dhcp_enabled = IPStatus_Cache.dhcp;
+    memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));
+    sprintf(netclock_des_g->subnet_mask, IPStatus_Cache.mask);
+    memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
+    sprintf(netclock_des_g->default_gateway, IPStatus_Cache.gate);
+}
+OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
+{
+    OSStatus err = kNoErr;
     if (wifi_Mode == Station)
     {
-        mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi station",
-                                Wifi_station_threed, 0x500, (mico_thread_arg_t)NULL);
+        err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi station",
+                                      Wifi_station_threed, 0x500, (mico_thread_arg_t)NULL);
     }
     else if (wifi_Mode == Soft_AP)
     {
-        Eland_httpd_start();
+        err = Eland_httpd_start();
+        if (err == kNoErr)
+            SendElandStateQueue(APServerStart);
         //Wifi_SoftAP_fun(); //
-        mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
-                                Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
+        err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
+                                      Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
     }
+    return err;
 }
 
 void Wifi_station_threed(mico_thread_arg_t arg)
