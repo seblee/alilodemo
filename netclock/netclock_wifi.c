@@ -113,7 +113,7 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
             SendElandStateQueue(APServerStart);
         //Wifi_SoftAP_fun(); //
         err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
-                                      Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
+                                      Wifi_SoftAP_threed, 0x1500, (mico_thread_arg_t)NULL);
     }
     return err;
 }

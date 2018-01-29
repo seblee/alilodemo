@@ -73,10 +73,10 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
+    //start_uart_service();
 
     /*start init eland SPI*/
-    err = start_eland_flash_service();
+    // err = start_eland_flash_service();
     require_noerr(err, exit);
 
     /* Wait for wlan connection*/

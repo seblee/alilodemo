@@ -28,8 +28,8 @@
 /* Private define ------------------------------------------------------------*/
 #define Eland_uart_log(format, ...) custom_log("netclock_uart", format, ##__VA_ARGS__)
 
-#define UART_BUFFER_LENGTH 2048
-#define UART_ONE_PACKAGE_LENGTH 1024
+#define UART_BUFFER_LENGTH 1024
+#define UART_ONE_PACKAGE_LENGTH 512
 #define STACK_SIZE_UART_RECV_THREAD 0x2000
 
 /* Private macro -------------------------------------------------------------*/
@@ -362,38 +362,38 @@ static void Eland_H02_Send(uint8_t *Cache)
     OSStatus err = kGeneralErr;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
-    //micoMemInfo_t *memory_info;
+    micoMemInfo_t *memory_info;
     static uint8_t timesend02 = 0;
     uint8_t len;
 
-    // if (timesend02 > 5)
-    // {
-    //     //timesend02 = 0;
-    //     memory_info = MicoGetMemoryInfo();
-    //     *Cache = Uart_Packet_Header;
-    //     *(Cache + 1) = KEY_READ_02;
-    //     *(Cache + 2) = sizeof(int) + sizeof(int);
-    //     *((int *)(Cache + 3)) = memory_info->num_of_chunks;
-    //     *((int *)(Cache + 3 + sizeof(int))) = memory_info->free_memory;
-    //     *(Cache + 3 + sizeof(int) + sizeof(int)) = Uart_Packet_Trail;
-    //     len = 4 + sizeof(int) + sizeof(int);
-    // }
-    // else
-    // {
-    //     timesend02++;
-    //     *Cache = Uart_Packet_Header;
-    //     *(Cache + 1) = KEY_READ_02;
-    //     *(Cache + 2) = 1;
-    //     *(Cache + 3) = timesend02;
-    //     *(Cache + 4) = Uart_Packet_Trail;
-    //     len = 4 + 1;
-    // }
-    *Cache = Uart_Packet_Header;
-    *(Cache + 1) = KEY_READ_02;
-    *(Cache + 2) = 1;
-    *(Cache + 3) = timesend02++;
-    *(Cache + 4) = Uart_Packet_Trail;
-    len = 4 + 1;
+    if (timesend02 > 5)
+    {
+        timesend02 = 0;
+        memory_info = MicoGetMemoryInfo();
+        *Cache = Uart_Packet_Header;
+        *(Cache + 1) = KEY_READ_02;
+        *(Cache + 2) = sizeof(int) + sizeof(int);
+        *((int *)(Cache + 3)) = memory_info->num_of_chunks;
+        *((int *)(Cache + 3 + sizeof(int))) = memory_info->free_memory;
+        *(Cache + 3 + sizeof(int) + sizeof(int)) = Uart_Packet_Trail;
+        len = 4 + sizeof(int) + sizeof(int);
+    }
+    else
+    {
+        timesend02++;
+        *Cache = Uart_Packet_Header;
+        *(Cache + 1) = KEY_READ_02;
+        *(Cache + 2) = 1;
+        *(Cache + 3) = timesend02;
+        *(Cache + 4) = Uart_Packet_Trail;
+        len = 4 + 1;
+    }
+    // *Cache = Uart_Packet_Header;
+    // *(Cache + 1) = KEY_READ_02;
+    // *(Cache + 2) = 1;
+    // *(Cache + 3) = timesend02++;
+    // *(Cache + 4) = Uart_Packet_Trail;
+    // len = 4 + 1;
 
 start_send:
     sended_times--;
@@ -562,7 +562,7 @@ static void ELAND_H08_Send(uint8_t *Cache)
     mode_state_temp = get_eland_mode_state();
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_LINK_STATE_08;
-    *(Cache + 2) = 2;
+    *(Cache + 2) = 3;
     *(Cache + 3) = rssi_level;
     *(Cache + 4) = (uint8_t)(mode_state_temp >> 8);
     *(Cache + 5) = (uint8_t)(mode_state_temp & 0xff);
@@ -715,6 +715,7 @@ static uint16_t get_eland_mode_state(void)
     uint16_t Cache = 0;
     Cache = eland_mode_state.eland_mode << 16;
     Cache |= eland_mode_state.eland_status;
+    return Cache;
 }
 static void set_eland_mode(_ELAND_MODE_t mode)
 {
@@ -725,7 +726,7 @@ static void set_eland_mode(_ELAND_MODE_t mode)
 static void set_eland_state(Eland_Status_type_t state)
 {
     mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
-    eland_mode_state.eland_status = mode;
+    eland_mode_state.eland_status = state;
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
 }
 
