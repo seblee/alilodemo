@@ -82,6 +82,7 @@ typedef struct _ELAND_DEVICE //设备状态结构
     uint32_t eland_id;                     //Eland唯一识别的ID
     char serial_number[serial_number_len]; //Eland的串口番号。
     char eland_name[eland_name_Len];       //Eland名称，用户输入
+    int32_t timezone_offset_sec;           //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
 
     /*APP/tcpIP通信時獲取*/
     char user_id[user_id_len];            //用户唯一识别ID

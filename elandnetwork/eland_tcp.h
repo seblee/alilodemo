@@ -15,6 +15,7 @@
 #define __ELAND_TCP_H_
 /* Private include -----------------------------------------------------------*/
 #include "mico.h"
+#include "eland_alarm.h"
 /* Private typedef -----------------------------------------------------------*/
 typedef struct _Eland_Network Network_t;
 /*! \public
@@ -142,6 +143,8 @@ typedef enum {
     MUTEX_DESTROY_ERROR = -49,
     /** Response err cmd */
     CMD_BACK_ERROR = -50,
+    /** Response memery err */
+    BACK_DATA_MEMERY_ERROR = -51,
 } TCP_Error_t;
 
 typedef enum _TCP_CMD {
@@ -251,7 +254,7 @@ struct _Eland_Network
 {
     TCP_Error_t (*connect)(Network_t *, ServerParams_t *);
 
-    TCP_Error_t (*read)(Network_t *, uint8_t *, struct timeval *, size_t *);  //< Function pointer pointing to the network function to read from the network
+    TCP_Error_t (*read)(Network_t *, uint8_t **, struct timeval *, size_t *); //< Function pointer pointing to the network function to read from the network
     TCP_Error_t (*write)(Network_t *, uint8_t *, struct timeval *, size_t *); //< Function pointer pointing to the network function to write to the network
     TCP_Error_t (*disconnect)(Network_t *);                                   //< Function pointer pointing to the network function to disconnect from the network
     TCP_Error_t (*isConnected)(Network_t *);                                  //< Function pointer pointing to the network function to check if TLS is connected
@@ -269,7 +272,7 @@ struct _Eland_Network
  */
 // MQTT pub and sub buff len
 #define MQTT_TX_BUF_LEN (1024 + 200) //
-#define MQTT_RX_BUF_LEN (1024 + 200) //
+#define MQTT_RX_BUF_LEN (2048 + 200) //
 
 typedef struct _ClientData
 {
@@ -288,7 +291,7 @@ typedef struct _ClientData
     size_t readBufSize;
 
     unsigned char writeBuf[MQTT_TX_BUF_LEN];
-    unsigned char readBuf[MQTT_RX_BUF_LEN];
+    unsigned char *readBuf;
 
     bool isBlockOnThreadLockEnabled;
     mico_mutex_t state_change_mutex;
@@ -350,16 +353,17 @@ typedef enum TIME_RECORD_T {
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-
+extern mico_semaphore_t TCP_Stop_Sem;
 /* Private function prototypes -----------------------------------------------*/
 TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params);
 TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *written_len);
-TCP_Error_t TCP_Read(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *read_len);
+TCP_Error_t TCP_Read(Network_t *pNetwork, uint8_t **pMsg, struct timeval *timer, size_t *read_len);
 TCP_Error_t TCP_disconnect(Network_t *pNetwork);
 TCP_Error_t TCP_tls_destroy(Network_t *pNetwork);
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork);
 OSStatus TCP_Service_Start(void);
 ClientState_t eland_get_client_state(_Client_t *pClient);
+void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data);
 mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
 /* Private functions ---------------------------------------------------------*/
 

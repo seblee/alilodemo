@@ -21,7 +21,7 @@
 #include "netclock_wifi.h"
 #include "netclock_uart.h"
 #include "netclock_httpd.h"
-
+#include "eland_tcp.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -49,7 +49,6 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
         mico_rtos_set_semaphore(&wifi_netclock);
         recorde_IPStatus(Station);
         mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
-        SendElandStateQueue(WifyConnected);
         /*Send wifi state station*/
         my_message.value = Wify_Station_Connect_Successed;
         mico_rtos_push_to_queue(&wifistate_queue, &my_message, 20);
@@ -111,9 +110,9 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
         err = Eland_httpd_start();
         if (err == kNoErr)
             SendElandStateQueue(APServerStart);
-        //Wifi_SoftAP_fun(); //
+        // Wifi_SoftAP_fun();
         err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
-                                      Wifi_SoftAP_threed, 0x1500, (mico_thread_arg_t)NULL);
+                                      Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
     }
     return err;
 }
@@ -121,8 +120,8 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
 void Wifi_station_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_adv_st wNetConfigAdv;
-    mico_rtos_lock_mutex(&WifiConfigMutex);
 
+    mico_rtos_lock_mutex(&WifiConfigMutex);
     micoWlanSuspend();
     /* Initialize wlan parameters */
     memset(&wNetConfigAdv, 0x0, sizeof(wNetConfigAdv));
@@ -154,9 +153,13 @@ void Wifi_station_threed(mico_thread_arg_t arg)
 static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 {
     network_InitTypeDef_st wNetConfig;
-
+    if ((get_eland_mode_state() & 0xff) >= (uint8_t)HTTP_Get_HOST_INFO)
+    {
+        mico_rtos_set_semaphore(&TCP_Stop_Sem);
+        mico_rtos_thread_sleep(2);
+    }
     mico_rtos_lock_mutex(&WifiConfigMutex);
-    micoWlanSuspendSoftAP();
+    micoWlanSuspend();
     WifiSet_log("Soft_ap_Server");
     memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
     strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
@@ -179,7 +182,7 @@ void Wifi_SoftAP_fun(void)
     network_InitTypeDef_st wNetConfig;
 
     mico_rtos_lock_mutex(&WifiConfigMutex);
-    //micoWlanSuspendSoftAP();
+    micoWlanSuspend();
     WifiSet_log("Soft_ap_Server");
     memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
     strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);

@@ -39,10 +39,9 @@
 /* Private variables ---------------------------------------------------------*/
 ELAND_DES_S *netclock_des_g = NULL;
 _ELAND_DEVICE_t *device_state = NULL;
-static bool NetclockInitSuccess = false;
 
 //http client mutex
-static mico_mutex_t http_send_setting_mutex = NULL;
+mico_mutex_t http_send_setting_mutex = NULL;
 json_object *ElandJsonData = NULL;
 json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
@@ -65,8 +64,6 @@ OSStatus set_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *http_req, //reques
                                 char *http_body,                        //數據 body
                                 uint32_t http_req_id);                  //請求 id
 
-//發送 http請求信號量
-static OSStatus push_http_req_to_queue(ELAND_HTTP_REQUEST_SETTING_S *http_req);
 //从队列中获取请求
 OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
                                  ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
@@ -79,12 +76,6 @@ static OSStatus alarm_sound_download(void);
 
 /* Private functions ---------------------------------------------------------*/
 
-//生成一个http回话id
-static uint32_t generate_http_session_id(void)
-{
-    static uint32_t id = 1;
-    return id++;
-}
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
@@ -108,6 +99,7 @@ OSStatus netclock_desInit(void)
 
     Eland_log("local firmware version:%s", Eland_Firmware_Version);
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
+    SendElandStateQueue(HTTP_Get_HOST_INFO);
     return kNoErr;
 exit:
     if (device_state != NULL)
@@ -129,39 +121,23 @@ OSStatus start_eland_service(void)
 {
     OSStatus err = kGeneralErr;
 
-    NetclockInitSuccess = false;
     require_string(get_wifi_status() == true, exit, "wifi is not connect");
 
     /*初始化互斥信号量*/
     err = mico_rtos_init_mutex(&http_send_setting_mutex);
     require_noerr(err, exit);
 
-    //闹钟初始化
-    //开启http client 后台线程
-    err = start_client_serrvice(); //内部有队列初始化,需要先执行 //ssl登录等
-    require_noerr(err, exit);
-
     //1.eland 通訊情報取得
     err = eland_communication_info_get();
     require_noerr(err, exit);
-    SendElandStateQueue(HTTP_Get_HOST_INFO);
+    Eland_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     //3.eland test  下載音頻到flash
     //err = alarm_sound_download(); //暫時做測試用
     require_noerr(err, exit);
 
-    NetclockInitSuccess = true;
 exit:
-    if (NetclockInitSuccess == true)
-    {
-        Eland_log("eland init success!");
-        err = kNoErr;
-    }
-    else
-    {
-        Eland_log("eland init failure!");
-        err = kGeneralErr;
-    }
+    Eland_log(" err = %d", err);
     return err;
 }
 
@@ -200,7 +176,7 @@ start_Check:
         else
         {
             mico_Context_t *context = NULL;
-            Eland_log("Is not Activate chear the wifi para");
+            Eland_log("Is not Activate clear the wifi para");
             context = mico_system_context_get();
             context->micoSystemConfig.configured = unConfigured;
             mico_system_context_update(context);
@@ -222,9 +198,8 @@ start_Check:
     netclock_des_g->eland_id = device_state->eland_id; // des_g_Temp.eland_id; //Eland唯一识别的ID
     memcpy(netclock_des_g->user_id, device_state->user_id, user_id_len);
     memcpy(netclock_des_g->serial_number, device_state->serial_number, serial_number_len);
-    /***initialization to default value***/
-    netclock_des_g->timezone_offset_sec = 32400;
     /***initialize by device flash***/
+    netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
     wlan_get_mac_address(mac);                                                                        //MAC地址
     memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
@@ -516,6 +491,11 @@ OSStatus ProcessPostJson(char *InputJson)
         needupdateflash = true;
         memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
     }
+    if (device_state->timezone_offset_sec != netclock_des_g->timezone_offset_sec)
+    {
+        needupdateflash = true;
+        device_state->timezone_offset_sec = netclock_des_g->timezone_offset_sec;
+    }
 
     if (needupdateflash == true)
         mico_system_context_update(mico_system_context_get());
@@ -534,30 +514,15 @@ static OSStatus eland_communication_info_get(void)
 {
     OSStatus err = kGeneralErr;
     json_object *ReceivedJsonCache = NULL, *ServerJsonCache = NULL;
-
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
 DEVICE_INFO_GET_START:
-    if (get_wifi_status() == false)
-    {
-        Eland_log("wifi_status disconnect ");
-        err = kGeneralErr;
-        goto exit;
-    }
-    if (get_https_connect_status() == false)
-    {
-        Eland_log("https_connect_status is not true");
-        mico_rtos_thread_sleep(2);
-        goto DEVICE_INFO_GET_START;
-    }
-
-    err = eland_push_http_req_mutex(ELAND_COMMUNICATION_INFO_UPDATE_METHOD, //請求方式
-                                    ELAND_COMMUNICATION_INFO_GET,           //請求類型
-                                    ELAND_COMMUNICATION_INFO_UPDATE_URI,    //URI參數
-                                    ELAND_HTTP_DOMAIN_NAME,                 //主機域名
-                                    "",                                     //request body
-                                    &user_http_res);                        //response 接收緩存
+    err = eland_http_request(ELAND_COMMUNICATION_INFO_UPDATE_METHOD, //請求方式
+                             ELAND_COMMUNICATION_INFO_GET,           //請求類型
+                             ELAND_COMMUNICATION_INFO_UPDATE_URI,    //URI參數
+                             ELAND_HTTP_DOMAIN_NAME,                 //主機域名
+                             NULL,                                   //request body
+                             &user_http_res);                        //response 接收緩存
     require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)
@@ -588,6 +553,8 @@ DEVICE_INFO_GET_START:
                 netclock_des_g->tcpIP_port = json_object_get_int(val);
             }
         }
+        free_json_obj(&ReceivedJsonCache);
+        free_json_obj(&ServerJsonCache);
         Eland_log("<===== eland_communication_info_get end <======");
     }
     else
@@ -609,7 +576,7 @@ exit:
         mico_thread_msleep(200);
         goto DEVICE_INFO_GET_START;
     }
-
+    SendElandStateQueue(HTTP_Get_HOST_INFO);
     return err;
 }
 
@@ -640,7 +607,7 @@ ALARM_SOUND_DOWNLOAD_START:
                                     ELAND_ALARM_GET,        //請求類型
                                     ELAND_DOWN_LOAD_URI,    //URI參數
                                     ELAND_HTTP_DOMAIN_NAME, //主機域名
-                                    "",                     //request body
+                                    NULL,                   //request body
                                     &user_http_res);        //response 接收緩存
     require_noerr(err, exit);
     //处理返回结果
@@ -666,215 +633,6 @@ exit:
         Eland_log("<===== alarm_sound_download error <======");
         mico_thread_msleep(200);
         goto ALARM_SOUND_DOWNLOAD_START;
-    }
-
-    return err;
-}
-
-//发送http请求
-OSStatus eland_push_http_req_mutex(ELAND_HTTP_METHOD method,                          //POST 或者 GET
-                                   ELAND_HTTP_REQUEST_TYPE request_type,              //eland request type
-                                   char *request_uri,                                 //uri
-                                   char *host_name,                                   //host
-                                   char *http_body,                                   //BODY
-                                   ELAND_HTTP_RESPONSE_SETTING_S *user_http_response) //response 指針
-{
-    OSStatus err = kGeneralErr;
-    int32_t id = 0;
-    ELAND_HTTP_REQUEST_SETTING_S user_http_req;
-    ELAND_HTTP_RESPONSE_SETTING_S *eland_http_response_temp_p = NULL;
-
-    mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
-
-    if (false == mico_rtos_is_queue_empty(&eland_http_response_queue))
-    { //queue满了  在发生错误的情况下 可能导致 eland_http_response_queue 里面有数据
-        Eland_log("[error]want send http request, but eland_http_response_queue is full");
-        err = mico_rtos_pop_from_queue(&eland_http_response_queue, &eland_http_response_temp_p, 10); //弹出数据
-        require_noerr_string(err, exit, "mico_rtos_pop_from_queue() error");
-
-        if (eland_http_response_temp_p->eland_response_body != NULL)
-        {
-            free(eland_http_response_temp_p->eland_response_body);
-            eland_http_response_temp_p->eland_response_body = NULL;
-        }
-
-        eland_http_response_temp_p = NULL;
-    }
-
-    id = generate_http_session_id();
-
-    memset(&user_http_req, 0, sizeof(user_http_req));
-    err = set_eland_http_request(&user_http_req, method, request_type, request_uri, host_name, http_body, id);
-    require_noerr(err, exit);
-
-    err = push_http_req_to_queue(&user_http_req); //发送请求
-    require_noerr(err, exit);
-
-    err = get_http_res_from_queue(user_http_response, request_type, id); //等待返回结果
-    require_noerr(err, exit);
-
-exit:
-    mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
-
-    return err;
-}
-
-//设置请求参数
-OSStatus set_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *http_req, //request 指針
-                                ELAND_HTTP_METHOD method,               //請求方式 POST/GET
-                                ELAND_HTTP_REQUEST_TYPE request_type,   //eland request type
-                                char *request_uri,                      //URI 路徑
-                                char *host_name,                        //host 主機
-                                char *http_body,                        //數據 body
-                                uint32_t http_req_id)                   //請求 id
-{
-    memset(http_req, 0, sizeof(ELAND_HTTP_REQUEST_SETTING_S));
-
-    http_req->method = method;
-    http_req->eland_request_type = request_type;
-
-    if (strlen(request_uri) > HTTP_REQUEST_REQ_URI_MAX_LEN)
-    {
-        Eland_log("request_uri is error!");
-        memset(http_req, 0, sizeof(ELAND_HTTP_REQUEST_SETTING_S));
-        return kGeneralErr;
-    }
-
-    if (strlen(host_name) > HTTP_REQUEST_HOST_NAME_MAX_LEN)
-    {
-        Eland_log("host_name is error!");
-        memset(http_req, 0, sizeof(ELAND_HTTP_REQUEST_SETTING_S));
-        return kGeneralErr;
-    }
-
-    if (http_body != NULL)
-    {
-        if (strlen(http_body) > HTTP_REQUEST_BODY_MAX_LEN)
-        {
-            Eland_log("http_body is too long!");
-            memset(http_req, 0, sizeof(ELAND_HTTP_REQUEST_SETTING_S));
-            return kGeneralErr;
-        }
-    }
-
-    memcpy(http_req->request_uri, request_uri, strlen(request_uri));
-    memcpy(http_req->host_name, host_name, strlen(host_name));
-
-    if (http_body != NULL)
-    {
-        http_req->http_body = malloc(strlen(http_body) + 1);
-        if (http_req->http_body == NULL)
-        {
-            Eland_log("http body malloc error");
-            return kNoMemoryErr;
-        }
-
-        memset(http_req->http_body, 0, strlen(http_body) + 1); //清空申请的缓冲区
-        memcpy(http_req->http_body, http_body, strlen(http_body));
-    }
-
-    http_req->http_req_id = http_req_id;
-
-    return kNoErr;
-}
-//發送 http請求信號量
-static OSStatus push_http_req_to_queue(ELAND_HTTP_REQUEST_SETTING_S *http_req)
-{
-    OSStatus err = kGeneralErr;
-
-    if (mico_rtos_is_queue_full(&eland_http_request_queue) == true)
-    {
-        Eland_log("eland_http_request_queue is full!");
-        return kGeneralErr;
-    }
-
-    err = mico_rtos_push_to_queue(&eland_http_request_queue, &http_req, 10);
-    if (err != kNoErr)
-    {
-        if (http_req->http_body != NULL)
-        {
-            free(http_req->http_body);
-            http_req->http_body = NULL;
-        }
-        Eland_log("push req to eland_http_request_queue error");
-    }
-
-    return err;
-}
-
-//从队列中获取请求
-OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
-                                 ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
-                                 uint32_t id)
-{
-    OSStatus err = kGeneralErr;
-    uint32_t res_body_len = 0;
-    ELAND_HTTP_RESPONSE_SETTING_S *eland_http_res_p = NULL;
-    ELAND_HTTP_REQUEST_SETTING_S *eland_http_req = NULL;
-
-    memset(http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
-    err = mico_rtos_pop_from_queue(&eland_http_response_queue, &eland_http_res_p, MICO_WAIT_FOREVER); // WAIT_HTTP_RES_MAX_TIME);
-    if (err != kNoErr)
-    {
-        http_res->send_status = HTTP_CONNECT_ERROR;
-        Eland_log("mico_rtos_pop_from_queue() timeout!!!");
-        if (mico_rtos_is_queue_full(&eland_http_request_queue) == true)
-        {
-            err = mico_rtos_pop_from_queue(&eland_http_request_queue, &eland_http_req, 10);
-            if (err == kNoErr)
-            {
-                if (eland_http_req->http_body != NULL)
-                {
-                    free(eland_http_req->http_body);
-                    eland_http_req->http_body = NULL;
-                }
-                Eland_log("push one req from queue!");
-            }
-        }
-        return kGeneralErr;
-    }
-
-    require_action_string((eland_http_res_p->http_res_id == id), exit, err = kIDErr, "response id is error"); //检查ID
-
-    require_action_string((eland_http_res_p->send_status == HTTP_RESPONSE_SUCCESS), exit, err = kStateErr, "send_state is not success"); //检查是否成功
-
-    res_body_len = strlen(eland_http_res_p->eland_response_body);
-
-    if ((res_body_len == 0) && (request_type != ELAND_ALARM_GET))
-    {
-        Eland_log("[error]get data is len is 0");
-        err = kGeneralErr;
-        goto exit;
-    }
-    // Eland_log("--------------------------------------------------------");
-    // Eland_log("eland_response_body:%s", eland_http_res_p->eland_response_body);
-    // Eland_log("--------------------------------------------------------");
-    if ((request_type == ELAND_COMMUNICATION_INFO_GET) && //只在請求通信情報時候 做JSON格式检查
-        ((eland_http_res_p->eland_response_body[0] != '{') ||
-         eland_http_res_p->eland_response_body[res_body_len - 1] != '}'))
-    {
-        Eland_log("[error]get data is not JSON format!");
-        err = kGeneralErr;
-        goto exit;
-    }
-
-    memcpy(http_res, eland_http_res_p, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
-exit:
-    if (err != kNoErr)
-    { //copy send_status and status_code
-        http_res->send_status = eland_http_res_p->send_status;
-        http_res->status_code = eland_http_res_p->status_code;
-    }
-
-    if (err == kIDErr)
-    {
-        Eland_log("requese id:%ld, rseponse id:%ld", id, eland_http_res_p->http_res_id);
-    }
-    else if (err == kStateErr)
-    {
-        Eland_log("send_state:%d, state_code:%ld", eland_http_res_p->send_status, eland_http_res_p->status_code);
     }
 
     return err;

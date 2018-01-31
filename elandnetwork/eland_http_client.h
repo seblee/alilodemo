@@ -94,8 +94,7 @@ typedef enum __SOUND_DOWNLOAD_STATUS {
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-extern mico_queue_t eland_http_request_queue;  //eland HTTP的发送请求队列
-extern mico_queue_t eland_http_response_queue; //eland HTTP的接收响应队列
+
 extern char *certificate;
 extern char *private_key;
 extern char *capem;
@@ -108,5 +107,10 @@ bool get_https_connect_status(void);
 //域名域名DNS解析
 OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen);
 int user_set_tcp_keepalive(int socket, int send_timeout, int recv_timeout, int idle, int interval, int count);
-
+OSStatus eland_http_request(ELAND_HTTP_METHOD method,             //POST 或者 GET
+                            ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
+                            char *request_uri,                    //uri
+                            char *host_name,                      //host
+                            char *http_body,                      //BODY
+                            ELAND_HTTP_RESPONSE_SETTING_S *user_http_response);
 #endif

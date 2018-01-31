@@ -76,21 +76,21 @@ int application_start(void)
     //start_uart_service();
 
     /*start init eland SPI*/
-    // err = start_eland_flash_service();
+    err = start_eland_flash_service();
     require_noerr(err, exit);
 
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
-
+    SendElandStateQueue(WifyConnected);
     /*start eland HTTP service */
     err = start_eland_service();
     require_noerr(err, exit);
 
     err = TCP_Service_Start();
+    app_netclock_log("TCP_Service_Start err = %d", err);
     require_noerr(err, exit);
-
     //err = start_test_thread();
     require_noerr(err, exit);
 

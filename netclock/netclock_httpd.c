@@ -95,8 +95,8 @@ static void eland_check_ssid(void)
         context->micoSystemConfig.configured = allConfigured;
         mico_system_context_update(context);
 
-        //app_httpd_log("system restart");
-        //mico_system_power_perform(context, eState_Software_Reset);
+        app_httpd_log("system restart");
+        mico_system_power_perform(context, eState_Software_Reset);
     }
     Eland_httpd_stop(); //stop http server mode
     flagHttpdServerAP = 1;
@@ -268,8 +268,7 @@ int Eland_httpd_start(void)
         app_http_register_handlers();
         is_handlers_registered = true;
     }
-
-exit:
+    exit:
     return err;
 }
 

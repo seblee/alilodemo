@@ -36,23 +36,16 @@
 #include "flash_kh25.h"
 #include "eland_sound.h"
 #include "netclock.h"
-
-//#define CONFIG_CLIENT_DEBUG
+#include "netclock_uart.h"
+#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
 #define client_log(...)
 #endif /* ! CONFIG_CLIENT_DEBUG */
 
-static bool is_https_connect = false; //HTTPS 是否连接
-
-static ELAND_HTTP_RESPONSE_SETTING_S eland_http_res; //全局变量 http响应的全局设置
 static char *eland_http_requeset = NULL;
 
-mico_queue_t eland_http_request_queue = NULL;  //eland HTTP的发送请求队列
-mico_queue_t eland_http_response_queue = NULL; //eland HTTP的接收响应队列
-
-static mico_semaphore_t eland_http_client_InitCompleteSem = NULL;
 uint32_t eland_sound_download_pos = 0;
 uint32_t eland_sound_download_len = 0;
 SOUND_DOWNLOAD_STATUS sound_download_status = SOUND_DOWNLOAD_IDLE;
@@ -60,10 +53,6 @@ SOUND_DOWNLOAD_STATUS sound_download_status = SOUND_DOWNLOAD_IDLE;
 
 /**********************************************/
 
-static bool http_get_wifi_status(void);
-static OSStatus http_queue_init(void);
-static OSStatus http_queue_deinit(void);
-static void eland_client_serrvice(mico_thread_arg_t arg);
 static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext);
 
 /*one request may receive multi reply*/
@@ -170,93 +159,6 @@ SdE0WebPo0V0j6bBvtiPEt2q7SLlNk6oCvra2b8tRvZQZC6hIfkk1PtDBgavL87k\n\
     ""
 /*******************************************************/
 
-//啟動eland_client 線程，
-OSStatus start_client_serrvice(void)
-{
-    OSStatus err = kGeneralErr;
-
-    err = mico_rtos_init_semaphore(&eland_http_client_InitCompleteSem, 1);
-    require_noerr_string(err, exit, "eland_http_client_InitCompleteSem init err");
-
-    err = http_queue_init();
-    require_noerr(err, exit);
-
-    if (http_get_wifi_status() == false)
-    {
-        err = kGeneralErr;
-        client_log("[ERROR]wifi is not connect!");
-        goto exit;
-    }
-
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "client_serrvice", eland_client_serrvice, 0x2800, 0);
-    require_noerr(err, exit);
-
-    err = mico_rtos_get_semaphore(&eland_http_client_InitCompleteSem, MICO_WAIT_FOREVER);
-    require_noerr_string(err, exit, "eland_http_client_InitCompleteSem get err");
-
-exit:
-    if (err != kNoErr)
-    {
-        http_queue_deinit();
-    }
-    err = mico_rtos_deinit_semaphore(&eland_http_client_InitCompleteSem);
-    require_noerr_string(err, exit, "eland_http_client_InitCompleteSem deinit err");
-    return err;
-}
-static OSStatus http_queue_init(void)
-{
-    OSStatus err = kGeneralErr;
-
-    //初始化eland http 發送 request 消息
-    err = mico_rtos_init_queue(&eland_http_request_queue, "eland_http_request_queue", sizeof(ELAND_HTTP_REQUEST_SETTING_S *), 1); //只容纳一个成员 传递的只是地址
-    require_noerr(err, exit);
-
-    //初始化eland http 接收到 response 消息
-    err = mico_rtos_init_queue(&eland_http_response_queue, "eland_http_response_queue", sizeof(ELAND_HTTP_RESPONSE_SETTING_S *), 1); //只容纳一个成员 传递的只是地址
-    require_noerr(err, exit);
-
-exit:
-    return err;
-}
-
-static OSStatus http_queue_deinit(void)
-{
-    if (eland_http_request_queue != NULL)
-    {
-        mico_rtos_deinit_queue(&eland_http_request_queue);
-    }
-
-    if (eland_http_response_queue != NULL)
-    {
-        mico_rtos_deinit_queue(&eland_http_response_queue);
-    }
-    return kNoErr;
-}
-
-//获取网络连接状态
-static bool http_get_wifi_status(void)
-{
-    LinkStatusTypeDef link_status;
-
-    memset(&link_status, 0, sizeof(link_status));
-
-    micoWlanGetLinkStatus(&link_status);
-
-    return (bool)(link_status.is_connected);
-}
-
-//设置https连接状态
-void set_https_connect_status(bool status)
-{
-    is_https_connect = status;
-}
-
-//获取https连接状态
-bool get_https_connect_status(void)
-{
-    return is_https_connect;
-}
-
 //域名域名DNS解析
 OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
 {
@@ -293,80 +195,6 @@ OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
     memcpy(addr, ip_addr, strlen(ip_addr));
 
     return kNoErr;
-}
-
-//根据eland_http_req来生成一个http请求,组合出一个字符串
-static OSStatus generate_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *eland_http_req)
-{
-    OSStatus err = kGeneralErr;
-    uint32_t http_req_all_len = strlen(eland_http_req->http_body) + 1024; //为head部分预留1024字节
-
-    eland_http_requeset = malloc(http_req_all_len);
-    if (eland_http_requeset == NULL)
-    {
-        client_log("[ERROR]malloc error!!! malloc len is %ld", http_req_all_len);
-        return kGeneralErr;
-    }
-
-    memset(eland_http_requeset, 0, http_req_all_len);
-
-    if (eland_http_req->method != HTTP_POST && eland_http_req->method != HTTP_GET)
-    {
-        client_log("http method error!");
-        err = kGeneralErr;
-        goto exit;
-    }
-
-    if (eland_http_req->method == HTTP_POST)
-    {
-        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, eland_http_req->request_uri);
-    }
-    else if (eland_http_req->method == HTTP_GET)
-    {
-        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, eland_http_req->request_uri);
-    }
-
-    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", eland_http_req->host_name); //增加hostname
-    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
-    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n"); //增加Connection设置
-
-    //增加http body部分
-    if (eland_http_req->http_body != NULL)
-    {
-        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: %d\r\n\r\n", strlen((const char *)eland_http_req->http_body)); //增加Content-Length
-
-        sprintf(eland_http_requeset + strlen(eland_http_requeset), "%s", eland_http_req->http_body);
-
-        if (eland_http_req->http_body != NULL)
-        {
-            free(eland_http_req->http_body);
-            eland_http_req->http_body = NULL;
-        }
-    }
-    else
-    {
-        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: 0\r\n\r\n"); //增加Content-Length
-    }
-
-    err = kNoErr;
-
-#if (HTTP_REQ_LOG == 1)
-    client_log("--------------------------------------");
-    client_log("\r\n%s", eland_http_requeset);
-    client_log("--------------------------------------");
-#endif
-
-exit:
-    if (err != kNoErr)
-    {
-        if (eland_http_requeset != NULL)
-        {
-            free(eland_http_requeset);
-            eland_http_requeset = NULL;
-        }
-    }
-
-    return err;
 }
 
 //设置tcp keep_alive 参数
@@ -407,26 +235,86 @@ exit:
     return retVal;
 }
 
-static void eland_client_serrvice(mico_thread_arg_t arg)
+//发送http请求 single mode
+OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          //POST 或者 GET
+                            ELAND_HTTP_REQUEST_TYPE request_type,              //eland request type
+                            char *request_uri,                                 //uri
+                            char *host_name,                                   //host
+                            char *http_body,                                   //BODY
+                            ELAND_HTTP_RESPONSE_SETTING_S *user_http_response) //response 指針
 {
     OSStatus err = kGeneralErr;
-    int http_fd = -1;
-    int ssl_errno = 0;
-    int ret = 0;
-    mico_ssl_t client_ssl = NULL;
-    fd_set readfds;
+    uint32_t http_req_all_len;
     char ipstr[20] = {0};
-    struct sockaddr_in addr;
+    char *eland_host = ELAND_HTTP_DOMAIN_NAME;
     HTTPHeader_t *httpHeader = NULL;
     http_context_t context = {NULL, 0};
-    char *eland_host = ELAND_HTTP_DOMAIN_NAME;
+    struct sockaddr_in addr;
+    int http_fd = -1;
+    int ret = 0;
+    int ssl_errno = 0;
+    mico_ssl_t client_ssl = NULL;
+    fd_set readfds;
     struct timeval t = {0, HTTP_YIELD_TMIE * 1000};
-    uint32_t req_id = 0;
-    static uint8_t connect_count = 0;
-    ELAND_HTTP_REQUEST_SETTING_S *eland_http_req = NULL; //http 请求
 
+    if (http_body)
+        http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
+    else
+        http_req_all_len = 1024; //为head部分预留1024字节 need free
+    eland_http_requeset = malloc(http_req_all_len);
+    if (eland_http_requeset == NULL)
+    {
+        client_log("[ERROR]malloc error!!! malloc len is %ld", http_req_all_len);
+        return kGeneralErr;
+    }
+    memset(eland_http_requeset, 0, http_req_all_len);
+    if (method != HTTP_POST && method != HTTP_GET)
+    {
+        client_log("http method error!");
+        err = kGeneralErr;
+        goto exit;
+    }
+    mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
+    /******set request mode******/
+    if (method == HTTP_POST)
+    {
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, request_uri);
+    }
+    else if (method == HTTP_GET)
+    {
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, request_uri);
+    }
+    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", host_name); //增加hostname
+    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
+    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n"); //增加Connection设置
+
+    //增加http body部分
+    if (http_body != NULL)
+    {
+        /*增加Content-Length*/
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: %d\r\n\r\n", strlen((const char *)http_body));
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "%s", http_body);
+        if (http_body != NULL)
+        {
+            free(http_body);
+            http_body = NULL;
+        }
+    }
+    else
+    {
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: 0\r\n\r\n"); //增加Content-Length
+    }
 HTTP_SSL_START:
-    set_https_connect_status(false);
+    if (client_ssl)
+    {
+        ssl_close(client_ssl);
+        client_ssl = NULL;
+    }
+    if (http_fd > 0)
+    {
+        SocketClose(&http_fd);
+        http_fd = -1;
+    }
     client_log("start dns annlysis, domain:%s", eland_host);
     err = usergethostbyname(eland_host, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
@@ -435,7 +323,6 @@ HTTP_SSL_START:
         mico_thread_msleep(200);
         goto HTTP_SSL_START;
     }
-    client_log("HTTP server address: host:%s, ip: %s", eland_host, ipstr);
     /*HTTPHeaderCreateWithCallback set some callback functions */
     httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData, onClearData, &context);
     if (httpHeader == NULL)
@@ -446,7 +333,6 @@ HTTP_SSL_START:
     }
     SocketClose(&http_fd);
     http_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(ipstr);
     addr.sin_port = htons(ELAND_HTTP_PORT_SSL); //HTTP SSL端口 443
@@ -460,49 +346,24 @@ HTTP_SSL_START:
                                  ELAND_HTTP_KEEP_COUNT);     // 尝试探测的次数.如果第1次探测包就收到响应了,则后2次的不再发
     if (ret < 0)
     {
+        err = kGeneralErr;
         client_log("user_set_tcp_keepalive() error ret:%d", ret);
         goto exit;
     }
-
     client_log("start connect");
     err = connect(http_fd, (struct sockaddr *)&addr, sizeof(addr));
     require_noerr_string(err, exit, "connect https server failed");
-
     // 設置 證書
     ssl_set_client_cert(certificate, private_key);
     //ssl_version_set(TLS_V1_2_MODE);    //设置SSL版本
     ssl_set_client_version(TLS_V1_2_MODE);
-
     client_log("start ssl_connect");
     //client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
-    client_log("#####https connect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-    if (eland_http_client_InitCompleteSem != NULL)
-        mico_rtos_set_semaphore(&eland_http_client_InitCompleteSem);
-SSL_SEND:
-    set_https_connect_status(true);
-    //1.从消息队列中取一条信息
-    err = mico_rtos_pop_from_queue(&eland_http_request_queue, &eland_http_req, MICO_WAIT_FOREVER);
-    require_noerr(err, SSL_SEND);
-    connect_count++;
-    req_id = eland_http_req->http_req_id;
-
-    err = generate_eland_http_request(eland_http_req); //生成http请求
-    if (err != kNoErr)
-    {
-        send_response_to_queue(HTTP_REQUEST_ERROR, req_id, 0, NULL);
-        goto SSL_SEND;
-    }
-
+    SendElandStateQueue(HTTP_Get_HOST_INFO);
     /* Send HTTP Request */
-    ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset)); /* Send HTTP Request */
-
-    if (eland_http_requeset != NULL) //释放发送缓冲区
-    {
-        free(eland_http_requeset);
-        eland_http_requeset = NULL;
-    }
+    ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
     if (ret > 0)
     {
         //client_log("ssl_send success [%d] [%d]", strlen((const char *)eland_http_requeset) ,ret);
@@ -516,7 +377,6 @@ SSL_SEND:
     }
     FD_ZERO(&readfds);
     FD_SET(http_fd, &readfds);
-
     ret = select(http_fd + 1, &readfds, NULL, NULL, &t);
     if (ret == -1 || ret == 0)
     {
@@ -540,18 +400,26 @@ SSL_SEND:
             if (httpHeader->statusCode >= 500)
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
-                goto exit; //断开重新连接
+                user_http_response->send_status = HTTP_REQUEST_ERROR;
+                user_http_response->status_code = httpHeader->statusCode;
+                user_http_response->eland_response_body = NULL;
+                break;
             }
             if (httpHeader->statusCode == 400) //認證錯誤
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
-                goto exit; //断开重新连接
+                user_http_response->send_status = HTTP_CONNECT_ERROR;
+                user_http_response->status_code = httpHeader->statusCode;
+                user_http_response->eland_response_body = NULL;
+                break;
             }
 
             if (httpHeader->statusCode == 404) //沒找到文件
             {
                 client_log("[FAILURE]eland http response fail, code:%d", httpHeader->statusCode);
-                send_response_to_queue(HTTP_RESPONSE_FAILURE, req_id, httpHeader->statusCode, NULL);
+                user_http_response->send_status = HTTP_RESPONSE_FAILURE;
+                user_http_response->status_code = httpHeader->statusCode;
+                user_http_response->eland_response_body = NULL;
                 break;
             }
 
@@ -566,7 +434,15 @@ SSL_SEND:
                 client_log("Content %s0x%08x:[%ld]",
                            context.content, context.content, context.content_length); /*get data and print*/
 #endif
-                send_response_to_queue(HTTP_RESPONSE_SUCCESS, req_id, httpHeader->statusCode, context.content);
+                user_http_response->send_status = HTTP_RESPONSE_SUCCESS;
+                user_http_response->status_code = httpHeader->statusCode;
+                if (context.content_length < 1501)
+                {
+                    user_http_response->eland_response_body = calloc(context.content_length, sizeof(uint8_t));
+                    memcpy(user_http_response->eland_response_body, context.content, context.content_length);
+                }
+                else
+                    user_http_response->eland_response_body = NULL;
             }
             break;
         }
@@ -575,33 +451,19 @@ SSL_SEND:
 
         case kNoSpaceErr:
             client_log("SocketReadHTTPSHeader kNoSpaceErr");
-            goto exit; //断开重新连接
+            user_http_response->send_status = HTTP_REQUEST_ERROR;
             break;
         case kConnectionErr:
             client_log("SocketReadHTTPSHeader kConnectionErr");
-            goto exit; //断开重新连接
+            user_http_response->send_status = HTTP_REQUEST_ERROR;
             break;
         default:
             client_log("ERROR: HTTP Header parse error: %d", err);
-            goto exit; //断开重新连接
+            user_http_response->send_status = HTTP_REQUEST_ERROR;
             break;
         }
     }
-    if (eland_sound_download_pos == eland_sound_download_len)
-    {
-        sound_download_status = SOUND_DOWNLOAD_IDLE;
-    }
-
-    HTTPHeaderClear(httpHeader);
-    //client_log("#####https send#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-    if (connect_count > 90) //測試90次以後重新連接
-        goto exit_2;        //
-    goto SSL_SEND;
 exit:
-    send_response_to_queue(HTTP_CONNECT_ERROR, req_id, 0, NULL); //只有发生连接发生错误的时候才会进入exit中
-exit_2:
-    set_https_connect_status(false);
-    connect_count = 0;
     if (client_ssl)
     {
         ssl_close(client_ssl);
@@ -609,24 +471,19 @@ exit_2:
     }
 
     SocketClose(&http_fd);
-    HTTPHeaderDestory(&httpHeader);
 
-    mico_thread_msleep(200);
-    client_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-    goto HTTP_SSL_START;
-
+    /*free request buf*/
     if (eland_http_requeset != NULL)
     {
         free(eland_http_requeset);
         eland_http_requeset = NULL;
     }
-
-    http_queue_deinit();
-
-    client_log("Exit: Client exit with err = %d, fd:%d", err, http_fd);
-    mico_rtos_delete_thread(NULL);
-    return;
+    HTTPHeaderDestory(&httpHeader);
+    mico_thread_msleep(200);
+    mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
+    return err;
 }
+
 /*one request may receive multi reply */
 static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
                                size_t inLen, void *inUserContext)
@@ -713,74 +570,11 @@ static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext)
 {
     UNUSED_PARAMETER(inHeader);
     http_context_t *context = inUserContext;
+    client_log("clear header");
     if (context->content)
     {
         free(context->content);
         context->content = NULL;
     }
     eland_sound_download_pos = 0;
-}
-
-//给response的消息队列发送消息
-void send_response_to_queue(ELAND_HTTP_RESPONSE_E status, uint32_t http_id, int32_t status_code, const char *response_body)
-{
-    OSStatus err = kGeneralErr;
-    ELAND_HTTP_RESPONSE_SETTING_S *eland_http_response_temp = NULL, *eland_http_res_p = NULL;
-    static uint32_t local_id = 0;
-
-    if (local_id == http_id) //过滤重复id   理论上id是递增的
-    {
-        return;
-    }
-
-    eland_http_res.send_status = status;
-    eland_http_res.http_res_id = http_id;
-    eland_http_res.status_code = status_code;
-
-    if (response_body != NULL)
-    {
-        eland_http_res.eland_response_body = malloc(strlen(response_body) + 2);
-        require_action_string(eland_http_res.eland_response_body != NULL, exit, err = kNoMemoryErr, "[ERROR]malloc() error!");
-
-        memset(eland_http_res.eland_response_body, 0, strlen(response_body) + 2); //清0
-
-        memcpy(eland_http_res.eland_response_body, response_body, strlen(response_body));
-    }
-    else
-    {
-        eland_http_res.eland_response_body = NULL;
-    }
-    if (false == mico_rtos_is_queue_empty(&eland_http_response_queue))
-    {
-        client_log("[error]eland_http_response_queue is full");
-
-        err = mico_rtos_pop_from_queue(&eland_http_response_queue, &eland_http_response_temp, 10); //如果满先弹出一个
-        require_noerr_action(err, exit, client_log("[error]mico_rtos_pop_from_queue err"));
-
-        if (eland_http_response_temp->eland_response_body != NULL)
-        {
-            free(eland_http_response_temp->eland_response_body);
-            eland_http_response_temp->eland_response_body = NULL;
-        }
-
-        eland_http_response_temp = NULL;
-    }
-
-    eland_http_res_p = &eland_http_res;
-    err = mico_rtos_push_to_queue(&eland_http_response_queue, &eland_http_res_p, 10);
-    require_noerr_action(err, exit, client_log("[error]mico_rtos_push_to_queue err"));
-
-    local_id = http_id;
-
-exit:
-    if (err != kNoErr)
-    {
-        if (eland_http_res.eland_response_body != NULL)
-        {
-            free(eland_http_res.eland_response_body);
-            eland_http_res.eland_response_body = NULL;
-        }
-    }
-
-    return;
 }

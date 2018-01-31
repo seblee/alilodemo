@@ -49,7 +49,7 @@ extern const char Eland_Data[11];
 extern json_object *ElandJsonData;
 extern ELAND_DES_S *netclock_des_g;
 extern _ELAND_DEVICE_t *device_state;
-
+extern mico_mutex_t http_send_setting_mutex;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus start_eland_service(void);
 OSStatus netclock_desInit(void);

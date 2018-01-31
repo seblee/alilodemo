@@ -55,7 +55,7 @@ OSStatus Start_Alarm_service(void)
 
     elsv_alarm_data_init_MCU(&elsv_alarm_data, (_alarm_mcu_data_t *)cache);
     elsv_alarm_data_sort_out(&elsv_alarm_data);
-    alarm_list_add(&alarm_list, &elsv_alarm_data);
+    //alarm_list_add(&alarm_list, &elsv_alarm_data);
 
     alarm_stream.stream_id = audio_service_system_generate_stream_id();
     set_alarm_stream_pos(0);
@@ -359,6 +359,7 @@ void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inDat
         {
             if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
             {
+                alarm_log("get minus alarm_id");
                 memmove(AlarmList->alarm_lib + i,
                         AlarmList->alarm_lib + i + 1,
                         (AlarmList->alarm_number - 1 - i) * sizeof(__elsv_alarm_data_t));

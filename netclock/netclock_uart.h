@@ -31,9 +31,7 @@ typedef enum {
     WifyConnected,
     WifyDisConnected,
     WifyConnectedFailed,
-    ElandAliloPlay,
-    ElandAliloPause,
-    ElandAliloStop,
+    CONNECTED_NET,
     HTTP_Get_HOST_INFO,
     TCP_CN00,
     TCP_DV00,
@@ -110,12 +108,12 @@ typedef struct eland_mode_state
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
+uint16_t get_eland_mode_state(void);
 OSStatus start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void StateReceivethread(mico_thread_arg_t arg);
 void SendElandStateQueue(Eland_Status_type_t value);
-
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

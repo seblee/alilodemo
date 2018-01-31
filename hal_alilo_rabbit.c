@@ -112,10 +112,10 @@ OSStatus hal_alilo_rabbit_init(void)
     err = audio_service_init();
     require_noerr(err, exit);
 
-    err = user_key_init();
-    require_noerr(err, exit);
+    // err = user_key_init();
+    // require_noerr(err, exit);
 
-    mico_rtos_thread_sleep(3); //wait for audio ready
+    // mico_rtos_thread_sleep(3); //wait for audio ready
 
 //audio_service_sound_remind_start(&result, 1); //我的尝夥伴，快來和我玩耝坧
 //audio_service_sound_remind_start(&result, 2);//請先幫我酝置無線網絡坧

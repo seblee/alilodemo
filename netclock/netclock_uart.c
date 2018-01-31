@@ -30,7 +30,7 @@
 
 #define UART_BUFFER_LENGTH 1024
 #define UART_ONE_PACKAGE_LENGTH 512
-#define STACK_SIZE_UART_RECV_THREAD 0x2000
+#define STACK_SIZE_UART_RECV_THREAD 0x1500
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -62,7 +62,6 @@ static void uart_thread_DDE(uint32_t arg);
 static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
 static void Opration_Packet(uint8_t *data);
 
-static uint16_t get_eland_mode_state(void);
 static void set_eland_mode(_ELAND_MODE_t mode);
 static void set_eland_state(Eland_Status_type_t state);
 static void reset_eland_flash_para(void);
@@ -75,7 +74,7 @@ OSStatus start_uart_service(void)
     err = mico_rtos_init_mutex(&eland_mode_state.state_mutex);
     require_noerr(err, exit);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_service", uart_service, STACK_SIZE_UART_RECV_THREAD, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_service", uart_service, 0x1000, 0);
 exit:
     return err;
 }
@@ -92,7 +91,7 @@ static void uart_service(uint32_t arg)
     mico_rtos_thread_msleep(1100);
     /*creat mcu_ota thread*/
 
-    err = mico_rtos_create_thread(&MCU_OTA_thread, MICO_APPLICATION_PRIORITY, "mcu_ota_thread", mcu_ota_thread, STACK_SIZE_UART_RECV_THREAD, (uint32_t)&ota_arg);
+    err = mico_rtos_create_thread(&MCU_OTA_thread, MICO_APPLICATION_PRIORITY, "mcu_ota_thread", mcu_ota_thread, 0x1000, (uint32_t)&ota_arg);
     require_noerr(err, exit);
     /*wait ota thread*/
     mico_rtos_thread_join(&MCU_OTA_thread);
@@ -304,20 +303,17 @@ exit:
 
 void SendElandStateQueue(Eland_Status_type_t value)
 {
-    Eland_Status_type_t state = value;
+    Eland_Status_type_t state;
     __msg_function_t eland_cmd = ELAND_STATES_05;
     set_eland_state(value);
-
     if (eland_state_queue == NULL)
         return;
     if (mico_rtos_is_queue_full(&eland_state_queue)) //if full pick out data then update state
         mico_rtos_pop_from_queue(&eland_state_queue, &state, 0);
-    else
-    {
-        state = value;
-        mico_rtos_push_to_queue(&eland_state_queue, &state, 10);
-    }
-    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+    state = value;
+    mico_rtos_push_to_queue(&eland_state_queue, &state, 0);
+
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
 }
 static void timer100_key_handle(void *arg)
 {
@@ -400,7 +396,7 @@ start_send:
     err = elandUsartSendData(Cache, len);
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)KEY_READ_02)
         err = kNoErr;
@@ -432,7 +428,7 @@ start_send:
     err = elandUsartSendData(Cache, 4 + sizeof(mico_rtc_time_t));
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)TIME_SET_03)
         err = kNoErr;
@@ -462,7 +458,7 @@ start_send:
     err = elandUsartSendData(Cache, 5);
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)TIME_READ_04)
         err = kNoErr;
@@ -495,7 +491,7 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 5);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)ELAND_STATES_05)
         err = kNoErr;
@@ -524,7 +520,7 @@ start_send:
     err = elandUsartSendData(Cache, 4 + strlen(Eland_Firmware_Version));
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
 
     if (received_cmd == (__msg_function_t)SEND_FIRM_WARE_06)
@@ -548,15 +544,19 @@ static void ELAND_H08_Send(uint8_t *Cache)
     LCD_Wifi_Rssi_t rssi_level = LEVELNUM;
     LinkStatusTypeDef LinkStatus_Cache;
     micoWlanGetLinkStatus(&LinkStatus_Cache);
-
-    if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE4)
-        rssi_level = LEVEL4;
-    else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE3)
-        rssi_level = LEVEL3;
-    else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE2)
-        rssi_level = LEVEL2;
-    else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE1)
-        rssi_level = LEVEL1;
+    if (LinkStatus_Cache.is_connected)
+    {
+        if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE4)
+            rssi_level = LEVEL4;
+        else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE3)
+            rssi_level = LEVEL3;
+        else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE2)
+            rssi_level = LEVEL2;
+        else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE1)
+            rssi_level = LEVEL1;
+        else
+            rssi_level = LEVEL0;
+    }
     else
         rssi_level = LEVEL0;
     mode_state_temp = get_eland_mode_state();
@@ -571,7 +571,7 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 7);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
 
     if (received_cmd == (__msg_function_t)SEND_LINK_STATE_08)
@@ -599,7 +599,7 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 4);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
     require_noerr(err, exit);
 
     if (received_cmd == (__msg_function_t)ALARM_READ_10)
@@ -659,10 +659,11 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     }
     else //eland net clock mode
     {
-        if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus))
+        if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus)) //NA
         {
-            Start_wifi_Station_SoftSP_Thread(Soft_AP);
             set_eland_mode(ELAND_NA);
+
+            Start_wifi_Station_SoftSP_Thread(Soft_AP);
         }
     }
 
@@ -710,7 +711,7 @@ static void MODH_Opration_10H(uint8_t *usart_rec)
     elsv_alarm_data_init_MCU(&elsv_alarm_data, &cache);
 }
 
-static uint16_t get_eland_mode_state(void)
+uint16_t get_eland_mode_state(void)
 {
     uint16_t Cache = 0;
     Cache = eland_mode_state.eland_mode << 16;
@@ -719,12 +720,16 @@ static uint16_t get_eland_mode_state(void)
 }
 static void set_eland_mode(_ELAND_MODE_t mode)
 {
+    if (eland_mode_state.state_mutex == NULL)
+        return;
     mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
     eland_mode_state.eland_mode = mode;
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
 }
 static void set_eland_state(Eland_Status_type_t state)
 {
+    if (eland_mode_state.state_mutex == NULL)
+        return;
     mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
     eland_mode_state.eland_status = state;
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
