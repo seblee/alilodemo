@@ -760,7 +760,6 @@ static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient)
         rc = CMD_BACK_ERROR;
     if (TCP_SUCCESS == rc)
         SendElandStateQueue(TCP_AL00);
-
     return rc;
 }
 static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient)
@@ -1180,6 +1179,8 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
             alarm = json_object_array_get_idx(alarm_array, i);
             memset(&alarm_data_cache, 0, sizeof(__elsv_alarm_data_t));
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
+            elan_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
+            //  elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             elsv_alarm_data_sort_out(&alarm_data_cache);
             alarm_list_add(&alarm_list, &alarm_data_cache);
         }

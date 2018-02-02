@@ -46,7 +46,9 @@ OSStatus Start_Alarm_service(void)
     uint8_t cache[11] = {0x00, 0x1e, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
     memset(&alarm_list, 0, sizeof(_eland_alarm_list_t));
-    err = mico_rtos_init_mutex(&alarm_list.AlarmListMutex);
+    err = mico_rtos_init_mutex(&alarm_list.AlarmlibMutex);
+    require_noerr(err, exit);
+    err = mico_rtos_init_mutex(&alarm_list.AlarmSerialMutex);
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_list.state.AlarmStateMutex);
     require_noerr(err, exit);
@@ -70,9 +72,12 @@ void Alarm_Manager(uint32_t arg)
     __elsv_alarm_data_t *alarm_nearest = NULL;
     uint32_t current_seconds = 0;
     uint8_t i;
-
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < alarm_list.alarm_number; i++)
         elsv_alarm_data_sort_out(alarm_list.alarm_lib + i);
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+
+    alarm_log("start Alarm_Manager ");
     alarm_nearest = Alarm_ergonic_list(&alarm_list);
     if (alarm_nearest)
     {
@@ -85,6 +90,7 @@ void Alarm_Manager(uint32_t arg)
         if ((alarm_list.list_refreshed) || (alarm_list.state.alarm_stoped == true))
         {
             /**refresh point**/
+            alarm_log("list_refreshed");
             alarm_nearest = Alarm_ergonic_list(&alarm_list);
             if (alarm_nearest)
             {
@@ -159,15 +165,14 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     _alarm_mcu_data_t *alarm_mcu_data = NULL;
     int ho, mi, se;
     uint8_t i;
-    mico_rtos_lock_mutex(&alarm_list.AlarmListMutex);
     set_alarm_state(ALARM_SORT);
     if (elsv_alarm_data == NULL)
-        goto exit;
+        return;
     alarm_eland_data = &(elsv_alarm_data->alarm_data_for_eland);
     alarm_mcu_data = &(elsv_alarm_data->alarm_data_for_mcu);
     sscanf((const char *)(&(elsv_alarm_data->alarm_time)), "%02d:%02d:%02d", &ho, &mi, &se);
-
     alarm_eland_data->moment_second = (uint32_t)ho * 3600 + (uint32_t)mi * 60 + (uint32_t)se;
+
     alarm_mcu_data->moment_time.hr = ho;
     alarm_mcu_data->moment_time.min = mi;
     alarm_mcu_data->moment_time.sec = se;
@@ -216,8 +221,6 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
         alarm_eland_data->alarm_on_days_of_week = 0;
         alarm_mcu_data->alarm_on_days_of_week = 0;
     }
-exit:
-    mico_rtos_unlock_mutex(&alarm_list.AlarmListMutex);
 }
 void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data)
 {
@@ -271,35 +274,57 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
     set_alarm_state(ALARM_IDEL);
+    alarm_log("lock AlarmlibMutex");
     if (list->alarm_number == 0)
-        return NULL;
-    elsv_alarm_data = list->alarm_lib;
+    {
+        alarm_log("alarm_number = 0");
+        elsv_alarm_data = NULL;
+        goto exit;
+    }
     current_seconds = GET_current_second();
+    alarm_log("current_seconds:%ld", current_seconds);
+    list->alarm_waiting_serial = 0;
+    for (i = 0; i < list->alarm_number; i++)
+    {
+        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < current_seconds)
+            continue;
+        else
+        {
+            elsv_alarm_data = list->alarm_lib + i;
+            set_waiting_alarm_serial(i);
+            break;
+        }
+    }
+    if (elsv_alarm_data == NULL)
+        return NULL;
 
     for (i = 0; i < list->alarm_number; i++)
     {
+        alarm_log("alarm[%d]:%ld", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second);
+
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < current_seconds)
             continue;
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <
             elsv_alarm_data->alarm_data_for_eland.moment_second)
         {
             elsv_alarm_data = list->alarm_lib + i;
+            set_waiting_alarm_serial(i);
         }
     }
 
-    if (elsv_alarm_data->alarm_data_for_eland.moment_second > current_seconds)
-        return elsv_alarm_data;
-    else
-        return NULL;
+exit:
+    return elsv_alarm_data;
 }
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
     OSStatus err = kNoErr;
     uint8_t i;
     __elsv_alarm_data_t *p = AlarmList->alarm_lib;
-    mico_rtos_lock_mutex(&alarm_list.AlarmListMutex);
+    alarm_log("ALARM_ADD");
     set_alarm_state(ALARM_ADD);
-
+    alarm_log("lock AlarmlibMutex");
+    err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    require_noerr(err, exit);
     if (AlarmList->alarm_number == 0)
     {
         alarm_log("alarm is first");
@@ -340,13 +365,16 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         }
     }
 exit:
-    mico_rtos_unlock_mutex(&alarm_list.AlarmListMutex);
+    err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     return err;
 }
-void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
+OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
+    OSStatus err = kNoErr;
     uint8_t i;
-    mico_rtos_lock_mutex(&alarm_list.AlarmListMutex);
+    alarm_log("lock AlarmlibMutex");
+    err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    require_noerr(err, exit);
     set_alarm_state(ALARM_MINUS);
     if (AlarmList->alarm_number == 0)
     {
@@ -375,7 +403,10 @@ void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inDat
             }
         }
     }
-    mico_rtos_unlock_mutex(&alarm_list.AlarmListMutex);
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+    require_noerr(err, exit);
+exit:
+    return err;
 }
 
 static void alarm_operation(__elsv_alarm_data_t *alarm)
@@ -606,4 +637,57 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
               alarm_data->alarm_data_for_mcu.moment_time.hr,
               alarm_data->alarm_data_for_mcu.moment_time.min,
               alarm_data->alarm_data_for_mcu.moment_time.sec);
+}
+
+uint8_t get_next_alarm_serial(uint8_t now_serial)
+{
+    now_serial++;
+    if (now_serial >= alarm_list.alarm_number)
+        now_serial = 0;
+    return now_serial;
+}
+uint8_t get_previous_alarm_serial(uint8_t now_serial)
+{
+    if (alarm_list.alarm_number)
+    {
+        if ((now_serial >= alarm_list.alarm_number) || (now_serial == 0))
+            now_serial = alarm_list.alarm_number - 1;
+        else
+            now_serial--;
+    }
+    return now_serial;
+}
+uint8_t get_waiting_alarm_serial(void)
+{
+    return alarm_list.alarm_waiting_serial;
+}
+void set_waiting_alarm_serial(uint8_t now_serial)
+{
+    if (alarm_list.AlarmSerialMutex != NULL)
+        mico_rtos_lock_mutex(&alarm_list.AlarmSerialMutex);
+    alarm_list.alarm_waiting_serial = now_serial;
+    if (alarm_list.AlarmSerialMutex != NULL)
+        mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
+}
+
+uint8_t get_display_alarm_serial(void)
+{
+    return alarm_list.alarm_display_serial;
+}
+void set_display_alarm_serial(uint8_t serial)
+{
+    if (alarm_list.AlarmSerialMutex != NULL)
+        mico_rtos_lock_mutex(&alarm_list.AlarmSerialMutex);
+    alarm_list.alarm_display_serial = serial;
+    if (alarm_list.AlarmSerialMutex != NULL)
+        mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
+}
+_alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial)
+{
+    _alarm_mcu_data_t *temp = NULL;
+    if (serial >= alarm_list.alarm_number)
+        return temp;
+    else
+        temp = &(alarm_list.alarm_lib + serial)->alarm_data_for_mcu;
+    return temp;
 }

@@ -99,7 +99,6 @@ OSStatus netclock_desInit(void)
 
     Eland_log("local firmware version:%s", Eland_Firmware_Version);
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
-    SendElandStateQueue(HTTP_Get_HOST_INFO);
     return kNoErr;
 exit:
     if (device_state != NULL)
@@ -130,6 +129,8 @@ OSStatus start_eland_service(void)
     //1.eland 通訊情報取得
     err = eland_communication_info_get();
     require_noerr(err, exit);
+    // SendElandStateQueue(HTTP_Get_HOST_INFO);
+
     Eland_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     //3.eland test  下載音頻到flash
@@ -234,7 +235,7 @@ OSStatus Netclock_des_recovery(void)
     /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
     device_state->IsAlreadySet = device_temp.IsAlreadySet;
-    device_state->eland_id = device_temp.eland_id;
+    device_state->eland_id = 5; // device_temp.eland_id;
     memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
     context = mico_system_context_get();
@@ -576,7 +577,6 @@ exit:
         mico_thread_msleep(200);
         goto DEVICE_INFO_GET_START;
     }
-    SendElandStateQueue(HTTP_Get_HOST_INFO);
     return err;
 }
 

@@ -30,7 +30,7 @@
 
 #define UART_BUFFER_LENGTH 1024
 #define UART_ONE_PACKAGE_LENGTH 512
-#define STACK_SIZE_UART_RECV_THREAD 0x1500
+#define STACK_SIZE_UART_RECV_THREAD 0x2000
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -53,6 +53,7 @@ static void ELAND_H05_Send(uint8_t *Cache);
 static void ELAND_H06_Send(uint8_t *Cache);
 static void ELAND_H08_Send(uint8_t *Cache);
 static void ELAND_H10_Send(uint8_t *Cache);
+static void ELAND_H11_Send(uint8_t *Cache);
 static void MODH_Opration_02H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
 static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec);
@@ -62,6 +63,7 @@ static void uart_thread_DDE(uint32_t arg);
 static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
 static void Opration_Packet(uint8_t *data);
 
+static _ELAND_MODE_t get_eland_mode(void);
 static void set_eland_mode(_ELAND_MODE_t mode);
 static void set_eland_state(Eland_Status_type_t state);
 static void reset_eland_flash_para(void);
@@ -246,6 +248,9 @@ static void Opration_Packet(uint8_t *data)
     case ALARM_READ_10:
         MODH_Opration_10H(data);
         break;
+    case ALARM_SEND_11:
+        MODH_Opration_xxH(ALARM_SEND_11, data);
+        break;
     default:
         break;
     }
@@ -291,6 +296,9 @@ static void uart_thread_DDE(uint32_t arg)
             break;
         case ALARM_READ_10: /* READ MCU ALARM*/
             ELAND_H10_Send(inDataBuffer);
+            break;
+        case ALARM_SEND_11: /* READ MCU ALARM*/
+            ELAND_H11_Send(inDataBuffer);
             break;
         default:
             break;
@@ -396,15 +404,15 @@ start_send:
     err = elandUsartSendData(Cache, len);
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)KEY_READ_02)
         err = kNoErr;
     else //10ms resend mechanism
     {
         mico_rtos_thread_msleep(10);
-        if (sended_times > 0)
-            goto start_send;
+        // if (sended_times > 0)
+        //     goto start_send;
     }
 exit:
     return;
@@ -428,7 +436,7 @@ start_send:
     err = elandUsartSendData(Cache, 4 + sizeof(mico_rtc_time_t));
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)TIME_SET_03)
         err = kNoErr;
@@ -458,7 +466,7 @@ start_send:
     err = elandUsartSendData(Cache, 5);
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)TIME_READ_04)
         err = kNoErr;
@@ -491,7 +499,7 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 5);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
     if (received_cmd == (__msg_function_t)ELAND_STATES_05)
         err = kNoErr;
@@ -520,7 +528,7 @@ start_send:
     err = elandUsartSendData(Cache, 4 + strlen(Eland_Firmware_Version));
     require_noerr(err, exit);
 
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
 
     if (received_cmd == (__msg_function_t)SEND_FIRM_WARE_06)
@@ -571,7 +579,7 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 7);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
 
     if (received_cmd == (__msg_function_t)SEND_LINK_STATE_08)
@@ -599,7 +607,7 @@ start_send:
     sended_times--;
     err = elandUsartSendData(Cache, 4);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 30);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
 
     if (received_cmd == (__msg_function_t)ALARM_READ_10)
@@ -613,35 +621,69 @@ start_send:
 exit:
     return;
 }
+static void ELAND_H11_Send(uint8_t *Cache)
+{
+    OSStatus err = kGeneralErr;
+    __msg_function_t received_cmd = KEY_FUN_NONE;
+    uint8_t sended_times = USART_RESEND_MAX_TIMES;
+    _alarm_mcu_data_t *alarm_data_mcu = NULL;
+    uint8_t serial_cache;
+    serial_cache = get_display_alarm_serial();
+    alarm_data_mcu = get_alarm_mcu_data(serial_cache);
+
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = ALARM_SEND_11;
+    if (alarm_data_mcu == NULL)
+        *(Cache + 2) = 0;
+    else
+    {
+        *(Cache + 2) = sizeof(_alarm_mcu_data_t);
+        memcpy(Cache + 3, (uint8_t *)alarm_data_mcu, sizeof(_alarm_mcu_data_t));
+    }
+    *(Cache + 3 + (*(Cache + 2))) = Uart_Packet_Trail;
+start_send:
+    sended_times--;
+    err = elandUsartSendData(Cache, 4 + (*(Cache + 2)));
+    require_noerr(err, exit);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    require_noerr(err, exit);
+
+    if (received_cmd == (__msg_function_t)ALARM_SEND_11)
+        err = kNoErr;
+    else //10ms resend mechanism
+    {
+        mico_rtos_thread_msleep(10);
+        if (sended_times > 0)
+            goto start_send;
+    }
+exit:
+    return;
+}
 static void MODH_Opration_02H(uint8_t *usart_rec)
 {
     static uint16_t Key_Count = 0, Key_Restain = 0;
-    static uint16_t Reset_key_Restain_Trg, Reset_key_Restain_count;
-    static uint16_t KEY_Add_Count_Trg, KEY_Add_Count_count;
-    static uint16_t Set_Minus_Restain_Trg, Set_Minus_Restain_count;
-    uint16_t ReadData;
+    static uint16_t Key_Count_Trg = 0, Key_Restain_Trg = 0;
+    static uint16_t Key_Count_count = 0, Key_Restain_count = 0;
+    // uint16_t ReadData;
     __msg_function_t eland_cmd = SEND_FIRM_WARE_06;
+    uint8_t cache = 0;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
 
-    /*analysis key NA mode key value*/
-    if ((Key_Restain & KEY_Set) && (Key_Restain & KEY_Minus))
-        ReadData = (KEY_Set | KEY_Minus);
-    else
-        ReadData = 0;
-    Set_Minus_Restain_Trg = ReadData & (ReadData ^ Set_Minus_Restain_count);
-    Set_Minus_Restain_count = ReadData;
-    /*analysis key reset mode key value*/
-    ReadData = Key_Restain & KEY_Reset;
-    Reset_key_Restain_Trg = ReadData & (ReadData ^ Reset_key_Restain_count);
-    Reset_key_Restain_count = ReadData;
-    if (Reset_key_Restain_Trg)
+    Key_Count_Trg = Key_Count & (Key_Count ^ Key_Count_count);
+    Key_Count_count = Key_Count;
+
+    Key_Restain_Trg = Key_Restain & (Key_Restain ^ Key_Restain_count);
+    Key_Restain_count = Key_Restain;
+
+    if (Key_Restain_Trg & KEY_Reset)
     {
         reset_eland_flash_para();
     }
+    /*analysis add key value*/
 
-    if (Key_Count & 0x0030) //ELAND_CLOCK_MON or ELAND_CLOCK_ALARM
+    if (Key_Count & (KEY_MON | KEY_AlarmMode)) //ELAND_CLOCK_MON or ELAND_CLOCK_ALARM
     {
         switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
         {
@@ -659,21 +701,46 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     }
     else //eland net clock mode
     {
-        if (Set_Minus_Restain_Trg == (KEY_Set | KEY_Minus)) //NA
+        switch (get_eland_mode())
         {
-            set_eland_mode(ELAND_NA);
-
-            Start_wifi_Station_SoftSP_Thread(Soft_AP);
+        case ELAND_NC:
+            if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
+            {
+                set_eland_mode(ELAND_NA);
+                cache = get_waiting_alarm_serial();
+                if (Key_Count_Trg & KEY_Add)
+                    cache = get_next_alarm_serial(cache);
+                else
+                    cache = get_previous_alarm_serial(cache);
+                set_display_alarm_serial(cache);
+                eland_cmd = ALARM_SEND_11;
+                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+            }
+            else if (Key_Restain_Trg & KEY_Set) //NA
+            {
+                set_eland_mode(ELAND_AP);
+                Start_wifi_Station_SoftSP_Thread(Soft_AP);
+            }
+            break;
+        case ELAND_NA:
+            if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
+            {
+                set_eland_mode(ELAND_NA);
+                cache = get_display_alarm_serial();
+                if (Key_Count_Trg & KEY_Add)
+                    cache = get_next_alarm_serial(cache);
+                else
+                    cache = get_previous_alarm_serial(cache);
+                set_display_alarm_serial(cache);
+                eland_cmd = ALARM_SEND_11;
+                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+            }
+            break;
+        case ELAND_AP:
+            break;
+        default:
+            set_eland_mode(ELAND_NC);
         }
-    }
-
-    ReadData = Key_Count & KEY_Add;
-    KEY_Add_Count_Trg = ReadData & (ReadData ^ KEY_Add_Count_count);
-    KEY_Add_Count_count = ReadData;
-    if (KEY_Add_Count_Trg)
-    {
-        eland_cmd = SEND_FIRM_WARE_06;
-        // mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     }
 }
 
@@ -718,6 +785,10 @@ uint16_t get_eland_mode_state(void)
     Cache |= eland_mode_state.eland_status;
     return Cache;
 }
+static _ELAND_MODE_t get_eland_mode(void)
+{
+    return eland_mode_state.eland_mode;
+}
 static void set_eland_mode(_ELAND_MODE_t mode)
 {
     if (eland_mode_state.state_mutex == NULL)
@@ -740,5 +811,5 @@ static void reset_eland_flash_para(void)
     OSStatus err = kNoErr;
     err = Netclock_des_recovery();
     err = err;
-    //MicoSystemReboot();
+    MicoSystemReboot();
 }

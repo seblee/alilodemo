@@ -86,6 +86,7 @@ typedef enum _eland_mode {
     ELAND_CLOCK_ALARM,
     ELAND_NC,
     ELAND_NA,
+    ELAND_AP,
     ELAND_MODE_MAX,
 } _ELAND_MODE_t;
 

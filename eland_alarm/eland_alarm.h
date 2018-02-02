@@ -28,6 +28,7 @@ typedef struct
     mico_rtc_time_t moment_time; //
     int8_t color;
     int8_t snooze_count;
+    int8_t alarm_repeat;
     uint8_t alarm_on_days_of_week;
 } _alarm_mcu_data_t;
 
@@ -91,10 +92,12 @@ typedef struct
 {
     bool list_refreshed;
     uint8_t alarm_number;
-    mico_mutex_t AlarmListMutex;
+    mico_mutex_t AlarmlibMutex;
     _alarm_state_t state;
     /*******************/
-
+    uint8_t alarm_display_serial;
+    uint8_t alarm_waiting_serial;
+    mico_mutex_t AlarmSerialMutex;
     /**********************************************/
     __elsv_alarm_data_t *alarm_lib;
 } _eland_alarm_list_t;
@@ -111,11 +114,18 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 extern _eland_alarm_list_t alarm_list;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
-void alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
+OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
 OSStatus Start_Alarm_service(void);
 void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data);
 void alarm_print(__elsv_alarm_data_t *alarm_data);
+_alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial);
+uint8_t get_display_alarm_serial(void);
+void set_display_alarm_serial(uint8_t serial);
+uint8_t get_next_alarm_serial(uint8_t now_serial);
+uint8_t get_previous_alarm_serial(uint8_t now_serial);
+uint8_t get_waiting_alarm_serial(void);
+void set_waiting_alarm_serial(uint8_t now_serial);
 /* Private functions ---------------------------------------------------------*/
 
 #endif
