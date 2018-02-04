@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-12 17:15:43
+ * @Last Modified time:2018-02-04 18:11:50
  * @brief   :
  ****************************************************************************
 **/
@@ -17,6 +17,7 @@
 #include "eland_alarm.h"
 #include "audio_service.h"
 #include "eland_sound.h"
+#include "netclock.h"
 /* Private define ------------------------------------------------------------*/
 #define alarm_log(format, ...) custom_log("alarm", format, ##__VA_ARGS__)
 /* Private typedef -----------------------------------------------------------*/
@@ -62,7 +63,7 @@ OSStatus Start_Alarm_service(void)
     alarm_stream.stream_id = audio_service_system_generate_stream_id();
     set_alarm_stream_pos(0);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager", Alarm_Manager, 0x500, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager", Alarm_Manager, 0x3000, 0);
     require_noerr(err, exit);
 exit:
     return err;
@@ -129,12 +130,13 @@ static void set_alarm_state(_alarm_list_state_t state)
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
 }
-static void init_alarm_stream(char *alarm_id)
+static void init_alarm_stream(char *alarm_id, uint8_t sound_type)
 {
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
     alarm_stream.data_pos = 0;
     memcpy(alarm_stream.alarm_id, alarm_id, ALARM_ID_LEN);
+    alarm_stream.sound_type = sound_type;
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
 static uint32_t get_alarm_stream_pos(void)
@@ -270,6 +272,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     uint8_t i;
     __elsv_alarm_data_t *elsv_alarm_data = NULL;
     uint32_t current_seconds = 0;
+    OSStatus err = kNoErr;
 
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
@@ -286,6 +289,32 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     list->alarm_waiting_serial = 0;
     for (i = 0; i < list->alarm_number; i++)
     {
+        if (((list->alarm_lib + i)->alarm_pattern == 1) ||
+            ((list->alarm_lib + i)->alarm_pattern == 3) ||
+            ((list->alarm_lib + i)->alarm_pattern == 4))
+        {
+            alarm_log("SID:%d,alarmID:%s", i, (list->alarm_lib + i)->alarm_id);
+            alarm_log("##### alarm flash:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+            err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_SID);
+            require_noerr_action(err, exit, elsv_alarm_data = NULL);
+            alarm_log("##### alarm flash:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        }
+        if (((list->alarm_lib + i)->alarm_pattern == 2) ||
+            ((list->alarm_lib + i)->alarm_pattern == 3))
+        {
+            alarm_log("VID:%d,alarmID:%s", i, (list->alarm_lib + i)->alarm_id);
+            err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_VID);
+            require_noerr_action(err, exit, elsv_alarm_data = NULL);
+        }
+        if ((list->alarm_lib + i)->alarm_pattern == 4)
+        {
+            alarm_log("OID:%d,alarmID:%s", i, (list->alarm_lib + i)->alarm_id);
+            err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_OID);
+            require_noerr_action(err, exit, elsv_alarm_data = NULL);
+        }
+    }
+    for (i = 0; i < list->alarm_number; i++)
+    {
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < current_seconds)
             continue;
         else
@@ -300,7 +329,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 
     for (i = 0; i < list->alarm_number; i++)
     {
-        alarm_log("alarm[%d]:%ld", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second);
+        //  alarm_log("alarm[%d]:%ld", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second);
 
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < current_seconds)
             continue;
@@ -320,9 +349,7 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
     OSStatus err = kNoErr;
     uint8_t i;
     __elsv_alarm_data_t *p = AlarmList->alarm_lib;
-    alarm_log("ALARM_ADD");
     set_alarm_state(ALARM_ADD);
-    alarm_log("lock AlarmlibMutex");
     err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
     if (AlarmList->alarm_number == 0)
@@ -415,7 +442,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     int8_t snooze_count;
     uint32_t current_seconds;
     uint32_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
-    init_alarm_stream(alarm->alarm_id);
 
     if (alarm->snooze_enabled)
         snooze_count = alarm->snooze_count;
@@ -475,15 +501,21 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     mscp_result_t result;
     mscp_status_t audio_status;
     static bool isVoice = false;
+
     if (CMD) //play
     {
         audio_service_get_audio_status(&result, &audio_status);
+        alarm_log("audio_status %d", audio_status);
         if (audio_status == MSCP_STATUS_IDLE)
         {
             if ((alarm->alarm_pattern == 1) || (alarm->alarm_pattern == 4))
-                audio_service_sound_remind_start(&result, 12);
+            {
+                init_alarm_stream(alarm->alarm_id, SOUND_FILE_SID);
+                mico_rtos_create_thread(play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
+            }
             else if (alarm->alarm_pattern == 2)
             {
+                init_alarm_stream(alarm->alarm_id, SOUND_FILE_SID);
                 mico_rtos_create_thread(play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
             }
             else if (alarm->alarm_pattern == 3)
@@ -505,6 +537,9 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     }
     else //stop
     {
+        if (alarm->alarm_pattern == 4) //alarm off oid
+        {
+        }
     }
 }
 
@@ -531,6 +566,7 @@ static void play_voice(mico_thread_arg_t arg)
     alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
     memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
     memcpy(alarm_w_r_queue->alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
+    alarm_w_r_queue->sound_type = stream->sound_type;
     alarm_w_r_queue->is_read = true;
     alarm_w_r_queue->sound_data = flashdata;
 
@@ -539,7 +575,7 @@ falsh_read_start:
     alarm_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
     err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, 1000);
     require_noerr(err, exit);
 
     if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
@@ -553,6 +589,7 @@ falsh_read_start:
     }
     else if (alarm_r_w_callbcke_queue->read_write_err == FILE_NOT_FIND)
     {
+        free(alarm_r_w_callbcke_queue);
         alarm_log("FILE_NOT_FIND");
         goto exit;
     }
@@ -592,11 +629,12 @@ audio_transfer:
         goto falsh_read_start;
     else
         data_pos = 0;
-    alarm_log("state is HTTP_FILE_DOWNLOAD_STATE_SUCCESS !");
+    alarm_log("state is_SUCCESS !");
 exit:
-    set_alarm_stream_pos(data_pos);
+    set_alarm_stream_pos(0);
     free(flashdata);
     free(alarm_w_r_queue);
+    mico_rtos_delete_thread(NULL);
 }
 
 void alarm_print(__elsv_alarm_data_t *alarm_data)

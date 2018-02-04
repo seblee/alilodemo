@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-12 15:02:40
+ * @Last Modified time:2018-02-04 17:47:03
  * @brief   :
  ****************************************************************************
 **/
@@ -31,13 +31,20 @@ typedef struct
     int8_t alarm_repeat;
     uint8_t alarm_on_days_of_week;
 } _alarm_mcu_data_t;
-
+typedef struct __SOUND_FILE_INFO_
+{
+    uint32_t file_len;
+    uint32_t file_address;
+} _sound_file_info_t;
 typedef struct
 {
     uint32_t moment_second; //
     int8_t color;
     int8_t snooze_count;
     uint8_t alarm_on_days_of_week;
+    _sound_file_info_t sound_vid;
+    _sound_file_info_t sound_sid;
+    _sound_file_info_t sound_oid;
 } _alarm_eland_data_t;
 
 typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
@@ -86,6 +93,7 @@ typedef struct
     uint8_t stream_id;
     uint32_t data_pos;
     char alarm_id[ALARM_ID_LEN + 1];
+    uint8_t sound_type;
 } _alarm_stream_t;
 
 typedef struct

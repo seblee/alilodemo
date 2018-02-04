@@ -1,5 +1,6 @@
 #include "mico.h"
 #include "eland_sound.h"
+
 //#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
@@ -10,10 +11,10 @@
 static mico_mutex_t eland_sound_mutex = NULL; //flash 調用保護
 mico_queue_t eland_sound_R_W_queue = NULL;    //flash sound 讀寫命令队列
 mico_queue_t eland_sound_reback_queue = NULL; //flash sound 讀寫完成返回队列
+_http_w_r_struct_t HTTP_W_R_struct = {NULL, NULL};
 
 static mico_semaphore_t sound_service_InitCompleteSem = NULL; //sound service 初始化完成信號量
-
-_sound_file_type_t *eland_sound_point = NULL; //音頻鏈接指針句柄
+_sound_file_type_t *eland_sound_point = NULL;                 //音頻鏈接指針句柄
 uint32_t sound_sector_start = 0;
 uint32_t sound_sector_end = 0;
 
@@ -24,6 +25,10 @@ OSStatus start_eland_flash_service(void)
     OSStatus err = kGeneralErr;
     /*初始化互斥信号量*/
     err = mico_rtos_init_mutex(&eland_sound_mutex);
+    require_noerr(err, exit);
+    HTTP_W_R_struct.alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
+
+    err = mico_rtos_init_mutex(&HTTP_W_R_struct.mutex);
     require_noerr(err, exit);
     /*初始化消息隊列 flash sound file write*/
     err = mico_rtos_init_queue(&eland_sound_R_W_queue, "sound_read_write_queue", sizeof(_sound_read_write_type_t *), 1); //只容纳一个成员 传递的只是地址
@@ -53,6 +58,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
     uint32_t sector_count = 0;
     SOUND_FILE_SCAN_STATUS get_soundfileflag = FILE_SCAN_START;
     static uint16_t number_file = 0;
+    uint16_t i;
 
     _sound_file_type_t *alarm_file_cache = NULL;
     _sound_read_write_type_t *alarm_w_r_queue = NULL;
@@ -109,7 +115,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
                 break;
             case GET_FILE_SCAN_START:
                 number_file += 1;
-                sound_log("SCAN--%s, number_file:%d, file_address:%ld", alarm_file_cache->alarm_ID, number_file, alarm_file_cache->file_address);
+                sound_log("SCAN- %s, number_file:%d, file_address:%ld", alarm_file_cache->alarm_ID, number_file, alarm_file_cache->file_address);
                 get_soundfileflag = GET_FILE_START;
                 sound_sector_start = sector_count * KH25L8006_SECTOR_SIZE;
                 eland_sound_point = (_sound_file_type_t *)calloc(number_file, sizeof(_sound_file_type_t));
@@ -117,7 +123,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
                 break;
             case GET_FILE_START:
                 number_file += 1;
-                sound_log("START-%s, number_file:%d, file_address:%ld", alarm_file_cache->alarm_ID, number_file, alarm_file_cache->file_address);
+                sound_log("START %s, number_file:%d, file_address:%ld", alarm_file_cache->alarm_ID, number_file, alarm_file_cache->file_address);
                 eland_sound_point = (_sound_file_type_t *)realloc(eland_sound_point, (number_file * sizeof(_sound_file_type_t)));
                 memcpy((uint8_t *)eland_sound_point + ((number_file - 1) * sizeof(_sound_file_type_t)), alarm_file_cache, sizeof(_sound_file_type_t));
                 break;
@@ -138,6 +144,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
         free(alarm_file_cache);
         alarm_file_cache = NULL;
     }
+    sound_log("start sound while");
     mico_rtos_set_semaphore(&sound_service_InitCompleteSem); //wait until get semaphore
     while (1)
     {
@@ -148,30 +155,37 @@ static void eland_flash_service(mico_thread_arg_t arg)
 
         if (alarm_w_r_queue->is_read == true) //讀數據
         {
+            sound_log("read file number_file:%d", number_file);
             if (alarm_w_r_queue->pos == 0) //文件數據流首次讀取
             {
-                alarm_file_cache = eland_sound_point;
-                do
+                for (i = 0; i < number_file; i++)
                 {
-                    if (strncmp(alarm_file_cache->alarm_ID, alarm_w_r_queue->alarm_ID, ALARM_ID_LEN) == 0) //找到文件
+                    if (strncmp((eland_sound_point + i)->alarm_ID, alarm_w_r_queue->alarm_ID, ALARM_ID_LEN) == 0)
                     {
-                        sound_log("alarm_ID:%s", alarm_file_cache->alarm_ID);
-                        alarm_w_r_queue->total_len = alarm_file_cache->file_len;
-                        alarm_w_r_queue->file_address = alarm_file_cache->file_address;
-                        sound_log("total_len = %ld,sound_flash_pos = %ld", alarm_w_r_queue->total_len, alarm_w_r_queue->pos);
-                        goto start_read_sound;
+                        if ((eland_sound_point + i)->sound_type == alarm_w_r_queue->sound_type) //找到文件
+                        {
+                            sound_log("alarm_ID:%s", (eland_sound_point + i)->alarm_ID);
+                            alarm_w_r_queue->total_len = (eland_sound_point + i)->file_len;
+                            alarm_w_r_queue->file_address = (eland_sound_point + i)->file_address;
+                            sound_log("total_len = %ld,sound_flash_pos = %ld", alarm_w_r_queue->total_len, alarm_w_r_queue->pos);
+                            goto start_read_sound;
+                        }
+                        else
+                        {
+                            sound_log("no_file");
+                        }
                     }
                     else
                     {
-                        alarm_file_cache++;
                         sound_log("no_file");
                     }
-                } while ((uint8_t *)alarm_file_cache < (uint8_t *)eland_sound_point + sizeof(*eland_sound_point));
+                }
+
                 memcpy(alarm_r_w_callbcke_queue->alarm_ID, alarm_w_r_queue->alarm_ID, ALARM_ID_LEN);
                 alarm_r_w_callbcke_queue->read_write_err = FILE_NOT_FIND;
                 err = mico_rtos_push_to_queue(&eland_sound_reback_queue, alarm_r_w_callbcke_queue, 10);
                 sound_log("no_file");
-                //require_noerr_action(err, exit, sound_log("[error]mico_rtos_push_to_queue err"));
+                // require_noerr_action(err, exit, sound_log("[error]mico_rtos_push_to_queue err"));
                 goto waitfor_w_r_queue;
             }
         start_read_sound:
@@ -206,7 +220,9 @@ static void eland_flash_service(mico_thread_arg_t arg)
                 alarm_file_cache = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
                 sprintf((char *)(alarm_file_cache->flag), "%s", ALARM_FILE_FLAG_STRING);
                 sprintf((char *)(alarm_file_cache->alarm_ID), "%s", alarm_w_r_queue->alarm_ID);
+                sound_log("write alarm_ID:%s", alarm_file_cache->alarm_ID);
 
+                alarm_file_cache->sound_type = alarm_w_r_queue->sound_type;
                 alarm_file_cache->file_len = alarm_w_r_queue->total_len;
                 alarm_file_cache->file_address = sound_sector_end + sizeof(_sound_file_type_t);
                 memcpy((uint8_t *)eland_sound_point + ((number_file - 1) * sizeof(_sound_file_type_t)),
@@ -233,6 +249,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
                 sound_log("sound_sector_end:%ld", sound_sector_end);
             }
             memcpy(alarm_r_w_callbcke_queue->alarm_ID, alarm_w_r_queue->alarm_ID, ALARM_ID_LEN);
+            alarm_r_w_callbcke_queue->sound_type = alarm_w_r_queue->sound_type;
             alarm_r_w_callbcke_queue->read_write_err = ERRNONE;
             err = mico_rtos_push_to_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, 10);
             check_string((err == kNoErr), "callbace err");

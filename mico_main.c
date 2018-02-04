@@ -66,6 +66,10 @@ int application_start(void)
     err = mico_system_init(mico_context);
     require_noerr(err, exit);
 
+    /*start init eland SPI*/
+    err = start_eland_flash_service();
+    require_noerr(err, exit);
+
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
 
@@ -73,11 +77,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
-
-    /*start init eland SPI*/
-    err = start_eland_flash_service();
-    require_noerr(err, exit);
+    // start_uart_service();
 
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");

@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_TCP_DEBUG
+//#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define elan_tcp_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -604,9 +604,9 @@ cycle_loop:
         else
             tcp_HC_flag = false;
     }
+    elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     timer.tv_sec = 1;
     timer.tv_usec = 0;
-    elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     rc = eland_IF_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {

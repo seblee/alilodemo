@@ -17,7 +17,7 @@
 /* Private include -----------------------------------------------------------*/
 #include "../../alilodemo/netclock/netclockconfig.h"
 #include "mico.h"
-
+#include "eland_alarm.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -31,6 +31,7 @@
 //#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
 #define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
 //#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_40kbps")
+#define ELAND_SOUND_SID_URI ("/api/sound/download?eid=%ld&sid=%ld")
 
 //eland 通信情報取得
 #define ELAND_COMMUNICATION_INFO_UPDATE_METHOD HTTP_GET
@@ -67,7 +68,7 @@ OSStatus Eland_Rtc_Init(void);
 
 OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
-
+OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type);
 /* Private functions ---------------------------------------------------------*/
 
 //extern static mico_semaphore_t WifiConnectSem;

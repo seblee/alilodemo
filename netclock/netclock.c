@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-27 17:21:49
+ * @Last Modified time:2018-02-04 16:51:34
  * @brief   :
  ****************************************************************************
 **/
@@ -25,6 +25,7 @@
 #include "eland_http_client.h"
 #include "SocketUtils.h"
 #include "flash_kh25.h"
+#include "eland_sound.h"
 /* Private define ------------------------------------------------------------*/
 #define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
@@ -47,32 +48,9 @@ json_object *DeviceJsonData = NULL;
 json_object *AlarmJsonData = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
-//发送http请求
-OSStatus eland_push_http_req_mutex(ELAND_HTTP_METHOD method,                           //POST 或者 GET
-                                   ELAND_HTTP_REQUEST_TYPE request_type,               //eland request type
-                                   char *request_uri,                                  //uri
-                                   char *host_name,                                    //host
-                                   char *http_body,                                    //BODY
-                                   ELAND_HTTP_RESPONSE_SETTING_S *user_http_response); //response 指針
-
-//设置请求参数
-OSStatus set_eland_http_request(ELAND_HTTP_REQUEST_SETTING_S *http_req, //request 指針
-                                ELAND_HTTP_METHOD method,               //請求方式 POST/GET
-                                ELAND_HTTP_REQUEST_TYPE request_type,   //eland request type
-                                char *request_uri,                      //URI 路徑
-                                char *host_name,                        //host 主機
-                                char *http_body,                        //數據 body
-                                uint32_t http_req_id);                  //請求 id
-
-//从队列中获取请求
-OSStatus get_http_res_from_queue(ELAND_HTTP_RESPONSE_SETTING_S *http_res,
-                                 ELAND_HTTP_REQUEST_TYPE request_type, //eland request type
-                                 uint32_t id);
 
 //eland 通信情報取得
 static OSStatus eland_communication_info_get(void);
-//eland 下載數據
-static OSStatus alarm_sound_download(void);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -581,34 +559,50 @@ exit:
 }
 
 //eland 鬧鐘聲音取得
-static OSStatus alarm_sound_download(void)
+OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
     OSStatus err = kGeneralErr;
 
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
+    char uri_str[50] = {0};
+    //  _sound_read_write_type_t **alarm_w_r_queue = NULL;
+    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
+    uint8_t *flashdata = NULL;
+    uint32_t data_pos = 0;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-
-ALARM_SOUND_DOWNLOAD_START:
-    if (get_wifi_status() == false)
+    /******check sound*************/
+    flashdata = malloc(2001);
+    mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
+    memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+    memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_id, strlen(alarm->alarm_id));
+    HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
+    HTTP_W_R_struct.alarm_w_r_queue->is_read = true;
+    HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
+    HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
+    HTTP_W_R_struct.alarm_w_r_queue->len = 8;
+    Eland_log("inlen = %ld,sound_flash_pos = %ld", HTTP_W_R_struct.alarm_w_r_queue->len, HTTP_W_R_struct.alarm_w_r_queue->pos);
+    err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &HTTP_W_R_struct.alarm_w_r_queue, 10);
+    require_noerr(err, exit);
+    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+    require_noerr(err, exit);
+    if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE) //文件已下載
     {
-        Eland_log("https disconnect, eland_device_info_login is waitting...");
-        err = kGeneralErr;
+        Eland_log("ERRNONE");
         goto exit;
     }
-    if (get_https_connect_status() == false)
-    {
-        Eland_log("https_connect_status is not true");
-        mico_rtos_thread_sleep(2);
-        goto ALARM_SOUND_DOWNLOAD_START;
-    }
+    /*ready for uri*/
+    memset(uri_str, 0, 50);
+    if (sound_type == SOUND_FILE_SID)
+        sprintf(uri_str, ELAND_SOUND_SID_URI, netclock_des_g->eland_id, alarm->alarm_sound_id);
+
     Eland_log("=====> alarm_sound_download send ======>");
 
-    err = eland_push_http_req_mutex(ELAND_DOWN_LOAD_METHOD, //請求方式
-                                    ELAND_ALARM_GET,        //請求類型
-                                    ELAND_DOWN_LOAD_URI,    //URI參數
-                                    ELAND_HTTP_DOMAIN_NAME, //主機域名
-                                    NULL,                   //request body
-                                    &user_http_res);        //response 接收緩存
+    err = eland_http_request(ELAND_DOWN_LOAD_METHOD, //請求方式
+                             ELAND_ALARM_GET,        //請求類型
+                             uri_str,                //URI參數
+                             ELAND_HTTP_DOMAIN_NAME, //主機域名
+                             NULL,                   //request body
+                             &user_http_res);        //response 接收緩存
     require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)
@@ -623,6 +617,11 @@ ALARM_SOUND_DOWNLOAD_START:
     }
 
 exit:
+    /**************/
+    mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
+    free(alarm_r_w_callbcke_queue);
+    free(flashdata);
+
     if (user_http_res.eland_response_body != NULL) //释放资源
     {
         free(user_http_res.eland_response_body);
@@ -632,7 +631,6 @@ exit:
     {
         Eland_log("<===== alarm_sound_download error <======");
         mico_thread_msleep(200);
-        goto ALARM_SOUND_DOWNLOAD_START;
     }
 
     return err;

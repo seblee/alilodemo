@@ -240,19 +240,19 @@ static void url_fileDownload_test_thread(mico_thread_arg_t arg)
         case 1:
             hal_url_fileDownload_start(URL_FILE_DNLD);
             test_log("file download status:  ");
-              flagAudioPlay = 2;
+            flagAudioPlay = 2;
             break;
         case 2:
             hal_url_fileDownload_pause();
             audio_service_stream_pause(&result);
             test_log("file pause status:  ");
-             flagAudioPlay = 3;
+            flagAudioPlay = 3;
             break;
         case 3:
             hal_url_fileDownload_continue();
             test_log("file continue status:  ");
             audio_service_stream_continue(&result);
-              flagAudioPlay = 2;
+            flagAudioPlay = 2;
             break;
         default:
             flagAudioPlay = 1;
@@ -273,7 +273,7 @@ static void url_paly_stop_thread(mico_thread_arg_t arg)
 
         audio_service_stream_stop(&result, audio_service_system_generate_stream_id());
         flagAudioPlay = 1;
-      }
+    }
 }
 
 OSStatus start_test_thread(void)

@@ -37,7 +37,8 @@
 #include "eland_sound.h"
 #include "netclock.h"
 #include "netclock_uart.h"
-#define CONFIG_CLIENT_DEBUG
+
+//#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
@@ -441,8 +442,6 @@ HTTP_SSL_START:
                     user_http_response->eland_response_body = calloc(context.content_length, sizeof(uint8_t));
                     memcpy(user_http_response->eland_response_body, context.content, context.content_length);
                 }
-                else
-                    user_http_response->eland_response_body = NULL;
             }
             break;
         }
@@ -490,7 +489,6 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
 {
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
-    _sound_read_write_type_t *alarm_w_r_queue = NULL;
     _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
     static uint32_t sound_flash_pos = 0;
     static bool is_sound_data = false;
@@ -519,27 +517,23 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
         if (is_sound_data)
         {
+
             client_log("sound data");
-            alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-            memcpy(alarm_w_r_queue->alarm_ID, "01_128kbps", strlen("01_128kbps"));
-            alarm_w_r_queue->is_read = false;
-            alarm_w_r_queue->total_len = inHeader->contentLength;
+            if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
+                goto exit;
+            HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
             memcpy(context->content, inData, inLen);
-
-            alarm_w_r_queue->len = inLen;
-            alarm_w_r_queue->pos = sound_flash_pos;
-
-            alarm_w_r_queue->sound_data = (uint8_t *)context->content;
-            client_log("send_queue:inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
-            err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
+            HTTP_W_R_struct.alarm_w_r_queue->len = inLen;
+            HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
+            HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
+            HTTP_W_R_struct.alarm_w_r_queue->is_read = false;
+            client_log("send_queue:inlen = %ld,sound_flash_pos = %ld", HTTP_W_R_struct.alarm_w_r_queue->len, HTTP_W_R_struct.alarm_w_r_queue->pos);
+            err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &HTTP_W_R_struct.alarm_w_r_queue, 10);
             require_noerr(err, exit);
-            err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
+            err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, 1000);
             require_noerr(err, exit);
-            client_log("write_done");
             sound_flash_pos += inLen;
-            free(alarm_w_r_queue);
             free(alarm_r_w_callbcke_queue);
-            client_log("free queue");
         }
         else
             memcpy(context->content + inPos, inData, inLen);
