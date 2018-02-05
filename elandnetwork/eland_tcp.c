@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_TCP_DEBUG
+#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define elan_tcp_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -460,7 +460,7 @@ OSStatus TCP_Service_Start(void)
     err = mico_rtos_init_semaphore(&TCP_Stop_Sem, 1);
     require_noerr(err, exit);
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
-                                  0x3000, (mico_thread_arg_t)NULL);
+                                  0x3200, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
     return err;

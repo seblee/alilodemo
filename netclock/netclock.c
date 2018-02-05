@@ -26,8 +26,9 @@
 #include "SocketUtils.h"
 #include "flash_kh25.h"
 #include "eland_sound.h"
+#include "eland_tcp.h"
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ELAND_DEBUG
+//#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -641,6 +642,10 @@ OSStatus Eland_Rtc_Init(void)
     OSStatus status = kNoErr;
     mico_rtc_time_t cur_time = {0};
     iso8601_time_t iso8601_time;
+    mico_utc_time_t utc_time;
+    mico_utc_time_ms_t current_utc = 0;
+    DATE_TIME_t date_time;
+
     cur_time.year = 18; //设置时间
     cur_time.month = 1;
     cur_time.date = 18;
@@ -648,9 +653,22 @@ OSStatus Eland_Rtc_Init(void)
     cur_time.hr = 14;
     cur_time.min = 29;
     cur_time.sec = 50;
+
+    date_time.iYear = 2000 + cur_time.year;
+    date_time.iMon = (int16_t)cur_time.month;
+    date_time.iDay = (int16_t)cur_time.date;
+    date_time.iHour = (int16_t)cur_time.hr;
+    date_time.iMin = (int16_t)cur_time.min;
+    date_time.iSec = (int16_t)cur_time.sec;
+    date_time.iMsec = 0;
+    current_utc = GetSecondTime(&date_time);
+    current_utc *= 1000;
     status = MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
+    mico_time_set_utc_time_ms(&current_utc);
 
     mico_time_get_iso8601_time(&iso8601_time);
     Eland_log("Current time: %.26s", (char *)&iso8601_time);
+    mico_time_get_utc_time(&utc_time);
+    Eland_log("utc_time:%ld", utc_time);
     return status;
 }

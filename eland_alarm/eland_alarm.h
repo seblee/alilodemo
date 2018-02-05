@@ -42,9 +42,6 @@ typedef struct
     int8_t color;
     int8_t snooze_count;
     uint8_t alarm_on_days_of_week;
-    _sound_file_info_t sound_vid;
-    _sound_file_info_t sound_sid;
-    _sound_file_info_t sound_oid;
 } _alarm_eland_data_t;
 
 typedef struct _ELSV_ALARM_DATA //闹钟情報结构体

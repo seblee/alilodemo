@@ -77,7 +77,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    // start_uart_service();
+    start_uart_service();
 
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");

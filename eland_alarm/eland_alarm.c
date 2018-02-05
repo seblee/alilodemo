@@ -18,6 +18,7 @@
 #include "audio_service.h"
 #include "eland_sound.h"
 #include "netclock.h"
+#include "eland_tcp.h"
 /* Private define ------------------------------------------------------------*/
 #define alarm_log(format, ...) custom_log("alarm", format, ##__VA_ARGS__)
 /* Private typedef -----------------------------------------------------------*/
@@ -38,14 +39,11 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD);
 static void set_alarm_stream_pos(uint32_t pos);
 static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
-
+static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
 /* Private functions ---------------------------------------------------------*/
 OSStatus Start_Alarm_service(void)
 {
     OSStatus err;
-    __elsv_alarm_data_t elsv_alarm_data;
-    uint8_t cache[11] = {0x00, 0x1e, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
     memset(&alarm_list, 0, sizeof(_eland_alarm_list_t));
     err = mico_rtos_init_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
@@ -56,14 +54,11 @@ OSStatus Start_Alarm_service(void)
     err = mico_rtos_init_mutex(&alarm_stream.stream_Mutex);
     require_noerr(err, exit);
 
-    elsv_alarm_data_init_MCU(&elsv_alarm_data, (_alarm_mcu_data_t *)cache);
-    elsv_alarm_data_sort_out(&elsv_alarm_data);
-    //alarm_list_add(&alarm_list, &elsv_alarm_data);
-
     alarm_stream.stream_id = audio_service_system_generate_stream_id();
     set_alarm_stream_pos(0);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager", Alarm_Manager, 0x3000, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager",
+                                  Alarm_Manager, 0x3000, 0);
     require_noerr(err, exit);
 exit:
     return err;
@@ -71,7 +66,7 @@ exit:
 void Alarm_Manager(uint32_t arg)
 {
     __elsv_alarm_data_t *alarm_nearest = NULL;
-    uint32_t current_seconds = 0;
+    mico_utc_time_t utc_time = 0;
     uint8_t i;
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < alarm_list.alarm_number; i++)
@@ -104,9 +99,8 @@ void Alarm_Manager(uint32_t arg)
         {
             if (alarm_nearest)
             {
-                current_seconds = GET_current_second();
-
-                if (current_seconds >= alarm_nearest->alarm_data_for_eland.moment_second)
+                utc_time = GET_current_second();
+                if (utc_time >= alarm_nearest->alarm_data_for_eland.moment_second)
                 {
                     alarm_log("##### start alarm ######");
                     alarm_operation(alarm_nearest);
@@ -117,7 +111,6 @@ void Alarm_Manager(uint32_t arg)
         /* check current time per second */
         mico_rtos_thread_sleep(1);
     }
-
     mico_rtos_delete_thread(NULL);
 }
 static _alarm_list_state_t get_alarm_state(void)
@@ -150,15 +143,11 @@ static void set_alarm_stream_pos(uint32_t pos)
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
 
-static uint32_t GET_current_second(void)
+static mico_utc_time_t GET_current_second(void)
 {
-    uint32_t current_seconds;
-    mico_rtc_time_t cur_time = {0};
-    MicoRtcGetTime(&cur_time); //返回新的时间值
-    current_seconds = (uint32_t)cur_time.hr * 3600 +
-                      (uint32_t)cur_time.min * 60 +
-                      (uint32_t)cur_time.sec;
-    return current_seconds;
+    mico_utc_time_t utc_time;
+    mico_time_get_utc_time(&utc_time);
+    return utc_time;
 }
 /**elsv alarm data init**/
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
@@ -173,11 +162,12 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     alarm_eland_data = &(elsv_alarm_data->alarm_data_for_eland);
     alarm_mcu_data = &(elsv_alarm_data->alarm_data_for_mcu);
     sscanf((const char *)(&(elsv_alarm_data->alarm_time)), "%02d:%02d:%02d", &ho, &mi, &se);
-    alarm_eland_data->moment_second = (uint32_t)ho * 3600 + (uint32_t)mi * 60 + (uint32_t)se;
 
     alarm_mcu_data->moment_time.hr = ho;
     alarm_mcu_data->moment_time.min = mi;
     alarm_mcu_data->moment_time.sec = se;
+    // if (elsv_alarm_data->alarm_repeat == 0)
+    //      get_alarm_utc_second(elsv_alarm_data);
 
     alarm_eland_data->color = elsv_alarm_data->alarm_color;
     alarm_mcu_data->color = elsv_alarm_data->alarm_color;
@@ -271,51 +261,56 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 {
     uint8_t i;
     __elsv_alarm_data_t *elsv_alarm_data = NULL;
-    uint32_t current_seconds = 0;
+    mico_utc_time_t utc_time = 0;
     OSStatus err = kNoErr;
-
+start_ergonic_list:
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
     set_alarm_state(ALARM_IDEL);
-    alarm_log("lock AlarmlibMutex");
     if (list->alarm_number == 0)
     {
         alarm_log("alarm_number = 0");
         elsv_alarm_data = NULL;
         goto exit;
     }
-    current_seconds = GET_current_second();
-    alarm_log("current_seconds:%ld", current_seconds);
-    list->alarm_waiting_serial = 0;
+    utc_time = GET_current_second();
     for (i = 0; i < list->alarm_number; i++)
     {
+        if ((list->alarm_lib + i)->alarm_repeat)
+            get_alarm_utc_second(list->alarm_lib + i);
+        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
+        {
+            alarm_list_minus(list, list->alarm_lib + i);
+            goto start_ergonic_list;
+        }
         if (((list->alarm_lib + i)->alarm_pattern == 1) ||
             ((list->alarm_lib + i)->alarm_pattern == 3) ||
             ((list->alarm_lib + i)->alarm_pattern == 4))
         {
-            alarm_log("SID:%d,alarmID:%s", i, (list->alarm_lib + i)->alarm_id);
-            alarm_log("##### alarm flash:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+            alarm_log("SID:%d", i);
             err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_SID);
             require_noerr_action(err, exit, elsv_alarm_data = NULL);
-            alarm_log("##### alarm flash:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         }
         if (((list->alarm_lib + i)->alarm_pattern == 2) ||
             ((list->alarm_lib + i)->alarm_pattern == 3))
         {
-            alarm_log("VID:%d,alarmID:%s", i, (list->alarm_lib + i)->alarm_id);
+            alarm_log("VID:%d", i);
             err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_VID);
             require_noerr_action(err, exit, elsv_alarm_data = NULL);
         }
         if ((list->alarm_lib + i)->alarm_pattern == 4)
         {
-            alarm_log("OID:%d,alarmID:%s", i, (list->alarm_lib + i)->alarm_id);
+            alarm_log("OID:%d", i);
             err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_OID);
             require_noerr_action(err, exit, elsv_alarm_data = NULL);
         }
     }
+    utc_time = GET_current_second();
+    alarm_log("utc_time:%ld", utc_time);
+    set_waiting_alarm_serial(0);
     for (i = 0; i < list->alarm_number; i++)
     {
-        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < current_seconds)
+        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
             continue;
         else
         {
@@ -329,9 +324,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 
     for (i = 0; i < list->alarm_number; i++)
     {
-        //  alarm_log("alarm[%d]:%ld", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second);
-
-        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < current_seconds)
+        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
             continue;
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <
             elsv_alarm_data->alarm_data_for_eland.moment_second)
@@ -340,7 +333,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
             set_waiting_alarm_serial(i);
         }
     }
-
 exit:
     return elsv_alarm_data;
 }
@@ -440,8 +432,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
 {
     _alarm_list_state_t current_state;
     int8_t snooze_count;
-    uint32_t current_seconds;
-    uint32_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
+    mico_utc_time_t utc_time;
+    mico_utc_time_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
 
     if (alarm->snooze_enabled)
         snooze_count = alarm->snooze_count;
@@ -452,15 +444,15 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     do
     {
         current_state = get_alarm_state();
-        current_seconds = GET_current_second();
+        utc_time = GET_current_second();
         switch (current_state)
         {
         case ALARM_ING:
-            if (current_seconds > alarm_moment)
+            if (utc_time > alarm_moment)
             {
                 alarm_log("alarm_time up");
-                alarm_moment += (uint32_t)alarm->snooze_interval_min * 60 -
-                                (uint32_t)alarm->alarm_continue_min * 60;
+                alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
+                alarm_moment -= (uint32_t)alarm->alarm_continue_min * 60;
                 set_alarm_state(ALARM_SNOOZ_STOP);
                 snooze_count--;
                 Alarm_Play_Control(alarm, 0); //stop with delay
@@ -478,7 +470,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_SNOOZ_STOP:
             if (snooze_count)
             {
-                if (current_seconds > alarm_moment)
+                if (utc_time > alarm_moment)
                 {
                     alarm_log("alarm_time on aagin %d", snooze_count);
                     set_alarm_state(ALARM_ING);
@@ -728,4 +720,75 @@ _alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial)
     else
         temp = &(alarm_list.alarm_lib + serial)->alarm_data_for_mcu;
     return temp;
+}
+
+static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
+{
+    DATE_TIME_t date_time;
+    mico_rtc_time_t rtc_time = {0};
+    mico_utc_time_t utc_time = 0;
+    struct tm *currentTime;
+    int8_t i;
+    MicoRtcGetTime(&rtc_time);
+    date_time.iYear = 2000 + rtc_time.year;
+    date_time.iMon = (int16_t)rtc_time.month;
+    date_time.iDay = (int16_t)rtc_time.date;
+    date_time.iHour = (int16_t)alarm->alarm_data_for_mcu.moment_time.hr;
+    date_time.iMin = (int16_t)alarm->alarm_data_for_mcu.moment_time.min;
+    date_time.iSec = (int16_t)alarm->alarm_data_for_mcu.moment_time.sec;
+    date_time.iMsec = 0;
+    utc_time = GET_current_second();
+    switch (alarm->alarm_repeat)
+    {
+    case 0: //只在新数据导入时候计算一次
+        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        mico_time_get_utc_time(&utc_time);
+        if (alarm->alarm_data_for_eland.moment_second < utc_time)
+            alarm->alarm_data_for_eland.moment_second += 86400;
+        currentTime = localtime((const time_t *)&(alarm->alarm_data_for_eland.moment_second));
+        alarm->alarm_data_for_mcu.moment_time.sec = currentTime->tm_sec;
+        alarm->alarm_data_for_mcu.moment_time.min = currentTime->tm_min;
+        alarm->alarm_data_for_mcu.moment_time.hr = currentTime->tm_hour;
+        alarm->alarm_data_for_mcu.moment_time.date = currentTime->tm_mday;
+        alarm->alarm_data_for_mcu.moment_time.weekday = currentTime->tm_wday;
+        alarm->alarm_data_for_mcu.moment_time.month = currentTime->tm_mon + 1;
+        alarm->alarm_data_for_mcu.moment_time.year = (currentTime->tm_year + 1900) % 100;
+        alarm_log("moment_second %ld", alarm->alarm_data_for_eland.moment_second);
+        break;
+    case 1:
+        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        break;
+    case 2:
+        if (rtc_time.weekday < 2)
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 3600;
+        else if (rtc_time.weekday < 7)
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        else
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 7200;
+        break;
+    case 3:
+        if (rtc_time.weekday < 2)
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        else if (rtc_time.weekday < 7)
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - rtc_time.weekday) * 3600;
+        else
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        break;
+    case 4:
+        for (i = 0; i < 7; i++)
+        {
+            if (alarm->alarm_data_for_mcu.alarm_on_days_of_week & (1 << ((rtc_time.weekday + i - 1) % 7)))
+                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * 3600);
+        }
+        break;
+    case 5:
+        date_time.iYear = 2000 + alarm->alarm_data_for_mcu.moment_time.year;
+        date_time.iMon = (int16_t)alarm->alarm_data_for_mcu.moment_time.month;
+        date_time.iDay = (int16_t)alarm->alarm_data_for_mcu.moment_time.date;
+        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        break;
+    default:
+        alarm->alarm_data_for_eland.moment_second = 0;
+        break;
+    }
 }
