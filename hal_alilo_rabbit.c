@@ -97,6 +97,8 @@ extern system_context_t *sys_context;
 OSStatus hal_alilo_rabbit_init(void)
 {
     OSStatus err;
+    mscp_result_t result;
+    uint8_t i;
     ADUIO_SYSTEM_STATE_S Aduio_state;
     memset(&Aduio_state, 0, sizeof(ADUIO_SYSTEM_STATE_S));
 
@@ -112,6 +114,8 @@ OSStatus hal_alilo_rabbit_init(void)
     err = audio_service_init();
     require_noerr(err, exit);
 
+    for (i = 0; i < 35; i++)
+        audio_service_volume_down(&result, 1);
     // err = user_key_init();
     // require_noerr(err, exit);
 

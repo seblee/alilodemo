@@ -52,12 +52,13 @@ static void Eland_H04_Send(uint8_t *Cache);
 static void ELAND_H05_Send(uint8_t *Cache);
 static void ELAND_H06_Send(uint8_t *Cache);
 static void ELAND_H08_Send(uint8_t *Cache);
-static void ELAND_H10_Send(uint8_t *Cache);
-static void ELAND_H11_Send(uint8_t *Cache);
+static void ELAND_H0A_Send(uint8_t *Cache);
+static void ELAND_H0B_Send(uint8_t *Cache);
+static void ELAND_H0C_Send(uint8_t *Cache);
 static void MODH_Opration_02H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
 static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec);
-static void MODH_Opration_10H(uint8_t *usart_rec);
+static void MODH_Opration_0AH(uint8_t *usart_rec);
 static void timer100_key_handle(void *arg);
 static void uart_thread_DDE(uint32_t arg);
 static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
@@ -245,11 +246,14 @@ static void Opration_Packet(uint8_t *data)
     case SEND_LINK_STATE_08:
         MODH_Opration_xxH(SEND_LINK_STATE_08, data);
         break;
-    case ALARM_READ_10:
-        MODH_Opration_10H(data);
+    case ALARM_READ_0A:
+        MODH_Opration_0AH(data);
         break;
-    case ALARM_SEND_11:
-        MODH_Opration_xxH(ALARM_SEND_11, data);
+    case ALARM_SEND_0B:
+        MODH_Opration_xxH(ALARM_SEND_0B, data);
+        break;
+    case ELAND_DATA_0C:
+        MODH_Opration_xxH(ELAND_DATA_0C, data);
         break;
     default:
         break;
@@ -294,11 +298,14 @@ static void uart_thread_DDE(uint32_t arg)
         case SEND_LINK_STATE_08: /* SEND WIFI LINK STATE*/
             ELAND_H08_Send(inDataBuffer);
             break;
-        case ALARM_READ_10: /* READ MCU ALARM*/
-            ELAND_H10_Send(inDataBuffer);
+        case ALARM_READ_0A: /* READ MCU ALARM*/
+            ELAND_H0A_Send(inDataBuffer);
             break;
-        case ALARM_SEND_11: /* READ MCU ALARM*/
-            ELAND_H11_Send(inDataBuffer);
+        case ALARM_SEND_0B: /* READ MCU ALARM*/
+            ELAND_H0B_Send(inDataBuffer);
+            break;
+        case ELAND_DATA_0C: /* SEND ELAND DATA TO MCU */
+            ELAND_H0C_Send(inDataBuffer);
             break;
         default:
             break;
@@ -592,14 +599,14 @@ start_send:
 exit:
     return;
 }
-static void ELAND_H10_Send(uint8_t *Cache)
+static void ELAND_H0A_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
 
     *Cache = Uart_Packet_Header;
-    *(Cache + 1) = ALARM_READ_10;
+    *(Cache + 1) = ALARM_READ_0A;
     *(Cache + 2) = 0;
     *(Cache + 3) = Uart_Packet_Trail;
 start_send:
@@ -609,7 +616,7 @@ start_send:
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
 
-    if (received_cmd == (__msg_function_t)ALARM_READ_10)
+    if (received_cmd == (__msg_function_t)ALARM_READ_0A)
         err = kNoErr;
     else //10ms resend mechanism
     {
@@ -620,7 +627,7 @@ start_send:
 exit:
     return;
 }
-static void ELAND_H11_Send(uint8_t *Cache)
+static void ELAND_H0B_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
     __msg_function_t received_cmd = KEY_FUN_NONE;
@@ -631,7 +638,7 @@ static void ELAND_H11_Send(uint8_t *Cache)
     alarm_data_mcu = get_alarm_mcu_data(serial_cache);
 
     *Cache = Uart_Packet_Header;
-    *(Cache + 1) = ALARM_SEND_11;
+    *(Cache + 1) = ALARM_SEND_0B;
     if (alarm_data_mcu == NULL)
         *(Cache + 2) = 0;
     else
@@ -647,7 +654,46 @@ start_send:
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
 
-    if (received_cmd == (__msg_function_t)ALARM_SEND_11)
+    if (received_cmd == (__msg_function_t)ALARM_SEND_0B)
+        err = kNoErr;
+    else //10ms resend mechanism
+    {
+        mico_rtos_thread_msleep(10);
+        if (sended_times > 0)
+            goto start_send;
+    }
+exit:
+    return;
+}
+static void ELAND_H0C_Send(uint8_t *Cache)
+{
+    OSStatus err = kGeneralErr;
+    __msg_function_t received_cmd = KEY_FUN_NONE;
+    uint8_t sended_times = USART_RESEND_MAX_TIMES;
+    __ELAND_DATA_2_MCU_t cache_to_mcu = {0};
+    int ho, mi, se;
+    cache_to_mcu.time_display_format = netclock_des_g->time_display_format;
+    cache_to_mcu.night_mode_enabled = netclock_des_g->night_mode_enabled;
+    cache_to_mcu.brightness_normal = netclock_des_g->brightness_normal;
+    cache_to_mcu.brightness_night = netclock_des_g->brightness_night;
+    sscanf((const char *)(&(netclock_des_g->night_mode_begin_time)), "%02d:%02d:%02d", &ho, &mi, &se);
+    cache_to_mcu.night_mode_begin_time = (uint32_t)ho * 3600 + (uint32_t)mi * 60 + (uint32_t)se;
+    sscanf((const char *)(&(netclock_des_g->night_mode_end_time)), "%02d:%02d:%02d", &ho, &mi, &se);
+    cache_to_mcu.night_mode_end_time = (uint32_t)ho * 3600 + (uint32_t)mi * 60 + (uint32_t)se;
+
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = ELAND_DATA_0C;
+    *(Cache + 2) = sizeof(__ELAND_DATA_2_MCU_t);
+    memcpy(Cache + 3, &cache_to_mcu, sizeof(__ELAND_DATA_2_MCU_t));
+    *(Cache + 3 + (*(Cache + 2))) = Uart_Packet_Trail;
+start_send:
+    sended_times--;
+    err = elandUsartSendData(Cache, 4 + (*(Cache + 2)));
+    require_noerr(err, exit);
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    require_noerr(err, exit);
+
+    if (received_cmd == (__msg_function_t)ELAND_DATA_0C)
         err = kNoErr;
     else //10ms resend mechanism
     {
@@ -663,9 +709,10 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     static uint16_t Key_Count = 0, Key_Restain = 0;
     static uint16_t Key_Count_Trg = 0, Key_Restain_Trg = 0;
     static uint16_t Key_Count_count = 0, Key_Restain_count = 0;
-    // uint16_t ReadData;
     __msg_function_t eland_cmd = SEND_FIRM_WARE_06;
+    iso8601_time_t iso8601_time;
     uint8_t cache = 0;
+    static uint8_t time_delay_counter;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
@@ -680,7 +727,24 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     {
         reset_eland_flash_para();
     }
-    /*analysis add key value*/
+    /*alarm control*/
+    if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
+    {
+        if (get_alarm_state() == ALARM_ING)
+        {
+            mico_time_get_iso8601_time(&iso8601_time);
+            if (Key_Count_Trg & KEY_Snooze)
+            {
+                set_alarm_state(ALARM_SNOOZ_STOP);
+                alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
+            }
+            else if (Key_Count_Trg & KEY_Alarm)
+            {
+                set_alarm_state(ALARM_STOP);
+                alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
+            }
+        }
+    }
 
     if (Key_Count & (KEY_MON | KEY_AlarmMode)) //ELAND_CLOCK_MON or ELAND_CLOCK_ALARM
     {
@@ -691,7 +755,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
             break;
         case REFRESH_ALARM:
-            eland_cmd = ALARM_READ_10;
+            eland_cmd = ALARM_READ_0A;
             mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
             break;
         default:
@@ -706,14 +770,13 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
             {
                 set_eland_mode(ELAND_NA);
+                time_delay_counter = 0;
                 cache = get_waiting_alarm_serial();
                 if (Key_Count_Trg & KEY_Add)
                     cache = get_next_alarm_serial(cache);
                 else
                     cache = get_previous_alarm_serial(cache);
                 set_display_alarm_serial(cache);
-                eland_cmd = ALARM_SEND_11;
-                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
             }
             else if (Key_Restain_Trg & KEY_Set) //NA
             {
@@ -724,15 +787,23 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         case ELAND_NA:
             if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
             {
-                set_eland_mode(ELAND_NA);
+                time_delay_counter = 0;
                 cache = get_display_alarm_serial();
                 if (Key_Count_Trg & KEY_Add)
                     cache = get_next_alarm_serial(cache);
                 else
                     cache = get_previous_alarm_serial(cache);
                 set_display_alarm_serial(cache);
-                eland_cmd = ALARM_SEND_11;
-                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+            }
+            if ((Key_Count_Trg & KEY_Snooze) ||
+                (Key_Count_Trg & KEY_Alarm) ||
+                (time_delay_counter++ > 50))
+            {
+                /******back to nc********/
+                set_eland_mode(ELAND_NC);
+                cache = get_waiting_alarm_serial();
+                set_display_alarm_serial(cache);
+                time_delay_counter = 0;
             }
             break;
         case ELAND_AP:
@@ -769,7 +840,7 @@ static void MODH_Opration_04H(uint8_t *usart_rec)
 static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec)
 {
 }
-static void MODH_Opration_10H(uint8_t *usart_rec)
+static void MODH_Opration_0AH(uint8_t *usart_rec)
 {
     _alarm_mcu_data_t cache;
     __elsv_alarm_data_t elsv_alarm_data;

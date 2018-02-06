@@ -57,12 +57,13 @@ const char CommandTable[TCPCMD_MAX][COMMAND_LEN] = {
     {'F', 'W', '0', '1'}, //firmwart update start response
 };
 
-mico_utc_time_ms_t eland_send_time;
-mico_utc_time_ms_t elsv_receive_time;
-mico_utc_time_ms_t elsv_send_time;
-mico_utc_time_ms_t eland_receive_time;
+mico_utc_time_t eland_send_time;
+mico_utc_time_t elsv_receive_time;
+mico_utc_time_t elsv_send_time;
+mico_utc_time_t eland_receive_time;
 
 mico_semaphore_t TCP_Stop_Sem = NULL;
+
 /* Private function prototypes -----------------------------------------------*/
 static void TCP_thread_main(mico_thread_arg_t arg);
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams);
@@ -79,7 +80,7 @@ static TCP_Error_t TCP_Operate(const char *buff);
 static TCP_Error_t TCP_Operate_HC01(char *buf);
 static TCP_Error_t TCP_Operate_DV01(char *buf);
 static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd);
-static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t *value);
+static void time_record(TIME_RECORD_T_t type, mico_utc_time_t *value);
 static void eland_set_time(void);
 /* Private functions ---------------------------------------------------------*/
 
@@ -191,7 +192,8 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
     err = connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr));
     if (err != kNoErr)
     {
-        elan_tcp_log("ERROR: Unable to resolute the tcp connect");
+        elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        elan_tcp_log("ERROR: Unable to resolute the tcp connect err:%d", err);
         rc = TCP_CONNECTION_ERROR;
         goto exit;
     }
@@ -237,8 +239,7 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
     pNetwork->tlsDataParams.server_fd = socket_fd;
     return TCP_SUCCESS;
 exit:
-    if (socket_fd > 0)
-        close(socket_fd);
+    close(socket_fd);
     return rc;
 }
 TCP_Error_t TCP_Write(Network_t *pNetwork,
@@ -460,7 +461,7 @@ OSStatus TCP_Service_Start(void)
     err = mico_rtos_init_semaphore(&TCP_Stop_Sem, 1);
     require_noerr(err, exit);
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
-                                  0x3200, (mico_thread_arg_t)NULL);
+                                  0x3000, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
     return err;
@@ -548,6 +549,7 @@ cycle_loop:
             }
         }
     }
+
     if (tcp_write_flag[1] > 0)
     {
         tcp_write_flag[1]--;
@@ -562,6 +564,17 @@ cycle_loop:
                 goto exit;
             }
         }
+    }
+    if (tcp_HC_flag)
+    {
+        rc = eland_IF_health_check(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
+        else
+            tcp_HC_flag = false;
     }
     if (tcp_write_flag[2] > 0)
     {
@@ -593,18 +606,6 @@ cycle_loop:
             }
         }
     }
-    if (tcp_HC_flag)
-    {
-        rc = eland_IF_health_check(&Eland_Client);
-        if (TCP_SUCCESS != rc)
-        {
-            mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
-        }
-        else
-            tcp_HC_flag = false;
-    }
-    elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     timer.tv_sec = 1;
     timer.tv_usec = 0;
     rc = eland_IF_receive_packet(&Eland_Client, &timer);
@@ -731,7 +732,6 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
         SendElandStateQueue(TCP_DV00);
-
     return rc;
 }
 
@@ -812,12 +812,9 @@ static TCP_Error_t eland_IF_health_check(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    else
-    {
-        eland_set_time();
-    }
-
+    eland_set_time();
     elan_tcp_log("health_check:OK");
+    // elan_tcp_log("health_check:OK json:%s", pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HC01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -1001,7 +998,7 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
     json_object *ReceivedJsonCache = NULL;
     char time_str_cache[30];
     DATE_TIME_t datetimeTemp;
-    mico_utc_time_ms_t iMsecond;
+    mico_utc_time_t iMsecond;
 
     memset(time_str_cache, 0, 30);
     if (*buf != '{')
@@ -1021,16 +1018,16 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
         {
             sprintf(time_str_cache, "%s", json_object_get_string(val));
             sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
-            iMsecond = GetSecondTime(&datetimeTemp);
-            iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
+            iMsecond = (mico_utc_time_t)GetSecondTime(&datetimeTemp);
+            //  iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
             time_record(SET_ELSV_RECE_TIME, &iMsecond);
         }
         else if (!strcmp(key, "send_at"))
         {
             sprintf(time_str_cache, "%s", json_object_get_string(val));
             sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
-            iMsecond = GetSecondTime(&datetimeTemp);
-            iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
+            iMsecond = (mico_utc_time_t)GetSecondTime(&datetimeTemp);
+            //   iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
             time_record(SET_ELSV_SEND_TIME, &iMsecond);
         }
     }
@@ -1344,15 +1341,15 @@ mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
     count_MS = CountDay; //*1000 + iMsec;
     return count_MS;
 }
-static void time_record(TIME_RECORD_T_t type, mico_utc_time_ms_t *value)
+static void time_record(TIME_RECORD_T_t type, mico_utc_time_t *value)
 {
     switch (type)
     {
     case SET_ELAND_SEND_TIME:
-        mico_time_get_utc_time_ms(&eland_send_time);
+        mico_time_get_utc_time(&eland_send_time);
         break;
     case SET_ELAND_RECE_TIME:
-        mico_time_get_utc_time_ms(&eland_receive_time);
+        mico_time_get_utc_time(&eland_receive_time);
         break;
     case SET_ELSV_SEND_TIME:
         elsv_send_time = *value;
@@ -1373,17 +1370,19 @@ static void eland_set_time(void)
     iso8601_time_t iso8601_time;
     mico_utc_time_t utc_time;
     mico_rtc_time_t rtc_time;
-    long long offset_time, offset_time1, offset_time2;
+    int32_t offset_time, offset_time1, offset_time2;
 
     offset_time1 = elsv_receive_time - eland_send_time;
     offset_time2 = elsv_send_time - eland_receive_time;
     offset_time = (offset_time1 + offset_time2) / 2;
 
-    offset_time1 = offset_time - (long long)(Timezone_offset_elsv * 1000);
-    offset_time = offset_time1 + (long long)(netclock_des_g->timezone_offset_sec * 1000);
+    offset_time1 = offset_time - (Timezone_offset_elsv);
+    offset_time = offset_time1 + (netclock_des_g->timezone_offset_sec);
 
-    mico_time_get_utc_time_ms(&utc_time_ms);
-    utc_time_ms = utc_time_ms + offset_time;
+    mico_time_get_utc_time(&utc_time);
+    utc_time += offset_time;
+    elan_tcp_log("utc_time:%ld", utc_time);
+    utc_time_ms = (mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000);
     mico_time_set_utc_time_ms(&utc_time_ms);
 
     mico_time_get_utc_time(&utc_time);
@@ -1399,6 +1398,8 @@ static void eland_set_time(void)
     MicoRtcSetTime(&rtc_time);
     mico_time_get_iso8601_time(&iso8601_time);
     elan_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
-    /*send cmd to lcd*/
+    /*send time to lcd*/
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+    if ((offset_time > 86400) || (offset_time < -86400))
+        mico_rtos_set_semaphore(&alarm_update);
 }

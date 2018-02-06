@@ -19,6 +19,7 @@
 #include "eland_sound.h"
 #include "netclock.h"
 #include "eland_tcp.h"
+#include "netclock_uart.h"
 /* Private define ------------------------------------------------------------*/
 #define alarm_log(format, ...) custom_log("alarm", format, ##__VA_ARGS__)
 /* Private typedef -----------------------------------------------------------*/
@@ -26,14 +27,15 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
+mico_semaphore_t alarm_update = NULL;
 _eland_alarm_list_t alarm_list;
 _alarm_stream_t alarm_stream;
 mico_thread_t play_voice_thread = NULL;
+
+_alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
 static uint32_t GET_current_second(void);
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list);
-static void set_alarm_state(_alarm_list_state_t state);
-static _alarm_list_state_t get_alarm_state(void);
 void Alarm_Manager(uint32_t arg);
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD);
 static void set_alarm_stream_pos(uint32_t pos);
@@ -53,7 +55,15 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_stream.stream_Mutex);
     require_noerr(err, exit);
-
+    /*need to ergonic alarm*/
+    err = mico_rtos_init_semaphore(&alarm_update, 1);
+    require_noerr(err, exit);
+    err = mico_rtos_init_mutex(&off_history.off_Mutex);
+    require_noerr(err, exit);
+    err = mico_rtos_init_semaphore(&off_history.alarm_off_sem);
+    require_noerr(err, exit);
+    off_history.AlarmOffHistoryData = NULL;
+    require_noerr(err, exit);
     alarm_stream.stream_id = audio_service_system_generate_stream_id();
     set_alarm_stream_pos(0);
 
@@ -67,6 +77,7 @@ void Alarm_Manager(uint32_t arg)
 {
     __elsv_alarm_data_t *alarm_nearest = NULL;
     mico_utc_time_t utc_time = 0;
+    OSStatus err = kGeneralErr;
     uint8_t i;
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < alarm_list.alarm_number; i++)
@@ -77,23 +88,34 @@ void Alarm_Manager(uint32_t arg)
     alarm_nearest = Alarm_ergonic_list(&alarm_list);
     if (alarm_nearest)
     {
+        set_display_alarm_serial(get_display_alarm_serial());
         alarm_log("get alarm_nearest alarm_id:%s", alarm_nearest->alarm_id);
     }
     else
+    {
+        set_display_alarm_serial(0);
         alarm_log("NO alarm_nearest ");
+    }
     while (1)
     {
-        if ((alarm_list.list_refreshed) || (alarm_list.state.alarm_stoped == true))
+        err = mico_rtos_get_semaphore(&alarm_update, 0);
+        if ((alarm_list.list_refreshed) ||
+            (alarm_list.state.alarm_stoped == true) ||
+            (err == kNoErr))
         {
             /**refresh point**/
             alarm_log("list_refreshed");
             alarm_nearest = Alarm_ergonic_list(&alarm_list);
             if (alarm_nearest)
             {
+                set_display_alarm_serial(get_display_alarm_serial());
                 alarm_log("get alarm_nearest alarm_id:%s", alarm_nearest->alarm_id);
             }
             else
+            {
                 alarm_log("NO alarm_nearest ");
+                set_display_alarm_serial(0);
+            }
         }
         if (get_alarm_state() == ALARM_IDEL)
         {
@@ -113,12 +135,19 @@ void Alarm_Manager(uint32_t arg)
     }
     mico_rtos_delete_thread(NULL);
 }
-static _alarm_list_state_t get_alarm_state(void)
+_alarm_list_state_t get_alarm_state(void)
 {
     return alarm_list.state.state;
 }
-static void set_alarm_state(_alarm_list_state_t state)
+void set_alarm_state(_alarm_list_state_t state)
 {
+    iso8601_time_t iso8601_time;
+    if (state == ALARM_ING)
+    {
+        mico_time_get_iso8601_time(&iso8601_time);
+        alarm_off_history_record_time(ALARM_ON, &iso8601_time);
+    }
+
     mico_rtos_lock_mutex(&alarm_list.state.AlarmStateMutex);
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
@@ -166,8 +195,8 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     alarm_mcu_data->moment_time.hr = ho;
     alarm_mcu_data->moment_time.min = mi;
     alarm_mcu_data->moment_time.sec = se;
-    // if (elsv_alarm_data->alarm_repeat == 0)
-    //      get_alarm_utc_second(elsv_alarm_data);
+    if (elsv_alarm_data->alarm_repeat == 0)
+        get_alarm_utc_second(elsv_alarm_data);
 
     alarm_eland_data->color = elsv_alarm_data->alarm_color;
     alarm_mcu_data->color = elsv_alarm_data->alarm_color;
@@ -238,24 +267,6 @@ void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_d
     elsv_alarm_data->alarm_data_for_eland.color = alarm_mcu_data->color;
     elsv_alarm_data->alarm_data_for_eland.snooze_count = 0;
     elsv_alarm_data->alarm_data_for_eland.alarm_on_days_of_week = 0x7f;
-
-    // alarm_log("alarm_id:%s", elsv_alarm_data->alarm_id);
-    // alarm_log("alarm_color:%d", elsv_alarm_data->alarm_color);
-    // alarm_log("alarm_time:%s", elsv_alarm_data->alarm_time);
-    // alarm_log("alarm_off_dates:%s", elsv_alarm_data->alarm_off_dates);
-    // alarm_log("snooze_enabled:%d", elsv_alarm_data->snooze_enabled);
-    // alarm_log("snooze_count:%d", elsv_alarm_data->snooze_count);
-    // alarm_log("snooze_interval_min:%d", elsv_alarm_data->snooze_interval_min);
-    // alarm_log("alarm_pattern:%d", elsv_alarm_data->alarm_pattern);
-    // alarm_log("alarm_sound_id:%ld", elsv_alarm_data->alarm_sound_id);
-    // alarm_log("voice_alarm_id:%s", elsv_alarm_data->voice_alarm_id);
-    // alarm_log("alarm_off_voice_alarm_id:%s", elsv_alarm_data->alarm_off_voice_alarm_id);
-    // alarm_log("alarm_volume:%d", elsv_alarm_data->alarm_volume);
-    // alarm_log("volume_stepup_enabled:%d", elsv_alarm_data->volume_stepup_enabled);
-    // alarm_log("alarm_continue_min:%d", elsv_alarm_data->alarm_continue_min);
-    // alarm_log("alarm_repeat:%d", elsv_alarm_data->alarm_repeat);
-    // alarm_log("alarm_on_dates:%s", elsv_alarm_data->alarm_on_dates);
-    // alarm_log("alarm_on_days_of_week:%s", elsv_alarm_data->alarm_on_days_of_week);
 }
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 {
@@ -263,7 +274,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     __elsv_alarm_data_t *elsv_alarm_data = NULL;
     mico_utc_time_t utc_time = 0;
     OSStatus err = kNoErr;
-start_ergonic_list:
+    //start_ergonic_list:
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
     set_alarm_state(ALARM_IDEL);
@@ -278,11 +289,12 @@ start_ergonic_list:
     {
         if ((list->alarm_lib + i)->alarm_repeat)
             get_alarm_utc_second(list->alarm_lib + i);
-        if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
-        {
-            alarm_list_minus(list, list->alarm_lib + i);
-            goto start_ergonic_list;
-        }
+
+        // if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
+        // {
+        //     alarm_list_minus(list, list->alarm_lib + i);
+        //     goto start_ergonic_list;
+        // }
         if (((list->alarm_lib + i)->alarm_pattern == 1) ||
             ((list->alarm_lib + i)->alarm_pattern == 3) ||
             ((list->alarm_lib + i)->alarm_pattern == 4))
@@ -341,7 +353,6 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
     OSStatus err = kNoErr;
     uint8_t i;
     __elsv_alarm_data_t *p = AlarmList->alarm_lib;
-    set_alarm_state(ALARM_ADD);
     err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
     if (AlarmList->alarm_number == 0)
@@ -372,18 +383,21 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
             AlarmList->alarm_lib = realloc(AlarmList->alarm_lib, (AlarmList->alarm_number + 1) * sizeof(__elsv_alarm_data_t));
             if (AlarmList->alarm_lib)
             {
+                alarm_log("alarm_add success!");
                 memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
                 AlarmList->list_refreshed = true;
                 AlarmList->alarm_number++;
             }
             else
             {
+                alarm_log("######memory err");
                 AlarmList->alarm_lib = p;
                 err = kNoMemoryErr;
             }
         }
     }
 exit:
+    set_alarm_state(ALARM_ADD);
     err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     return err;
 }
@@ -394,7 +408,7 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
     alarm_log("lock AlarmlibMutex");
     err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
-    set_alarm_state(ALARM_MINUS);
+
     if (AlarmList->alarm_number == 0)
     {
         if (AlarmList->alarm_lib)
@@ -425,6 +439,7 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
 exit:
+    set_alarm_state(ALARM_MINUS);
     return err;
 }
 
@@ -434,6 +449,20 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     int8_t snooze_count;
     mico_utc_time_t utc_time;
     mico_utc_time_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
+    bool first_to_snooze = true;
+    mscp_result_t result;
+    uint8_t volume_value = 0;
+    uint8_t volume_change_counter = 0;
+    iso8601_time_t iso8601_time;
+    uint8_t i = 0;
+    if (alarm->volume_stepup_enabled == 0)
+    {
+        for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+        {
+            audio_service_volume_up(&result, 1);
+            volume_value++;
+        }
+    }
 
     if (alarm->snooze_enabled)
         snooze_count = alarm->snooze_count;
@@ -441,6 +470,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         snooze_count = 1;
     alarm_moment += (uint32_t)alarm->alarm_continue_min * 60;
     set_alarm_state(ALARM_ING);
+    snooze_count--;
     do
     {
         current_state = get_alarm_state();
@@ -448,32 +478,57 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         switch (current_state)
         {
         case ALARM_ING:
+            if (alarm->volume_stepup_enabled)
+            {
+                if ((volume_change_counter++ > 1) &&
+                    (volume_value < (alarm->alarm_volume * 32 / 100 + 1)))
+                {
+                    volume_value++;
+                    volume_change_counter = 0;
+                    audio_service_volume_up(&result, 1);
+                }
+            }
             if (utc_time > alarm_moment)
             {
+                mico_time_get_iso8601_time(&iso8601_time);
+                alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
                 alarm_log("alarm_time up");
-                alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
-                alarm_moment -= (uint32_t)alarm->alarm_continue_min * 60;
                 set_alarm_state(ALARM_SNOOZ_STOP);
-                snooze_count--;
                 Alarm_Play_Control(alarm, 0); //stop with delay
             }
             else
                 Alarm_Play_Control(alarm, 1); //play with delay
+            first_to_snooze = true;
             break;
         case ALARM_ADD:
         case ALARM_MINUS:
         case ALARM_SORT:
         case ALARM_STOP:
+            first_to_snooze = true;
             Alarm_Play_Control(alarm, 0); //stop
             alarm_list.state.alarm_stoped = true;
             break;
         case ALARM_SNOOZ_STOP:
+            if (first_to_snooze)
+            {
+                for (i = volume_value; i > 0; i--)
+                    audio_service_volume_down(&result, 1);
+                volume_value = 0;
+                alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
+                alarm_moment -= (uint32_t)alarm->alarm_continue_min * 60;
+                mico_time_convert_utc_ms_to_iso8601(alarm_moment * 1000, &iso8601_time);
+                alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
+                /**add json for tcp**/
+                alarm_off_history_json_data_build(off_history);
+                first_to_snooze = false;
+            }
             if (snooze_count)
             {
                 if (utc_time > alarm_moment)
                 {
-                    alarm_log("alarm_time on aagin %d", snooze_count);
+                    alarm_log("alarm_time on again %d", snooze_count);
                     set_alarm_state(ALARM_ING);
+                    snooze_count--;
                     alarm_moment += (uint32_t)alarm->alarm_continue_min * 60;
                 }
             }
@@ -482,10 +537,13 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             break;
         default:
             alarm_list.state.alarm_stoped = true;
+            first_to_snooze = true;
             break;
         }
         mico_rtos_thread_msleep(500);
     } while (alarm_list.state.alarm_stoped == false);
+    for (i = 0; i < volume_value + 3; i++)
+        audio_service_volume_down(&result, 1);
 }
 /***CMD = 1 PALY   CMD = 0 STOP***/
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
@@ -706,11 +764,14 @@ uint8_t get_display_alarm_serial(void)
 }
 void set_display_alarm_serial(uint8_t serial)
 {
+    __msg_function_t eland_cmd = ALARM_SEND_0B;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_lock_mutex(&alarm_list.AlarmSerialMutex);
     alarm_list.alarm_display_serial = serial;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
+    eland_cmd = ALARM_SEND_0B;
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
 }
 _alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial)
 {
@@ -753,24 +814,23 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         alarm->alarm_data_for_mcu.moment_time.weekday = currentTime->tm_wday;
         alarm->alarm_data_for_mcu.moment_time.month = currentTime->tm_mon + 1;
         alarm->alarm_data_for_mcu.moment_time.year = (currentTime->tm_year + 1900) % 100;
-        alarm_log("moment_second %ld", alarm->alarm_data_for_eland.moment_second);
         break;
     case 1:
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         break;
     case 2:
         if (rtc_time.weekday < 2)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 3600;
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 86400;
         else if (rtc_time.weekday < 7)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         else
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 7200;
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 86400 + 86400;
         break;
     case 3:
         if (rtc_time.weekday < 2)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         else if (rtc_time.weekday < 7)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - rtc_time.weekday) * 3600;
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - rtc_time.weekday) * 86400;
         else
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         break;
@@ -778,7 +838,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         for (i = 0; i < 7; i++)
         {
             if (alarm->alarm_data_for_mcu.alarm_on_days_of_week & (1 << ((rtc_time.weekday + i - 1) % 7)))
-                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * 3600);
+                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * 86400);
         }
         break;
     case 5:
@@ -791,4 +851,69 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         alarm->alarm_data_for_eland.moment_second = 0;
         break;
     }
+    alarm_log("%04d-%02d-%02d %02d:%02d:%02d", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec);
+    alarm_log("alarm_id:%s", alarm->alarm_id);
+    alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);
+}
+
+void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
+{
+    iso8601_time_t iso8601_time;
+    uint8_t alarm_serial;
+
+    mico_rtos_lock_mutex(&off_history.off_Mutex);
+    switch (type)
+    {
+    case ALARM_ON:
+        memset(&off_history.HistoryData, 0, sizeof(AlarmOffHistoryData_t));
+        alarm_serial = get_waiting_alarm_serial();
+        memcpy(off_history.HistoryData.alarm_id,
+               (alarm_list.alarm_lib + alarm_serial)->alarm_id, ALARM_ID_LEN);
+        memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
+        break;
+    case ALARM_OFF_SNOOZE:
+    case ALARM_OFF_ALARMOFF:
+    case ALARM_OFF_AUTOOFF:
+        memcpy(&off_history.HistoryData.alarm_off_datetime, iso8601_time, 19);
+        off_history.HistoryData.alarm_off_reason = type;
+        break;
+    case ALARM_SNOOZE:
+        memcpy(&off_history.HistoryData.snooze_datetime, iso8601_time, 19);
+        break;
+    default:
+        break;
+    }
+    mico_rtos_unlock_mutex(&off_history.off_Mutex);
+}
+
+void alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff)
+{
+    json_object *TempJsonData = NULL;
+    json_object *historyJsonData = NULL;
+    const char *generate_data = NULL;
+    uint32_t generate_data_len = 0;
+    if (json_buff)
+        return;
+    TempJsonData = json_object_new_object();
+    require_action_string(TempJsonData, exit, err = kNoMemoryErr, "create TempJsonData object error!");
+    historyJsonData = json_object_new_object();
+    require_action_string(historyJsonData, exit, err = kNoMemoryErr, "create historyJsonData object error!");
+
+    Eland_log("Begin add historyJsonData object");
+    json_object_object_add(alarmhistory, "alarm_id", json_object_new_string(HistoryData->alarm_id));
+    json_object_object_add(alarmhistory, "alarm_on_datetime", json_object_new_string(HistoryData->alarm_on_datetime));
+    json_object_object_add(alarmhistory, "alarm_off_datetime", json_object_new_string(HistoryData->alarm_off_datetime));
+    json_object_object_add(alarmhistory, "alarm_off_reason", json_object_new_int(HistoryData->alarm_off_reason));
+    json_object_object_add(alarmhistory, "snooze_datetime", json_object_new_string(HistoryData->snooze_datetime));
+    json_object_object_add(TempJsonData, "AlarmOffHistoryData", historyJsonData);
+
+    generate_data = json_object_to_json_string(TempJsonData);
+    require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
+    generate_data_len = strlen(generate_data);
+    json_buff = calloc(generate_data_len + 1, sizeof(uint8_t));
+    memcpy(json_buff, generate_data, generate_data_len);
+exit:
+    free_json_obj(&TempJsonData);
+    free_json_obj(&JsonData);
+    return err;
 }

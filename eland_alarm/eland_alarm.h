@@ -92,6 +92,29 @@ typedef struct
     char alarm_id[ALARM_ID_LEN + 1];
     uint8_t sound_type;
 } _alarm_stream_t;
+typedef enum {
+    ALARM_ON = (uint8_t)0,
+    ALARM_OFF_SNOOZE = (uint8_t)1,
+    ALARM_OFF_ALARMOFF = (uint8_t)2,
+    ALARM_OFF_AUTOOFF = (uint8_t)3,
+    ALARM_SNOOZE = (uint8_t)4,
+} alarm_off_history_record_t;
+
+typedef struct _AlarmOffHistoryData //闹钟履历结构体
+{
+    char alarm_id[ALARM_ID_LEN + 1];             //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
+    iso8601_time_t alarm_on_datetime;            //闹钟播放时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
+    iso8601_time_t alarm_off_datetime;           //闹钟停止时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
+    alarm_off_history_record_t alarm_off_reason; //闹钟停止的理由。1、鬧鐘繼續響鈴操作 2 鬧鐘停止操作 3、鬧鐘自動停止
+    iso8601_time_t snooze_datetime;              //闹钟繼續響鈴时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
+} AlarmOffHistoryData_t;
+typedef struct
+{
+    mico_mutex_t off_Mutex;
+    mico_semaphore_t alarm_off_sem;
+    char *HistoryDatajson;
+    AlarmOffHistoryData_t HistoryData;
+} _alarm_off_history_t;
 
 typedef struct
 {
@@ -103,20 +126,15 @@ typedef struct
     uint8_t alarm_display_serial;
     uint8_t alarm_waiting_serial;
     mico_mutex_t AlarmSerialMutex;
-    /**********************************************/
+    /**********************/
+    /************************/
     __elsv_alarm_data_t *alarm_lib;
 } _eland_alarm_list_t;
-typedef struct _AlarmOffHistoryData //闹钟履历结构体
-{
-    int32_t AlarmID;                 //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
-    iso8601_time_t AlarmOnDateTime;  //闹钟播放时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
-    iso8601_time_t AlarmOffDateTime; //闹钟停止时间。"yyyy-MM-dd HH:mm:ss"的形式。 （ex : "2017-06-21 15:30:00"）
-    int32_t AlarmOffReason;          //闹钟停止的理由。 1 : 用户操作 2 : 自動停止
-} AlarmOffHistoryData;
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 extern _eland_alarm_list_t alarm_list;
+extern mico_semaphore_t alarm_update;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
@@ -131,6 +149,9 @@ uint8_t get_next_alarm_serial(uint8_t now_serial);
 uint8_t get_previous_alarm_serial(uint8_t now_serial);
 uint8_t get_waiting_alarm_serial(void);
 void set_waiting_alarm_serial(uint8_t now_serial);
+_alarm_list_state_t get_alarm_state(void);
+void set_alarm_state(_alarm_list_state_t state);
+void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

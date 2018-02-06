@@ -46,7 +46,6 @@ _ELAND_DEVICE_t *device_state = NULL;
 mico_mutex_t http_send_setting_mutex = NULL;
 json_object *ElandJsonData = NULL;
 json_object *DeviceJsonData = NULL;
-json_object *AlarmJsonData = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -242,11 +241,10 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     OSStatus err = kNoErr;
     const char *generate_data = NULL;
     uint32_t generate_data_len = 0;
-    if ((ElandJsonData != NULL) || (AlarmJsonData != NULL) || (DeviceJsonData != NULL))
+    if ((ElandJsonData != NULL) || (DeviceJsonData != NULL))
     {
         free_json_obj(&ElandJsonData);
         free_json_obj(&DeviceJsonData);
-        free_json_obj(&AlarmJsonData);
     }
     ElandJsonData = json_object_new_object();
     require_action_string(ElandJsonData, exit, err = kNoMemoryErr, "create ElandJsonData object error!");
