@@ -428,10 +428,21 @@ static void Eland_H03_Send(uint8_t *Cache)
 {
     OSStatus err = kGeneralErr;
     mico_rtc_time_t cur_time;
+    mico_utc_time_t utc_time = 0;
+    struct tm *currentTime;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
+    mico_time_get_utc_time(&utc_time);
+    currentTime = localtime((const time_t *)&(utc_time));
 
-    MicoRtcGetTime(&cur_time); //返回新的时间值
+    cur_time.sec = currentTime->tm_sec;
+    cur_time.min = currentTime->tm_min;
+    cur_time.hr = currentTime->tm_hour;
+    cur_time.date = currentTime->tm_mday;
+    cur_time.weekday = currentTime->tm_wday;
+    cur_time.month = currentTime->tm_mon + 1;
+    cur_time.year = (currentTime->tm_year + 1900) % 100;
+
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = TIME_SET_03;
     *(Cache + 2) = sizeof(mico_rtc_time_t);

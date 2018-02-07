@@ -330,7 +330,6 @@ void free_json_obj(json_object **json_obj)
 void destory_upload_data(void)
 {
     free_json_obj(&ElandJsonData);
-    free_json_obj(&AlarmJsonData);
     return;
 }
 //解析接收到的数据包

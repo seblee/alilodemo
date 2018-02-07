@@ -166,33 +166,37 @@ typedef enum _TCP_CMD {
     HD02,       //15 holiday data change notice
     HT00,       //16 alarm on notification
     HT01,       //17 alarm off notification
-    FW00,       //18 firmware update start request
-    FW01,       //19 firmwart update start response
-    TCPCMD_MAX, //20
+    HT02,       //18 alarm jump over notification
+    FW00,       //19 firmware update start request
+    FW01,       //20 firmwart update start response
+    TCPCMD_MAX, //21
     TCPCMD_NONE,
 } _TCP_CMD_t;
-/**
+
+
+
+    /**
  * @brief MQTT Client State Type
  *
  * Defining a type for MQTT Client State
  *
  */
-typedef enum _ClientState {
-    CLIENT_STATE_INVALID = 0,
-    CLIENT_STATE_INITIALIZED = 1,
-    CLIENT_STATE_CONNECTING = 2,
-    CLIENT_STATE_CONNECTED_IDLE = 3,
-    CLIENT_STATE_CONNECTED_YIELD_IN_PROGRESS = 4,
-    CLIENT_STATE_CONNECTED_PUBLISH_IN_PROGRESS = 5,
-    CLIENT_STATE_CONNECTED_SUBSCRIBE_IN_PROGRESS = 6,
-    CLIENT_STATE_CONNECTED_UNSUBSCRIBE_IN_PROGRESS = 7,
-    CLIENT_STATE_CONNECTED_RESUBSCRIBE_IN_PROGRESS = 8,
-    CLIENT_STATE_CONNECTED_WAIT_FOR_CB_RETURN = 9,
-    CLIENT_STATE_DISCONNECTING = 10,
-    CLIENT_STATE_DISCONNECTED_ERROR = 11,
-    CLIENT_STATE_DISCONNECTED_MANUALLY = 12,
-    CLIENT_STATE_PENDING_RECONNECT = 13
-} ClientState_t;
+    typedef enum _ClientState {
+        CLIENT_STATE_INVALID = 0,
+        CLIENT_STATE_INITIALIZED = 1,
+        CLIENT_STATE_CONNECTING = 2,
+        CLIENT_STATE_CONNECTED_IDLE = 3,
+        CLIENT_STATE_CONNECTED_YIELD_IN_PROGRESS = 4,
+        CLIENT_STATE_CONNECTED_PUBLISH_IN_PROGRESS = 5,
+        CLIENT_STATE_CONNECTED_SUBSCRIBE_IN_PROGRESS = 6,
+        CLIENT_STATE_CONNECTED_UNSUBSCRIBE_IN_PROGRESS = 7,
+        CLIENT_STATE_CONNECTED_RESUBSCRIBE_IN_PROGRESS = 8,
+        CLIENT_STATE_CONNECTED_WAIT_FOR_CB_RETURN = 9,
+        CLIENT_STATE_DISCONNECTING = 10,
+        CLIENT_STATE_DISCONNECTED_ERROR = 11,
+        CLIENT_STATE_DISCONNECTED_MANUALLY = 12,
+        CLIENT_STATE_PENDING_RECONNECT = 13
+    } ClientState_t;
 typedef struct _ClientStatus
 {
     ClientState_t clientState;

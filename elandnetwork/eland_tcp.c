@@ -53,6 +53,7 @@ const char CommandTable[TCPCMD_MAX][COMMAND_LEN] = {
     {'H', 'D', '0', '2'}, //holiday data change notice
     {'H', 'T', '0', '0'}, //alarm on notification
     {'H', 'T', '0', '1'}, //alarm off notification
+    {'H', 'T', '0', '2'}, //alarm jump over notification
     {'F', 'W', '0', '0'}, //firmware update start request
     {'F', 'W', '0', '1'}, //firmwart update start response
 };
@@ -72,6 +73,7 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient);   /*need back 
 static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient);       /*need back function*/
 static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient);     /*need back function*/
 static TCP_Error_t eland_IF_health_check(_Client_t *pClient);       /*need back function*/
+static TCP_Error_t eland_IF_upload(_Client_t *pClient, _TCP_CMD_t tcp_cmd);
 static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type);
 static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _time_t *timer);
 static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer);
@@ -517,54 +519,36 @@ RECONN:
         goto RECONN;
     }
 cycle_loop:
-    err = mico_rtos_get_semaphore(&TCP_Stop_Sem, 0);
-    if (err == kNoErr)
+
+    elan_tcp_log("eland_IF_connection_request");
+    rc = eland_IF_connection_request(&Eland_Client);
+    if (TCP_SUCCESS != rc)
     {
-        Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
-        Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
-        if (Eland_Client.clientData.readBuf != NULL)
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
         {
-            free(Eland_Client.clientData.readBuf);
-            Eland_Client.clientData.readBuf = NULL;
+            goto exit;
         }
-        mico_rtos_delete_thread(NULL);
-    }
-    if (tcp_write_flag[0] > 0)
-    {
-        elan_tcp_log("eland_IF_connection_request");
-        tcp_write_flag[0]--;
-        rc = eland_IF_connection_request(&Eland_Client);
-        if (TCP_SUCCESS != rc)
+        else if (rc == NETWORK_SSL_NOTHING_TO_READ)
         {
-            mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
-            if (rc == NETWORK_SSL_READ_ERROR)
-            {
-                goto exit;
-            }
-            else if (rc == NETWORK_SSL_NOTHING_TO_READ)
-            {
-                tcp_write_flag[0]++;
-                goto cycle_loop;
-            }
+            tcp_write_flag[0]++;
+            goto cycle_loop;
         }
     }
 
-    if (tcp_write_flag[1] > 0)
+    rc = eland_IF_update_elandinfo(&Eland_Client);
+    if (TCP_SUCCESS != rc)
     {
-        tcp_write_flag[1]--;
-        rc = eland_IF_update_elandinfo(&Eland_Client);
-        if (TCP_SUCCESS != rc)
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
         {
-            mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
-            if (rc == NETWORK_SSL_READ_ERROR)
-            {
-                tcp_write_flag[1]++;
-                goto exit;
-            }
+            tcp_write_flag[1]++;
+            goto exit;
         }
     }
+
     if (tcp_HC_flag)
     {
         rc = eland_IF_health_check(&Eland_Client);
@@ -576,36 +560,32 @@ cycle_loop:
         else
             tcp_HC_flag = false;
     }
-    if (tcp_write_flag[2] > 0)
+
+    rc = eland_IF_update_alarm(&Eland_Client);
+    if (TCP_SUCCESS != rc)
     {
-        tcp_write_flag[2]--;
-        rc = eland_IF_update_alarm(&Eland_Client);
-        if (TCP_SUCCESS != rc)
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
         {
-            mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
-            if (rc == NETWORK_SSL_READ_ERROR)
-            {
-                tcp_write_flag[2]++;
-                goto exit;
-            }
+            tcp_write_flag[2]++;
+            goto exit;
         }
     }
-    if (tcp_write_flag[3] > 0)
+
+    rc = eland_IF_update_holiday(&Eland_Client);
+    if (TCP_SUCCESS != rc)
     {
-        tcp_write_flag[3]--;
-        rc = eland_IF_update_holiday(&Eland_Client);
-        if (TCP_SUCCESS != rc)
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
         {
-            mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
-            if (rc == NETWORK_SSL_READ_ERROR)
-            {
-                tcp_write_flag[3]++;
-                goto exit;
-            }
+            tcp_write_flag[3]++;
+            goto exit;
         }
     }
+
+little_cycle_loop:
     timer.tv_sec = 1;
     timer.tv_usec = 0;
     rc = eland_IF_receive_packet(&Eland_Client, &timer);
@@ -622,11 +602,42 @@ cycle_loop:
         tcp_HC_flag = true;
         HC00_moment_min = cur_time.min;
     }
+    if (tcp_HC_flag)
+    {
+        rc = eland_IF_health_check(&Eland_Client);
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
+        else
+            tcp_HC_flag = false;
+    }
+    /*******upload alarm history********/
+    err = mico_rtos_get_semaphore(&off_history.alarm_off_sem, 0);
+    if (err == kNoErr)
+    {
+        rc = eland_IF_upload(&Eland_Client, HT01);
+    }
+    /*******delete tcp thread***********/
+    err = mico_rtos_get_semaphore(&TCP_Stop_Sem, 0);
+    if (err == kNoErr)
+    {
+        Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
+        Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
+        if (Eland_Client.clientData.readBuf != NULL)
+        {
+            free(Eland_Client.clientData.readBuf);
+            Eland_Client.clientData.readBuf = NULL;
+        }
+        mico_rtos_delete_thread(NULL);
+    }
     //   mico_rtos_delete_thread(NULL);
-    goto cycle_loop;
+    goto little_cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
+    SendElandStateQueue(WifyConnected);
     if (tcp_write_flag[0] == 0)
         tcp_write_flag[0]++;
     if (tcp_write_flag[1] == 0)
@@ -726,12 +737,13 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_elandinfo:OK");
+    elan_tcp_log("update_elandinfo:OK %s", (pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[DV01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
         SendElandStateQueue(TCP_DV00);
+
     return rc;
 }
 
@@ -823,6 +835,27 @@ static TCP_Error_t eland_IF_health_check(_Client_t *pClient)
 
     return rc;
 }
+static TCP_Error_t eland_IF_upload(_Client_t *pClient, _TCP_CMD_t tcp_cmd)
+{
+    TCP_Error_t rc = TCP_SUCCESS;
+    _time_t timer;
+    if (NULL == pClient)
+        return NULL_VALUE_ERROR;
+
+    timer.tv_sec = 5;
+    timer.tv_usec = 0;
+    rc = eland_IF_send_packet(pClient, tcp_cmd, &timer);
+    if (rc != TCP_SUCCESS)
+        return rc;
+
+    elan_tcp_log("upload %c%c%c%c:OK",
+                 CommandTable[tcp_cmd][0],
+                 CommandTable[tcp_cmd][1],
+                 CommandTable[tcp_cmd][2],
+                 CommandTable[tcp_cmd][3]);
+
+    return rc;
+}
 
 static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _time_t *timer)
 {
@@ -846,6 +879,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
 {
     _TELEGRAM_t *telegram = (_TELEGRAM_t *)pMsg;
     char *telegram_data = NULL;
+    AlarmOffHistoryData_t *history_data_p = NULL;
     static uint16_t telegram_squence_num = 0;
     memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
 
@@ -854,12 +888,24 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     memcpy(telegram->command, CommandTable[cmd_type], 4);
     telegram->reserved = 0;
     telegram->lenth = 0;
-
-    if (cmd_type == CN00)
+    switch (cmd_type)
     {
+    case CN00:
         telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
         InitUpLoadData(telegram_data);
         telegram->lenth = strlen(telegram_data);
+        break;
+    case HT01:
+        telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
+        history_data_p = get_alarm_history_data();
+        if (history_data_p)
+            alarm_off_history_json_data_build(history_data_p, telegram_data);
+        telegram->lenth = strlen(telegram_data);
+        memcpy(telegram->command, CommandTable[cmd_type], 4);
+        set_alarm_history_data_state(DONE_UPLOAD);
+        break;
+    default:
+        break;
     }
 }
 static TCP_Error_t eland_IF_receive_packet(_Client_t *pClient, _time_t *timer)
@@ -1037,8 +1083,8 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
 static TCP_Error_t TCP_Operate_DV01(char *buf)
 {
     TCP_Error_t rc = TCP_SUCCESS;
-    json_object *ReceivedJsonCache = NULL,
-                *device_JSON = NULL;
+    __msg_function_t eland_cmd = ELAND_DATA_0C;
+    json_object *ReceivedJsonCache = NULL, *device_JSON = NULL;
     ELAND_DES_S des_data_cache;
     memset(&des_data_cache, 0, sizeof(ELAND_DES_S));
     memcpy(&des_data_cache, netclock_des_g, sizeof(ELAND_DES_S));
@@ -1136,6 +1182,7 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
     mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
     memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
 exit:
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1337,7 +1384,7 @@ mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
     }
     CountDay += (iDay - 1);
 
-    CountDay = CountDay * 86400 + (unsigned long)iHour * 3600 + (unsigned long)iMin * 60 + iSec;
+    CountDay = CountDay * SECOND_ONE_DAY + (unsigned long)iHour * SECOND_ONE_HOUR + (unsigned long)iMin * SECOND_ONE_MINUTE + iSec;
     count_MS = CountDay; //*1000 + iMsec;
     return count_MS;
 }

@@ -22,6 +22,10 @@
 #define VOICE_ALARM_ID_LEN 37       //语音闹钟的ID
 #define ALARM_ON_DAYS_OF_WEEK_LEN 8 //鬧鐘播放的星期幾
 #define ALARM_ID_OF_SIMPLE_CLOCK "simple_clock"
+
+#define SECOND_ONE_DAY 86400
+#define SECOND_ONE_HOUR 3600
+#define SECOND_ONE_MINUTE 60
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
 {
@@ -99,7 +103,12 @@ typedef enum {
     ALARM_OFF_AUTOOFF = (uint8_t)3,
     ALARM_SNOOZE = (uint8_t)4,
 } alarm_off_history_record_t;
-
+typedef enum {
+    IDEL_UPLOAD = 0,
+    READY_UPLOAD,
+    WAIT_UPLOAD,
+    DONE_UPLOAD,
+} HistoryDatastate_t;
 typedef struct _AlarmOffHistoryData //闹钟履历结构体
 {
     char alarm_id[ALARM_ID_LEN + 1];             //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
@@ -112,8 +121,8 @@ typedef struct
 {
     mico_mutex_t off_Mutex;
     mico_semaphore_t alarm_off_sem;
-    char *HistoryDatajson;
     AlarmOffHistoryData_t HistoryData;
+    HistoryDatastate_t state;
 } _alarm_off_history_t;
 
 typedef struct
@@ -135,6 +144,7 @@ typedef struct
 /* Private variables ---------------------------------------------------------*/
 extern _eland_alarm_list_t alarm_list;
 extern mico_semaphore_t alarm_update;
+extern _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
@@ -152,6 +162,11 @@ void set_waiting_alarm_serial(uint8_t now_serial);
 _alarm_list_state_t get_alarm_state(void);
 void set_alarm_state(_alarm_list_state_t state);
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
+
+AlarmOffHistoryData_t *get_alarm_history_data(void);
+HistoryDatastate_t get_alarm_history_data_state(void);
+void set_alarm_history_data_state(HistoryDatastate_t value);
+OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

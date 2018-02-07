@@ -60,9 +60,7 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&off_history.off_Mutex);
     require_noerr(err, exit);
-    err = mico_rtos_init_semaphore(&off_history.alarm_off_sem);
-    require_noerr(err, exit);
-    off_history.AlarmOffHistoryData = NULL;
+    err = mico_rtos_init_semaphore(&off_history.alarm_off_sem, 1);
     require_noerr(err, exit);
     alarm_stream.stream_id = audio_service_system_generate_stream_id();
     set_alarm_stream_pos(0);
@@ -509,21 +507,28 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             alarm_list.state.alarm_stoped = true;
             break;
         case ALARM_SNOOZ_STOP:
-            if (first_to_snooze)
-            {
-                for (i = volume_value; i > 0; i--)
-                    audio_service_volume_down(&result, 1);
-                volume_value = 0;
-                alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
-                alarm_moment -= (uint32_t)alarm->alarm_continue_min * 60;
-                mico_time_convert_utc_ms_to_iso8601(alarm_moment * 1000, &iso8601_time);
-                alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
-                /**add json for tcp**/
-                alarm_off_history_json_data_build(off_history);
-                first_to_snooze = false;
-            }
             if (snooze_count)
             {
+                if (first_to_snooze)
+                {
+                    if (alarm->volume_stepup_enabled)
+                    {
+                        for (i = volume_value; i > 0; i--)
+                            audio_service_volume_down(&result, 1);
+                        volume_value = 0;
+                    }
+                    alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
+                    alarm_moment -= (uint32_t)alarm->alarm_continue_min * 60;
+                    mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)alarm_moment * 1000), &iso8601_time);
+                    alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
+                    /**add json for tcp**/
+                    if (get_alarm_history_data_state() != WAIT_UPLOAD)
+                    {
+                        mico_rtos_set_semaphore(&off_history.alarm_off_sem);
+                        set_alarm_history_data_state(WAIT_UPLOAD);
+                    }
+                    first_to_snooze = false;
+                }
                 if (utc_time > alarm_moment)
                 {
                     alarm_log("alarm_time on again %d", snooze_count);
@@ -542,6 +547,13 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         }
         mico_rtos_thread_msleep(500);
     } while (alarm_list.state.alarm_stoped == false);
+
+    if (get_alarm_history_data_state() != WAIT_UPLOAD)
+    {
+        mico_rtos_set_semaphore(&off_history.alarm_off_sem);
+        set_alarm_history_data_state(WAIT_UPLOAD);
+    }
+
     for (i = 0; i < volume_value + 3; i++)
         audio_service_volume_down(&result, 1);
 }
@@ -622,7 +634,7 @@ static void play_voice(mico_thread_arg_t arg)
 
 falsh_read_start:
     alarm_w_r_queue->pos = data_pos;
-    alarm_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
+    //alarm_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
     err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
     require_noerr(err, exit);
     err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, 1000);
@@ -630,7 +642,7 @@ falsh_read_start:
 
     if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
     {
-        alarm_log("ERRNONE");
+        // alarm_log("ERRNONE");
         if (data_pos == 0)
         {
             flash_read_stream.total_len = alarm_w_r_queue->total_len;
@@ -647,10 +659,10 @@ falsh_read_start:
     {
         alarm_log("ELSE %d", (uint8_t)alarm_r_w_callbcke_queue->read_write_err);
     }
-    alarm_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
-              (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
-              (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
-    alarm_log("free_callback_queue");
+    //alarm_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
+    //          (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
+    //          (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
+    //          alarm_log("free_callback_queue");
     free(alarm_r_w_callbcke_queue);
 
 audio_transfer:
@@ -805,7 +817,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         mico_time_get_utc_time(&utc_time);
         if (alarm->alarm_data_for_eland.moment_second < utc_time)
-            alarm->alarm_data_for_eland.moment_second += 86400;
+            alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
         currentTime = localtime((const time_t *)&(alarm->alarm_data_for_eland.moment_second));
         alarm->alarm_data_for_mcu.moment_time.sec = currentTime->tm_sec;
         alarm->alarm_data_for_mcu.moment_time.min = currentTime->tm_min;
@@ -817,20 +829,22 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         break;
     case 1:
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        if (alarm->alarm_data_for_eland.moment_second < utc_time)
+            alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
         break;
     case 2:
         if (rtc_time.weekday < 2)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 86400;
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + SECOND_ONE_DAY;
         else if (rtc_time.weekday < 7)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         else
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + 86400 + 86400;
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + SECOND_ONE_DAY + SECOND_ONE_DAY;
         break;
     case 3:
         if (rtc_time.weekday < 2)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         else if (rtc_time.weekday < 7)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - rtc_time.weekday) * 86400;
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - rtc_time.weekday) * SECOND_ONE_DAY;
         else
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         break;
@@ -838,7 +852,13 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         for (i = 0; i < 7; i++)
         {
             if (alarm->alarm_data_for_mcu.alarm_on_days_of_week & (1 << ((rtc_time.weekday + i - 1) % 7)))
-                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * 86400);
+            {
+                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * SECOND_ONE_DAY);
+                if (alarm->alarm_data_for_eland.moment_second < utc_time)
+                    continue;
+                else
+                    break;
+            }
         }
         break;
     case 5:
@@ -858,24 +878,28 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
 {
-    iso8601_time_t iso8601_time;
     uint8_t alarm_serial;
-
+    if (get_alarm_history_data_state() == WAIT_UPLOAD)
+        return;
     mico_rtos_lock_mutex(&off_history.off_Mutex);
     switch (type)
     {
     case ALARM_ON:
+
         memset(&off_history.HistoryData, 0, sizeof(AlarmOffHistoryData_t));
         alarm_serial = get_waiting_alarm_serial();
         memcpy(off_history.HistoryData.alarm_id,
                (alarm_list.alarm_lib + alarm_serial)->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
+        off_history.state = IDEL_UPLOAD;
+
         break;
     case ALARM_OFF_SNOOZE:
     case ALARM_OFF_ALARMOFF:
     case ALARM_OFF_AUTOOFF:
         memcpy(&off_history.HistoryData.alarm_off_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
+        off_history.state = READY_UPLOAD;
         break;
     case ALARM_SNOOZE:
         memcpy(&off_history.HistoryData.snooze_datetime, iso8601_time, 19);
@@ -886,34 +910,50 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
     mico_rtos_unlock_mutex(&off_history.off_Mutex);
 }
 
-void alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff)
+OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff)
 {
+    OSStatus err = kNoErr;
     json_object *TempJsonData = NULL;
-    json_object *historyJsonData = NULL;
+    json_object *AlarmOffHistoryData = NULL;
     const char *generate_data = NULL;
     uint32_t generate_data_len = 0;
-    if (json_buff)
-        return;
+
     TempJsonData = json_object_new_object();
     require_action_string(TempJsonData, exit, err = kNoMemoryErr, "create TempJsonData object error!");
-    historyJsonData = json_object_new_object();
-    require_action_string(historyJsonData, exit, err = kNoMemoryErr, "create historyJsonData object error!");
+    AlarmOffHistoryData = json_object_new_object();
+    require_action_string(AlarmOffHistoryData, exit, err = kNoMemoryErr, "create AlarmOffHistoryData object error!");
 
-    Eland_log("Begin add historyJsonData object");
-    json_object_object_add(alarmhistory, "alarm_id", json_object_new_string(HistoryData->alarm_id));
-    json_object_object_add(alarmhistory, "alarm_on_datetime", json_object_new_string(HistoryData->alarm_on_datetime));
-    json_object_object_add(alarmhistory, "alarm_off_datetime", json_object_new_string(HistoryData->alarm_off_datetime));
-    json_object_object_add(alarmhistory, "alarm_off_reason", json_object_new_int(HistoryData->alarm_off_reason));
-    json_object_object_add(alarmhistory, "snooze_datetime", json_object_new_string(HistoryData->snooze_datetime));
-    json_object_object_add(TempJsonData, "AlarmOffHistoryData", historyJsonData);
+    alarm_log("Begin add AlarmOffHistoryData object");
+    json_object_object_add(AlarmOffHistoryData, "alarm_id", json_object_new_string(HistoryData->alarm_id));
+    json_object_object_add(AlarmOffHistoryData, "alarm_on_datetime", json_object_new_string((char *)&HistoryData->alarm_on_datetime));
+    json_object_object_add(AlarmOffHistoryData, "alarm_off_datetime", json_object_new_string((char *)&HistoryData->alarm_off_datetime));
+    json_object_object_add(AlarmOffHistoryData, "alarm_off_reason", json_object_new_int(HistoryData->alarm_off_reason));
+    json_object_object_add(AlarmOffHistoryData, "snooze_datetime", json_object_new_string((char *)&HistoryData->snooze_datetime));
+    json_object_object_add(TempJsonData, "AlarmOffHistoryData", AlarmOffHistoryData);
 
     generate_data = json_object_to_json_string(TempJsonData);
     require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
     generate_data_len = strlen(generate_data);
     json_buff = calloc(generate_data_len + 1, sizeof(uint8_t));
     memcpy(json_buff, generate_data, generate_data_len);
+    alarm_log("history_json_buff:%s", json_buff);
 exit:
+
     free_json_obj(&TempJsonData);
-    free_json_obj(&JsonData);
+    free_json_obj(&AlarmOffHistoryData);
     return err;
+}
+HistoryDatastate_t get_alarm_history_data_state(void)
+{
+    return off_history.state;
+}
+void set_alarm_history_data_state(HistoryDatastate_t value)
+{
+    mico_rtos_lock_mutex(&off_history.off_Mutex);
+    off_history.state = value;
+    mico_rtos_unlock_mutex(&off_history.off_Mutex);
+}
+AlarmOffHistoryData_t *get_alarm_history_data(void)
+{
+    return &off_history.HistoryData;
 }
