@@ -107,9 +107,8 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
     }
     else if (wifi_Mode == Soft_AP)
     {
-        err = Eland_httpd_start();
-        if (err == kNoErr)
-            SendElandStateQueue(APServerStart);
+        mico_rtos_set_semaphore(&TCP_Stop_Sem);
+
         // Wifi_SoftAP_fun();
         err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
                                       Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
@@ -152,12 +151,13 @@ void Wifi_station_threed(mico_thread_arg_t arg)
 }
 static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 {
+    OSStatus err = kNoErr;
     network_InitTypeDef_st wNetConfig;
-    if ((get_eland_mode_state() & 0xff) >= (uint8_t)HTTP_Get_HOST_INFO)
-    {
-        mico_rtos_set_semaphore(&TCP_Stop_Sem);
-        mico_rtos_thread_sleep(2);
-    }
+
+    mico_rtos_thread_sleep(2);
+    err = Eland_httpd_start();
+    if (err == kNoErr)
+        SendElandStateQueue(APServerStart);
     mico_rtos_lock_mutex(&WifiConfigMutex);
     micoWlanSuspend();
     WifiSet_log("Soft_ap_Server");
@@ -167,9 +167,9 @@ static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     wNetConfig.wifi_mode = Soft_AP;
     wNetConfig.dhcpMode = DHCP_Server;
     wNetConfig.wifi_retry_interval = 100;
-    strcpy((char *)wNetConfig.local_ip_addr, "192.168.0.1");
-    strcpy((char *)wNetConfig.net_mask, "255.255.255.0");
-    strcpy((char *)wNetConfig.dnsServer_ip_addr, "192.168.0.1");
+    strcpy((char *)wNetConfig.local_ip_addr, ELAND_AP_LOCAL_IP);
+    strcpy((char *)wNetConfig.net_mask, ELAND_AP_NET_MASK);
+    strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_LOCAL_IP);
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
@@ -190,9 +190,9 @@ void Wifi_SoftAP_fun(void)
     wNetConfig.wifi_mode = Soft_AP;
     wNetConfig.dhcpMode = DHCP_Server;
     wNetConfig.wifi_retry_interval = 100;
-    strcpy((char *)wNetConfig.local_ip_addr, "192.168.0.1");
-    strcpy((char *)wNetConfig.net_mask, "255.255.255.0");
-    strcpy((char *)wNetConfig.dnsServer_ip_addr, "192.168.0.1");
+    strcpy((char *)wNetConfig.local_ip_addr, ELAND_AP_LOCAL_IP);
+    strcpy((char *)wNetConfig.net_mask, ELAND_AP_NET_MASK);
+    strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_LOCAL_IP);
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);

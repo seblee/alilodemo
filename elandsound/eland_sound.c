@@ -65,7 +65,7 @@ static void eland_flash_service(mico_thread_arg_t arg)
     _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
 
     alarm_file_cache = (_sound_file_type_t *)calloc(sizeof(_sound_file_type_t), sizeof(uint8_t));
-
+start_check_flash:
     /*start init eland SPI*/
     start_spi_test_service();
     require_noerr(err, exit);
@@ -138,7 +138,16 @@ static void eland_flash_service(mico_thread_arg_t arg)
         }
         memset(alarm_file_cache, 0, sizeof(_sound_file_type_t));
     } while (sector_count < KH25_FLASH_FILE_COUNT);
-
+    /***容量超過一定值  erase all***/
+    if (sound_sector_end > KH25_FLASH_FILE_COUNT - 10)
+    {
+        flash_kh25_chip_erase(); //
+        if (eland_sound_point)
+            free(eland_sound_point);
+        sound_sector_start = 0;
+        sound_sector_end = 0;
+        goto start_check_flash;
+    }
     if (alarm_file_cache != NULL)
     {
         free(alarm_file_cache);

@@ -84,6 +84,7 @@ int application_start(void)
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     app_netclock_log("wifi connected successful");
     SendElandStateQueue(WifyConnected);
+
     /*start eland HTTP service */
     err = start_eland_service();
     require_noerr(err, exit);

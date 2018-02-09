@@ -1002,9 +1002,8 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case DV00: //04 eland info request
         break;
     case DV01: //05 eland info response
-        rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
-        break;
     case DV02: //06 eland info change Notification
+        rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
         break;
     case DV03: //07 eland info remove Notification
         break;

@@ -20,7 +20,7 @@
 
 /* Private define ------------------------------------------------------------*/
 #define MCU_VERSION_MAJOR 1
-#define MCU_VERSION_MINOR 2
+#define MCU_VERSION_MINOR 3
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/

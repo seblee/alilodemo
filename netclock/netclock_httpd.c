@@ -123,7 +123,7 @@ static int web_send_Get_Request(httpd_request_t *req)
 
     err = httpd_send_body(req->sock, (const unsigned char *)upload_data, strlen(upload_data));
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-
+    SendElandStateQueue(ELAPPConnected);
 exit:
     if (upload_data != NULL) //回收资源
     {
@@ -268,7 +268,7 @@ int Eland_httpd_start(void)
         app_http_register_handlers();
         is_handlers_registered = true;
     }
-    exit:
+exit:
     return err;
 }
 

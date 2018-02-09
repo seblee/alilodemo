@@ -165,7 +165,7 @@ start_Check:
     {
         Eland_log("device not set");
         memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
-        device_state->eland_id = 5;
+        device_state->eland_id = 6;
         sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
         device_state->IsAlreadySet = true;
 
@@ -212,9 +212,10 @@ OSStatus Netclock_des_recovery(void)
     memcpy(&device_temp, device_state, sizeof(_ELAND_DEVICE_t));
     /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
-    device_state->IsAlreadySet = device_temp.IsAlreadySet;
-    device_state->eland_id = 5; // device_temp.eland_id;
-    memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
+    device_state->IsAlreadySet = true;
+    device_state->eland_id = 13; // device_temp.eland_id;
+    sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
+    // memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
     context = mico_system_context_get();
     /***clear wifi para***/

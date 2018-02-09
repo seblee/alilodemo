@@ -64,6 +64,7 @@ typedef enum {
     ALARM_READ_0A,       /* READ MCU ALARM*/
     ALARM_SEND_0B,       /* SEND NEXT ALARM STATE*/
     ELAND_DATA_0C,       /* SEND ELAND DATA TO MCU*/
+    ELAND_RESET_0D,      /* RESET SYSTEM */
 } __msg_function_t;
 
 typedef enum {

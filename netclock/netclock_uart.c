@@ -23,6 +23,7 @@
 #include "netclock_wifi.h"
 #include "eland_alarm.h"
 #include "eland_tcp.h"
+#include "flash_kh25.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -55,6 +56,7 @@ static void ELAND_H08_Send(uint8_t *Cache);
 static void ELAND_H0A_Send(uint8_t *Cache);
 static void ELAND_H0B_Send(uint8_t *Cache);
 static void ELAND_H0C_Send(uint8_t *Cache);
+static void ELAND_H0D_Send(uint8_t *Cache);
 static void MODH_Opration_02H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
 static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec);
@@ -306,6 +308,9 @@ static void uart_thread_DDE(uint32_t arg)
             break;
         case ELAND_DATA_0C: /* SEND ELAND DATA TO MCU */
             ELAND_H0C_Send(inDataBuffer);
+            break;
+        case ELAND_RESET_0D: /* SEND ELAND DATA TO MCU */
+            ELAND_H0D_Send(inDataBuffer);
             break;
         default:
             break;
@@ -715,6 +720,21 @@ start_send:
 exit:
     return;
 }
+static void ELAND_H0D_Send(uint8_t *Cache)
+{
+    OSStatus err = kGeneralErr;
+
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = ELAND_RESET_0D;
+    *(Cache + 2) = 0;
+    *(Cache + 3 + (*(Cache + 2))) = Uart_Packet_Trail;
+
+    err = elandUsartSendData(Cache, 4 + (*(Cache + 2)));
+    require_noerr(err, exit);
+
+exit:
+    return;
+}
 static void MODH_Opration_02H(uint8_t *usart_rec)
 {
     static uint16_t Key_Count = 0, Key_Restain = 0;
@@ -890,7 +910,13 @@ static void set_eland_state(Eland_Status_type_t state)
 static void reset_eland_flash_para(void)
 {
     OSStatus err = kNoErr;
+    __msg_function_t eland_cmd = ELAND_RESET_0D;
+    do
+    {
+        err = mico_rtos_pop_from_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
+    } while (err == kNoErr);
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     err = Netclock_des_recovery();
-    err = err;
+    flash_kh25_chip_erase();
     MicoSystemReboot();
 }

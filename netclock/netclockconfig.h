@@ -9,7 +9,7 @@
 #define NETCLOCK_NETCLOCKCONFIG_H_
 #include "mico.h"
 
-#define Eland_Firmware_Version ("01.02") //Eland固件版本号
+#define Eland_Firmware_Version ("01.03") //Eland固件版本号
 
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
@@ -17,8 +17,10 @@
 
 #define DEVICE_MAC_LEN (17) //MAC地址长度
 
-#define ELAND_AP_SSID ("Eland")   //配置模式ssid
-#define ELAND_AP_KEY ("12345678") //配置模式key
+#define ELAND_AP_SSID ("Eland")             //配置模式ssid
+#define ELAND_AP_KEY ("12345678")           //配置模式key
+#define ELAND_AP_LOCAL_IP ("192.168.0.1")   //本體IP
+#define ELAND_AP_NET_MASK ("255.255.255.0") //本體IP
 
 #define user_id_len 37          //Eland name
 #define eland_name_Len 151      //Eland名称，用户输入
