@@ -36,7 +36,7 @@
 
 #define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
 
-static void player_flash_thread(mico_thread_arg_t arg)
+void player_flash_thread(mico_thread_arg_t arg)
 {
     AUDIO_STREAM_PALY_S flash_read_stream;
     OSStatus err = kGeneralErr;
@@ -145,7 +145,7 @@ exit:
     mico_rtos_delete_thread(NULL);
 }
 
-static void player_test_thread(mico_thread_arg_t arg)
+void player_test_thread(mico_thread_arg_t arg)
 {
     char *buf = malloc(2000);
     char *buf_head = buf;

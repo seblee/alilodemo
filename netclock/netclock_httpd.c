@@ -61,7 +61,7 @@ static void eland_check_ssid(void)
     while (!mico_rtos_is_queue_empty(&wifistate_queue))
     {
         app_httpd_log("clear wifistate_queue");
-        mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
+        mico_rtos_pop_from_queue(&wifistate_queue, &received, 0);
     }
     app_httpd_log("wifistate_queue is empty");
     /********驗證wifi  ssid password*************/
@@ -94,11 +94,14 @@ static void eland_check_ssid(void)
 
         context->micoSystemConfig.configured = allConfigured;
         mico_system_context_update(context);
-
+        SendElandStateQueue(ELAPPConnected);
         app_httpd_log("system restart");
-        mico_system_power_perform(context, eState_Software_Reset);
+        MicoSystemReboot();
+        //   mico_system_power_perform(context, eState_Software_Reset);
+        mico_rtos_thread_sleep(2);
     }
-    Eland_httpd_stop(); //stop http server mode
+    SendElandStateQueue(WifyConnectedFailed);
+    //Eland_httpd_stop(); //stop http server mode
     flagHttpdServerAP = 1;
     // else
     // {
@@ -160,11 +163,12 @@ static int web_send_Post_Request(httpd_request_t *req)
 
         err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
         require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-        SendElandStateQueue(ELAPPConnected);
-        mico_thread_sleep(2); //等待傳輸完成
+
+        mico_thread_sleep(1); //等待傳輸完成
         if (ProcessPostJson(buf) == kNoErr)
         {
             app_httpd_log("Json useful");
+
             eland_check_ssid();
         }
         else

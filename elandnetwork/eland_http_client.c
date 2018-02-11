@@ -362,7 +362,7 @@ HTTP_SSL_START:
     //client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
-    SendElandStateQueue(HTTP_Get_HOST_INFO);
+
     /* Send HTTP Request */
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
     if (ret > 0)

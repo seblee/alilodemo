@@ -172,7 +172,7 @@ static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_LOCAL_IP);
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
-    mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
+    mico_rtos_get_semaphore(&wifi_SoftAP_Sem, 5000);
     mico_rtos_unlock_mutex(&WifiConfigMutex);
     mico_rtos_delete_thread(NULL);
 }
@@ -195,7 +195,7 @@ void Wifi_SoftAP_fun(void)
     strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_LOCAL_IP);
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
-    mico_rtos_get_semaphore(&wifi_SoftAP_Sem, MICO_WAIT_FOREVER);
+    mico_rtos_get_semaphore(&wifi_SoftAP_Sem, 5000);
     mico_rtos_unlock_mutex(&WifiConfigMutex);
 }
 

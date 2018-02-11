@@ -107,7 +107,6 @@ OSStatus start_eland_service(void)
     //1.eland 通訊情報取得
     err = eland_communication_info_get();
     require_noerr(err, exit);
-    // SendElandStateQueue(HTTP_Get_HOST_INFO);
 
     Eland_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
@@ -213,7 +212,7 @@ OSStatus Netclock_des_recovery(void)
     /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
     device_state->IsAlreadySet = true;
-    device_state->eland_id = 13; // device_temp.eland_id;
+    device_state->eland_id = 12; // device_temp.eland_id;
     sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
     // memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
@@ -554,6 +553,7 @@ exit:
         mico_thread_msleep(200);
         goto DEVICE_INFO_GET_START;
     }
+    SendElandStateQueue(HTTP_Get_HOST_INFO);
     return err;
 }
 

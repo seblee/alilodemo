@@ -112,7 +112,7 @@ typedef struct eland_data_2_mcu
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)
-#define USART_RESEND_MAX_TIMES 5
+#define USART_RESEND_MAX_TIMES 3
 
 #define RSSI_STATE_STAGE0 (int)(-85)
 #define RSSI_STATE_STAGE1 (int)(-70)
@@ -123,6 +123,7 @@ typedef struct eland_data_2_mcu
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
 uint16_t get_eland_mode_state(void);
+_ELAND_MODE_t get_eland_mode(void);
 OSStatus start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);

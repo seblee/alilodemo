@@ -86,7 +86,7 @@ void Alarm_Manager(uint32_t arg)
     alarm_nearest = Alarm_ergonic_list(&alarm_list);
     if (alarm_nearest)
     {
-        set_display_alarm_serial(get_display_alarm_serial());
+        set_display_alarm_serial(get_waiting_alarm_serial());
         alarm_log("get alarm_nearest alarm_id:%s", alarm_nearest->alarm_id);
     }
     else
@@ -106,7 +106,7 @@ void Alarm_Manager(uint32_t arg)
             alarm_nearest = Alarm_ergonic_list(&alarm_list);
             if (alarm_nearest)
             {
-                set_display_alarm_serial(get_display_alarm_serial());
+                set_display_alarm_serial(get_waiting_alarm_serial());
                 alarm_log("get alarm_nearest alarm_id:%s", alarm_nearest->alarm_id);
             }
             else
@@ -250,13 +250,13 @@ void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_d
     strcpy(elsv_alarm_data->alarm_id, ALARM_ID_OF_SIMPLE_CLOCK);
     elsv_alarm_data->alarm_color = 0;
     sprintf(elsv_alarm_data->alarm_time, "%02d:%02d:%02d", alarm_mcu_data->moment_time.hr, alarm_mcu_data->moment_time.min, alarm_mcu_data->moment_time.sec);
-    elsv_alarm_data->snooze_enabled = 1;
-    elsv_alarm_data->snooze_count = 3;
-    elsv_alarm_data->snooze_interval_min = 2;
+    elsv_alarm_data->snooze_enabled = 0;
+    elsv_alarm_data->snooze_count = 1;
+    elsv_alarm_data->snooze_interval_min = 0;
     elsv_alarm_data->alarm_pattern = 1;
     elsv_alarm_data->alarm_sound_id = 1;
     elsv_alarm_data->alarm_volume = 80;
-    elsv_alarm_data->alarm_continue_min = 1; //測試用 1分鐘
+    elsv_alarm_data->alarm_continue_min = 10; //測試用 1分鐘
     elsv_alarm_data->alarm_repeat = 1;
 
     elsv_alarm_data->alarm_data_for_eland.moment_second = (uint32_t)alarm_mcu_data->moment_time.hr * 3600 +
