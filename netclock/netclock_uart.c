@@ -95,7 +95,7 @@ static void uart_service(uint32_t arg)
     mico_rtos_thread_msleep(1100);
     /*creat mcu_ota thread*/
 
-    err = mico_rtos_create_thread(&MCU_OTA_thread, MICO_APPLICATION_PRIORITY, "mcu_ota_thread", mcu_ota_thread, 0x1000, (uint32_t)&ota_arg);
+    err = mico_rtos_create_thread(&MCU_OTA_thread, MICO_APPLICATION_PRIORITY, "mcu_ota_thread", mcu_ota_thread, 0x500, (uint32_t)&ota_arg);
     require_noerr(err, exit);
     /*wait ota thread*/
     mico_rtos_thread_join(&MCU_OTA_thread);
@@ -314,7 +314,6 @@ static void uart_thread_DDE(uint32_t arg)
         default:
             break;
         }
-        mico_rtos_thread_msleep(5);
     }
 exit:
     mico_rtos_delete_thread(NULL);
@@ -331,7 +330,6 @@ void SendElandStateQueue(Eland_Status_type_t value)
         mico_rtos_pop_from_queue(&eland_state_queue, &state, 0);
     state = value;
     mico_rtos_push_to_queue(&eland_state_queue, &state, 0);
-
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
 }
 static void timer100_key_handle(void *arg)
@@ -845,7 +843,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 (time_delay_counter++ > 3000))
             {
                 /******back to nc********/
-                set_eland_mode(ELAND_NC);
+                MicoSystemReboot();
             }
             break;
         default:

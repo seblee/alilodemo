@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-04 18:11:50
+ * @Last Modified time:2018-02-25 16:42:05
  * @brief   :
  ****************************************************************************
 **/
@@ -22,12 +22,16 @@
 #include "netclock_uart.h"
 /* Private define ------------------------------------------------------------*/
 #define alarm_log(format, ...) custom_log("alarm", format, ##__VA_ARGS__)
+
+/*********/
+#define ALARM_DATA_SIZE (uint16_t)(sizeof(__elsv_alarm_data_t) * 50 + 1)
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 mico_semaphore_t alarm_update = NULL;
+mico_semaphore_t alarm_sound_scan_sem = NULL;
 _eland_alarm_list_t alarm_list;
 _alarm_stream_t alarm_stream;
 mico_thread_t play_voice_thread = NULL;
@@ -46,7 +50,13 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
 OSStatus Start_Alarm_service(void)
 {
     OSStatus err;
+    /**init flash**/
+    /*start init eland SPI*/
+
     memset(&alarm_list, 0, sizeof(_eland_alarm_list_t));
+    /**apply alarm memory**/
+    alarm_list.alarm_lib = calloc(ALARM_DATA_SIZE, sizeof(uint8_t));
+    alarm_log("alarm_data memory size:%d", ALARM_DATA_SIZE);
     err = mico_rtos_init_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_list.AlarmSerialMutex);
@@ -55,8 +65,11 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_stream.stream_Mutex);
     require_noerr(err, exit);
+    alarm_list.alarm_nearest = NULL;
     /*need to ergonic alarm*/
     err = mico_rtos_init_semaphore(&alarm_update, 1);
+    require_noerr(err, exit);
+    err = mico_rtos_init_semaphore(&alarm_sound_scan_sem, 1);
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&off_history.off_Mutex);
     require_noerr(err, exit);
@@ -66,7 +79,7 @@ OSStatus Start_Alarm_service(void)
     set_alarm_stream_pos(0);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager",
-                                  Alarm_Manager, 0x3000, 0);
+                                  Alarm_Manager, 0x800, 0);
     require_noerr(err, exit);
 exit:
     return err;
@@ -104,6 +117,7 @@ void Alarm_Manager(uint32_t arg)
             /**refresh point**/
             alarm_log("list_refreshed");
             alarm_nearest = Alarm_ergonic_list(&alarm_list);
+            mico_rtos_set_semaphore(&alarm_sound_scan_sem);
             if (alarm_nearest)
             {
                 set_display_alarm_serial(get_waiting_alarm_serial());
@@ -268,21 +282,20 @@ void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_d
 }
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 {
-    uint8_t i;
+    uint8_t i, j;
     __elsv_alarm_data_t *elsv_alarm_data = NULL;
     mico_utc_time_t utc_time = 0;
-    OSStatus err = kNoErr;
-    //start_ergonic_list:
+    __elsv_alarm_data_t elsv_alarm_data_temp;
+
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
     set_alarm_state(ALARM_IDEL);
+    alarm_log("alarm_number = %d", list->alarm_number);
     if (list->alarm_number == 0)
     {
-        alarm_log("alarm_number = 0");
         elsv_alarm_data = NULL;
         goto exit;
     }
-    utc_time = GET_current_second();
     for (i = 0; i < list->alarm_number; i++)
     {
         if ((list->alarm_lib + i)->alarm_repeat)
@@ -293,28 +306,24 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
         //     alarm_list_minus(list, list->alarm_lib + i);
         //     goto start_ergonic_list;
         // }
-        if (((list->alarm_lib + i)->alarm_pattern == 1) ||
-            ((list->alarm_lib + i)->alarm_pattern == 3) ||
-            ((list->alarm_lib + i)->alarm_pattern == 4))
+    }
+    /*****Sequence*****/
+    for (i = 0; i < list->alarm_number - 1; i++)
+    {
+        for (j = 0; j < list->alarm_number - i - 1; j++)
         {
-            alarm_log("SID:%d", i);
-            err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_SID);
-            require_noerr_action(err, exit, elsv_alarm_data = NULL);
-        }
-        if (((list->alarm_lib + i)->alarm_pattern == 2) ||
-            ((list->alarm_lib + i)->alarm_pattern == 3))
-        {
-            alarm_log("VID:%d", i);
-            err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_VID);
-            require_noerr_action(err, exit, elsv_alarm_data = NULL);
-        }
-        if ((list->alarm_lib + i)->alarm_pattern == 4)
-        {
-            alarm_log("OID:%d", i);
-            err = alarm_sound_download(list->alarm_lib + i, SOUND_FILE_OID);
-            require_noerr_action(err, exit, elsv_alarm_data = NULL);
+            if ((list->alarm_lib + j)->alarm_data_for_eland.moment_second >
+                (list->alarm_lib + j + 1)->alarm_data_for_eland.moment_second)
+            {
+                memcpy(&elsv_alarm_data_temp, list->alarm_lib + j + 1, sizeof(__elsv_alarm_data_t));
+                memcpy(list->alarm_lib + j + 1, list->alarm_lib + j, sizeof(__elsv_alarm_data_t));
+                memcpy(list->alarm_lib + j, &elsv_alarm_data_temp, sizeof(__elsv_alarm_data_t));
+            }
         }
     }
+    for (i = 0; i < list->alarm_number; i++)
+        alarm_log("moment_second:%ld", (list->alarm_lib + i)->alarm_data_for_eland.moment_second);
+
     utc_time = GET_current_second();
     alarm_log("utc_time:%ld", utc_time);
     set_waiting_alarm_serial(0);
@@ -343,21 +352,55 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
             set_waiting_alarm_serial(i);
         }
     }
+
 exit:
     return elsv_alarm_data;
 }
+
+void alarm_sound_scan(void)
+{
+    OSStatus err;
+    uint8_t i;
+wait_for_sem:
+    mico_rtos_get_semaphore(&alarm_sound_scan_sem, MICO_WAIT_FOREVER);
+
+    for (i = 0; i < alarm_list.alarm_number; i++)
+    {
+        if (((alarm_list.alarm_lib + i)->alarm_pattern == 1) ||
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 3) ||
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 4))
+        {
+            alarm_log("SID:%d", i);
+            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
+            require_noerr(err, exit);
+        }
+        if (((alarm_list.alarm_lib + i)->alarm_pattern == 2) ||
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
+        {
+            alarm_log("VID:%d", i);
+            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
+            require_noerr(err, exit);
+        }
+        if ((alarm_list.alarm_lib + i)->alarm_pattern == 4)
+        {
+            alarm_log("OID:%d", i);
+            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OID);
+            require_noerr(err, exit);
+        }
+    }
+exit:
+    goto wait_for_sem;
+}
+
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
     OSStatus err = kNoErr;
     uint8_t i;
-    __elsv_alarm_data_t *p = AlarmList->alarm_lib;
     err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
     if (AlarmList->alarm_number == 0)
     {
         alarm_log("alarm is first");
-        AlarmList->alarm_lib = calloc(sizeof(__elsv_alarm_data_t), sizeof(uint8_t));
-        require_action((AlarmList->alarm_lib != NULL), exit, err = kNoMemoryErr);
         memcpy(AlarmList->alarm_lib, inData, sizeof(__elsv_alarm_data_t));
         AlarmList->list_refreshed = true;
         AlarmList->alarm_number++;
@@ -378,20 +421,10 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         alarm_log("alarm_id is new");
         if (i == AlarmList->alarm_number)
         {
-            AlarmList->alarm_lib = realloc(AlarmList->alarm_lib, (AlarmList->alarm_number + 1) * sizeof(__elsv_alarm_data_t));
-            if (AlarmList->alarm_lib)
-            {
-                alarm_log("alarm_add success!");
-                memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
-                AlarmList->list_refreshed = true;
-                AlarmList->alarm_number++;
-            }
-            else
-            {
-                alarm_log("######memory err");
-                AlarmList->alarm_lib = p;
-                err = kNoMemoryErr;
-            }
+            alarm_log("alarm_add success!");
+            memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
+            AlarmList->list_refreshed = true;
+            AlarmList->alarm_number++;
         }
     }
 exit:
@@ -407,34 +440,22 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
     err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
 
-    if (AlarmList->alarm_number == 0)
+    for (i = 0; i < AlarmList->alarm_number; i++)
     {
-        if (AlarmList->alarm_lib)
-            free(AlarmList->alarm_lib);
-    }
-    else
-    {
-        for (i = 0; i < AlarmList->alarm_number; i++)
+        if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
         {
-            if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
-            {
-                alarm_log("get minus alarm_id");
-                memmove(AlarmList->alarm_lib + i,
-                        AlarmList->alarm_lib + i + 1,
-                        (AlarmList->alarm_number - 1 - i) * sizeof(__elsv_alarm_data_t));
-                if (AlarmList->alarm_number > 1)
-                    AlarmList->alarm_lib = realloc(AlarmList->alarm_lib, (AlarmList->alarm_number - 1) * sizeof(__elsv_alarm_data_t));
-                else
-                {
-                    free(AlarmList->alarm_lib);
-                    AlarmList->alarm_lib = NULL;
-                }
-                AlarmList->alarm_number--;
-                AlarmList->list_refreshed = true;
-            }
+            alarm_log("get minus alarm_id");
+            memmove(AlarmList->alarm_lib + i,
+                    AlarmList->alarm_lib + i + 1,
+                    (AlarmList->alarm_number - 1 - i) * sizeof(__elsv_alarm_data_t));
+            AlarmList->alarm_number--;
+            AlarmList->list_refreshed = true;
         }
     }
-    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+    if (AlarmList->alarm_number == 0)
+        memset((uint8_t *)(AlarmList->alarm_lib), 0, ALARM_DATA_SIZE);
+
+    err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
 exit:
     set_alarm_state(ALARM_MINUS);
@@ -564,28 +585,28 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     mscp_status_t audio_status;
     static bool isVoice = false;
 
+    audio_service_get_audio_status(&result, &audio_status);
+    alarm_log("audio_status %d", audio_status);
     if (CMD) //play
     {
-        audio_service_get_audio_status(&result, &audio_status);
-        alarm_log("audio_status %d", audio_status);
         if (audio_status == MSCP_STATUS_IDLE)
         {
             if ((alarm->alarm_pattern == 1) || (alarm->alarm_pattern == 4))
             {
                 init_alarm_stream(alarm->alarm_id, SOUND_FILE_SID);
-                mico_rtos_create_thread(play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
+                mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
             }
             else if (alarm->alarm_pattern == 2)
             {
                 init_alarm_stream(alarm->alarm_id, SOUND_FILE_SID);
-                mico_rtos_create_thread(play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
+                mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
             }
             else if (alarm->alarm_pattern == 3)
             {
                 if (isVoice)
                 {
                     isVoice = false;
-                    mico_rtos_create_thread(play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
+                    mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
                 }
                 else
                 {
@@ -599,6 +620,12 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     }
     else //stop
     {
+        mico_rtos_delete_thread(&play_voice_thread);
+        if (audio_status == MSCP_STATUS_IDLE)
+        {
+        }
+        else
+            audio_service_stream_stop(&result, alarm_stream.stream_id);
         if (alarm->alarm_pattern == 4) //alarm off oid
         {
         }
@@ -615,10 +642,9 @@ static void play_voice(mico_thread_arg_t arg)
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
     _sound_read_write_type_t *alarm_w_r_queue = NULL;
-    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
 
     alarm_log("player_flash_thread");
-    flashdata = malloc(2001);
+    flashdata = malloc(SOUND_STREAM_DEFAULT_LENGTH + 1);
 
     flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
     flash_read_stream.pdata = flashdata;
@@ -631,39 +657,22 @@ static void play_voice(mico_thread_arg_t arg)
     alarm_w_r_queue->sound_type = stream->sound_type;
     alarm_w_r_queue->is_read = true;
     alarm_w_r_queue->sound_data = flashdata;
+    alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
 
 falsh_read_start:
     alarm_w_r_queue->pos = data_pos;
-    //alarm_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_queue->len, alarm_w_r_queue->pos);
-    err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &alarm_w_r_queue, 10);
+    err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
     require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, 1000);
-    require_noerr(err, exit);
+    if (data_pos == 0)
+    {
+        flash_read_stream.total_len = alarm_w_r_queue->total_len;
+    }
+    flash_read_stream.stream_len = alarm_w_r_queue->len;
 
-    if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE)
-    {
-        // alarm_log("ERRNONE");
-        if (data_pos == 0)
-        {
-            flash_read_stream.total_len = alarm_w_r_queue->total_len;
-        }
-        flash_read_stream.stream_len = alarm_w_r_queue->len;
-    }
-    else if (alarm_r_w_callbcke_queue->read_write_err == FILE_NOT_FIND)
-    {
-        free(alarm_r_w_callbcke_queue);
-        alarm_log("FILE_NOT_FIND");
-        goto exit;
-    }
-    else
-    {
-        alarm_log("ELSE %d", (uint8_t)alarm_r_w_callbcke_queue->read_write_err);
-    }
     //alarm_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
     //          (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
     //          (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
     //          alarm_log("free_callback_queue");
-    free(alarm_r_w_callbcke_queue);
 
 audio_transfer:
     err = audio_service_stream_play(&result, &flash_read_stream);
@@ -818,14 +827,6 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         mico_time_get_utc_time(&utc_time);
         if (alarm->alarm_data_for_eland.moment_second < utc_time)
             alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
-        currentTime = localtime((const time_t *)&(alarm->alarm_data_for_eland.moment_second));
-        alarm->alarm_data_for_mcu.moment_time.sec = currentTime->tm_sec;
-        alarm->alarm_data_for_mcu.moment_time.min = currentTime->tm_min;
-        alarm->alarm_data_for_mcu.moment_time.hr = currentTime->tm_hour;
-        alarm->alarm_data_for_mcu.moment_time.date = currentTime->tm_mday;
-        alarm->alarm_data_for_mcu.moment_time.weekday = currentTime->tm_wday;
-        alarm->alarm_data_for_mcu.moment_time.month = currentTime->tm_mon + 1;
-        alarm->alarm_data_for_mcu.moment_time.year = (currentTime->tm_year + 1900) % 100;
         break;
     case 1:
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
@@ -871,6 +872,16 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         alarm->alarm_data_for_eland.moment_second = 0;
         break;
     }
+    /*******Calculate date for mcu*********/
+    currentTime = localtime((const time_t *)&(alarm->alarm_data_for_eland.moment_second));
+    alarm->alarm_data_for_mcu.moment_time.sec = currentTime->tm_sec;
+    alarm->alarm_data_for_mcu.moment_time.min = currentTime->tm_min;
+    alarm->alarm_data_for_mcu.moment_time.hr = currentTime->tm_hour;
+    alarm->alarm_data_for_mcu.moment_time.date = currentTime->tm_mday;
+    alarm->alarm_data_for_mcu.moment_time.weekday = currentTime->tm_wday;
+    alarm->alarm_data_for_mcu.moment_time.month = currentTime->tm_mon + 1;
+    alarm->alarm_data_for_mcu.moment_time.year = (currentTime->tm_year + 1900) % 100;
+
     alarm_log("%04d-%02d-%02d %02d:%02d:%02d", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec);
     alarm_log("alarm_id:%s", alarm->alarm_id);
     alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);

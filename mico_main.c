@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-27 17:21:38
+ * @Last Modified time:2018-02-25 18:06:01
  * @brief   :
  ****************************************************************************
 **/
@@ -49,7 +49,6 @@ int application_start(void)
 {
     app_log_trace();
     OSStatus err = kNoErr;
-    mico_Context_t *mico_context;
     app_netclock_log(">>>>>>>>>>>>>>>>>> app start >>>>>>>>>>>>>>>>>>>>>>>>>");
     /*init Wify Notify ,queue and semaphore*/
     err = ElandWifyStateNotifyInit();
@@ -57,13 +56,11 @@ int application_start(void)
     /*init RTC*/
     err = Eland_Rtc_Init();
     require_noerr(err, exit);
-    /*start init system context*/
-    mico_context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
+
+    wifimgr_debug_enable(0);
+
     /*init fog v2 service*/
     err = netclock_desInit();
-    require_noerr(err, exit);
-    /* Start MiCO system functions according to mico_config.h*/
-    err = mico_system_init(mico_context);
     require_noerr(err, exit);
 
     /*start init eland SPI*/
@@ -77,8 +74,8 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
-
+    //  start_uart_service();
+    //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
@@ -90,9 +87,6 @@ int application_start(void)
     require_noerr(err, exit);
 
     err = TCP_Service_Start();
-    app_netclock_log("TCP_Service_Start err = %d", err);
-    require_noerr(err, exit);
-    //err = start_test_thread();
     require_noerr(err, exit);
 
 exit:
@@ -100,6 +94,7 @@ exit:
     {
         MicoSystemReboot();
     }
+    alarm_sound_scan();
     mico_rtos_delete_thread(NULL);
     return err;
 }

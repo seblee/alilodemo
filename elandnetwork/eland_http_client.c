@@ -38,7 +38,7 @@
 #include "netclock.h"
 #include "netclock_uart.h"
 
-//#define CONFIG_CLIENT_DEBUG
+#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
@@ -489,7 +489,6 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
 {
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
-    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
     static uint32_t sound_flash_pos = 0;
     static bool is_sound_data = false;
 
@@ -528,12 +527,9 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
             HTTP_W_R_struct.alarm_w_r_queue->is_read = false;
             client_log("send_queue:inlen = %ld,sound_flash_pos = %ld", HTTP_W_R_struct.alarm_w_r_queue->len, HTTP_W_R_struct.alarm_w_r_queue->pos);
-            err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &HTTP_W_R_struct.alarm_w_r_queue, 10);
-            require_noerr(err, exit);
-            err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, 1000);
+            err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
             require_noerr(err, exit);
             sound_flash_pos += inLen;
-            free(alarm_r_w_callbcke_queue);
         }
         else
             memcpy(context->content + inPos, inData, inLen);

@@ -42,6 +42,8 @@ typedef struct __SOUND_FILE_LIB_
 {
     _sound_file_type_t *lib;
     uint16_t file_number;
+    uint32_t sector_start;
+    uint32_t sector_end;
 } _sound_file_lib_t;
 
 typedef struct __SOUND_READ_WRITE_TYPE_
@@ -66,12 +68,6 @@ typedef enum {
     ERRNONE,
     FILE_NOT_FIND,
 } SOUND_FILE_ERR_TYPE;
-typedef struct __SOUND_CALLBACK_TYPE_
-{
-    char alarm_ID[ALARM_ID_LEN + 1];
-    uint8_t sound_type;
-    SOUND_FILE_ERR_TYPE read_write_err;
-} _sound_callback_type_t;
 
 typedef enum {
     FILE_SCAN_START,     //沒有文件
@@ -85,14 +81,15 @@ typedef enum {
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-extern mico_queue_t eland_sound_R_W_queue;    //flash sound 讀寫命令队列
-extern mico_queue_t eland_sound_reback_queue; //flash sound 讀寫完成返回队列
 extern _http_w_r_struct_t HTTP_W_R_struct;
+extern _sound_file_lib_t sound_file_list;
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
+OSStatus start_eland_flash_service(void);
+OSStatus sound_file_sort(_sound_file_lib_t *sound_list);
+OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_type_t *alarm_w_r_temp);
 
 /*************************/
-OSStatus start_eland_flash_service(void);
 
 #endif

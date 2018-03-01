@@ -82,10 +82,10 @@ static void eland_check_ssid(void)
         memset(context->micoSystemConfig.bssid, 0x0, 6);
         context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
         if (netclock_des_g->dhcp_enabled == 1)
-            context->micoSystemConfig.dhcpEnable = true; /* Fetch Ip address from DHCP server */
-        else
+            context->micoSystemConfig.dhcpEnable = DHCP_Client; /* Fetch Ip address from DHCP server */
+        else if (netclock_des_g->dhcp_enabled == 0)
         {
-            context->micoSystemConfig.dhcpEnable = false; /* Fetch Ip address from DHCP server */
+            context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
             memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
             memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
             memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
@@ -155,7 +155,7 @@ static int web_send_Post_Request(httpd_request_t *req)
         app_httpd_log("JSON*************");
         if (req->remaining_bytes == 0)
         {
-            //app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
+            app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
             /**add json process**/
         }
         err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);

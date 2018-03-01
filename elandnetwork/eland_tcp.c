@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-19 14:51:07
+ * @Last Modified time:2018-02-25 17:41:01
  * @brief   :
  ****************************************************************************
 **/
@@ -89,21 +89,13 @@ static void eland_set_time(void);
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
 {
     LinkStatusTypeDef link_status;
-
     memset(&link_status, 0, sizeof(link_status));
-
     micoWlanGetLinkStatus(&link_status);
-
     elan_tcp_log("wifi link_status:%d", link_status.is_connected);
-
     if (link_status.is_connected == true)
-    {
         return NETWORK_PHYSICAL_LAYER_CONNECTED;
-    }
     else
-    {
         return NETWORK_MANUALLY_DISCONNECTED;
-    }
 }
 
 static bool has_timer_expired(_time_t *timer)
@@ -462,10 +454,12 @@ OSStatus TCP_Service_Start(void)
     OSStatus err = kNoErr;
     err = mico_rtos_init_semaphore(&TCP_Stop_Sem, 1);
     require_noerr(err, exit);
+
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
                                   0x3000, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
+    elan_tcp_log("TCP_Service_Start err = %d", err);
     return err;
 }
 static void TCP_thread_main(mico_thread_arg_t arg)
@@ -480,6 +474,16 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _time_t timer;
     mico_rtc_time_t cur_time = {0};
     HC00_moment_sec = netclock_des_g->health_check_moment;
+GET_CONNECT_INFO:
+    if (TCP_Physical_is_connected(&(Eland_Client.networkStack)) != NETWORK_PHYSICAL_LAYER_CONNECTED)
+    {
+        elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
+        mico_rtos_thread_sleep(1);
+        goto GET_CONNECT_INFO;
+    }
+    err = eland_communication_info_get();
+    require_noerr(err, GET_CONNECT_INFO);
+
     memset(tcp_write_flag, 1, 5);
     if ((netclock_des_g == NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
     {
@@ -737,12 +741,9 @@ static TCP_Error_t eland_IF_update_elandinfo(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_elandinfo:OK %s", (pClient->clientData.readBuf + sizeof(_TELEGRAM_t)));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[DV01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
-    if (rc == TCP_SUCCESS)
-        SendElandStateQueue(TCP_DV00);
 
     return rc;
 }
@@ -770,8 +771,7 @@ static TCP_Error_t eland_IF_update_alarm(_Client_t *pClient)
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
-    if (TCP_SUCCESS == rc)
-        SendElandStateQueue(TCP_AL00);
+
     return rc;
 }
 static TCP_Error_t eland_IF_update_holiday(_Client_t *pClient)
@@ -894,6 +894,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
         telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
         InitUpLoadData(telegram_data);
         telegram->lenth = strlen(telegram_data);
+        elan_tcp_log("CN00 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case HT01:
         telegram_data = (char *)(pMsg + sizeof(_TELEGRAM_t));
@@ -902,6 +903,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
             alarm_off_history_json_data_build(history_data_p, telegram_data);
         telegram->lenth = strlen(telegram_data);
         memcpy(telegram->command, CommandTable[cmd_type], 4);
+        elan_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
         set_alarm_history_data_state(DONE_UPLOAD);
         break;
     default:
@@ -1003,6 +1005,8 @@ static TCP_Error_t TCP_Operate(const char *buff)
         break;
     case DV01: //05 eland info response
     case DV02: //06 eland info change Notification
+        SendElandStateQueue(TCP_DV00);
+        elan_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
         rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
         break;
     case DV03: //07 eland info remove Notification
@@ -1014,7 +1018,8 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case AL03: //11 alarm info change Notification
     case AL04: //12 alarm info delete notification
         rc = TCP_Operate_ALXX((char *)(buff + sizeof(_TELEGRAM_t)), tep_cmd);
-        elan_tcp_log("CMD:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
+        elan_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
+        SendElandStateQueue(TCP_AL00);
         break;
     case HD00: //13 holiday data request
         break;
@@ -1127,6 +1132,7 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
             if (!strncmp(des_data_cache.user_id, "\0", 1))
             {
                 elan_tcp_log("user_id  = %s", des_data_cache.user_id);
+                rc = JSON_PARSE_ERROR;
                 goto exit;
             }
         }

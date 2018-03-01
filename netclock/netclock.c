@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-04 16:51:34
+ * @Last Modified time:2018-02-25 14:53:38
  * @brief   :
  ****************************************************************************
 **/
@@ -28,7 +28,7 @@
 #include "eland_sound.h"
 #include "eland_tcp.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ELAND_DEBUG
+#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -49,23 +49,19 @@ json_object *DeviceJsonData = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
 
-//eland 通信情報取得
-static OSStatus eland_communication_info_get(void);
-
 /* Private functions ---------------------------------------------------------*/
 
 OSStatus netclock_desInit(void)
 {
     OSStatus err = kGeneralErr;
     mico_Context_t *context = NULL;
-
-    context = mico_system_context_get();
-    require_action_string(context != NULL, exit, err = kGeneralErr, "[ERROR]context is NULL!!!");
+    /*start init system context*/
+    context = mico_system_context_init(sizeof(_ELAND_DEVICE_t));
 
     device_state = (_ELAND_DEVICE_t *)mico_system_context_get_user_data(context);
     require_action_string(device_state != NULL, exit, err = kGeneralErr, "[ERROR]device_state is NULL!!!");
 
-    netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S));
+    netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S) + 1);
     require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
 
     err = mico_rtos_init_mutex(&netclock_des_g->des_mutex);
@@ -74,6 +70,12 @@ OSStatus netclock_desInit(void)
     //数据结构体初始化
     err = CheckNetclockDESSetting();
     require_noerr(err, exit);
+
+    /* Start MiCO system functions according to mico_config.h*/
+    err = mico_system_init(context);
+    require_noerr(err, exit);
+
+    eland_get_mac(netclock_des_g->mac_address);
 
     Eland_log("local firmware version:%s", Eland_Firmware_Version);
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
@@ -86,6 +88,7 @@ exit:
     }
     if (netclock_des_g != NULL)
     {
+        free(netclock_des_g);
         memset(netclock_des_g, 0, sizeof(ELAND_DES_S));
     }
     Eland_log("netclock_des_g init err");
@@ -104,10 +107,6 @@ OSStatus start_eland_service(void)
     err = mico_rtos_init_mutex(&http_send_setting_mutex);
     require_noerr(err, exit);
 
-    //1.eland 通訊情報取得
-    err = eland_communication_info_get();
-    require_noerr(err, exit);
-
     Eland_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     //3.eland test  下載音頻到flash
@@ -123,7 +122,6 @@ exit:
 OSStatus CheckNetclockDESSetting(void)
 {
     OSStatus err = kGeneralErr;
-    unsigned char mac[10] = {0};
 /*check Eland_ID*/
 start_Check:
     Eland_log("CheckNetclockDESSetting");
@@ -179,9 +177,7 @@ start_Check:
     /***initialize by device flash***/
     netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
-    wlan_get_mac_address(mac);                                                                        //MAC地址
-    memset(netclock_des_g->mac_address, 0, sizeof(netclock_des_g->mac_address));
-    sprintf(netclock_des_g->mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    //eland_get_mac(netclock_des_g->mac_address);
     netclock_des_g->dhcp_enabled = device_state->dhcp_enabled;
     memcpy(netclock_des_g->ip_address, device_state->ip_address, ip_address_Len);
     memcpy(netclock_des_g->subnet_mask, device_state->subnet_mask, ip_address_Len);
@@ -201,6 +197,15 @@ exit:
     require_noerr(err, exit);
     return kGeneralErr;
 }
+void eland_get_mac(char *mac_address)
+{
+    unsigned char mac[10] = {0};
+    wlan_get_mac_address(mac); //MAC地址
+    memset(mac_address, 0, mac_address_Len);
+    sprintf(mac_address, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    Eland_log("mac_address:%s", mac_address);
+}
+
 OSStatus Netclock_des_recovery(void)
 {
     _ELAND_DEVICE_t device_temp;
@@ -337,7 +342,10 @@ OSStatus ProcessPostJson(char *InputJson)
 {
     bool needupdateflash = false;
     json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL;
+    mico_Context_t *context = NULL;
+
     mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
+    context = mico_system_context_get();
     if (*InputJson != '{')
     {
         Eland_log("error:received err json format data");
@@ -410,6 +418,11 @@ OSStatus ProcessPostJson(char *InputJson)
             if (device_state->dhcp_enabled != netclock_des_g->dhcp_enabled)
             {
                 device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
+
+                if (netclock_des_g->dhcp_enabled == 1)
+                    context->micoSystemConfig.dhcpEnable = DHCP_Client; /* Fetch Ip address from DHCP server */
+                else if (netclock_des_g->dhcp_enabled == 0)
+                    context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
                 needupdateflash = true;
             }
         }
@@ -457,6 +470,13 @@ OSStatus ProcessPostJson(char *InputJson)
             memcpy(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len);
             memcpy(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len);
         }
+        if (needupdateflash)
+        {
+            memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
+            memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
+            memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
+            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
+        }
     }
     if (strncmp(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len) != 0)
     {
@@ -475,7 +495,7 @@ OSStatus ProcessPostJson(char *InputJson)
     }
 
     if (needupdateflash == true)
-        mico_system_context_update(mico_system_context_get());
+        mico_system_context_update(context);
 
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
@@ -487,7 +507,7 @@ exit:
 }
 
 //eland 通信情報取得
-static OSStatus eland_communication_info_get(void)
+OSStatus eland_communication_info_get(void)
 {
     OSStatus err = kGeneralErr;
     json_object *ReceivedJsonCache = NULL, *ServerJsonCache = NULL;
@@ -563,36 +583,42 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     OSStatus err = kGeneralErr;
 
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
-    char uri_str[50] = {0};
+    char uri_str[100] = {0};
     //  _sound_read_write_type_t **alarm_w_r_queue = NULL;
-    _sound_callback_type_t *alarm_r_w_callbcke_queue = NULL;
     uint8_t *flashdata = NULL;
-    uint32_t data_pos = 0;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
     /******check sound*************/
-    flashdata = malloc(2001);
+    flashdata = malloc(10);
     mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
     memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_id, strlen(alarm->alarm_id));
+    if (sound_type == SOUND_FILE_SID)
+        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
+    else if (sound_type == SOUND_FILE_VID)
+        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+    else if (sound_type == SOUND_FILE_OID)
+        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+    else
+        goto exit;
     HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
     HTTP_W_R_struct.alarm_w_r_queue->is_read = true;
     HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
-    HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
+    HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
     HTTP_W_R_struct.alarm_w_r_queue->len = 8;
-    Eland_log("inlen = %ld,sound_flash_pos = %ld", HTTP_W_R_struct.alarm_w_r_queue->len, HTTP_W_R_struct.alarm_w_r_queue->pos);
-    err = mico_rtos_push_to_queue(&eland_sound_R_W_queue, &HTTP_W_R_struct.alarm_w_r_queue, 10);
-    require_noerr(err, exit);
-    err = mico_rtos_pop_from_queue(&eland_sound_reback_queue, &alarm_r_w_callbcke_queue, MICO_WAIT_FOREVER);
-    require_noerr(err, exit);
-    if (alarm_r_w_callbcke_queue->read_write_err == ERRNONE) //文件已下載
+
+    err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+    if (err == kNoErr) //文件已下載
     {
         Eland_log("ERRNONE");
         goto exit;
     }
     /*ready for uri*/
-    memset(uri_str, 0, 50);
+    memset(uri_str, 0, 100);
     if (sound_type == SOUND_FILE_SID)
         sprintf(uri_str, ELAND_SOUND_SID_URI, netclock_des_g->eland_id, alarm->alarm_sound_id);
+    else if (sound_type == SOUND_FILE_VID)
+        sprintf(uri_str, ELAND_SOUND_VID_URI, netclock_des_g->eland_id, alarm->voice_alarm_id);
+    else if (sound_type == SOUND_FILE_OID)
+        sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, alarm->alarm_off_voice_alarm_id);
 
     Eland_log("=====> alarm_sound_download send ======>");
 
@@ -618,10 +644,10 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 exit:
     /**************/
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
-    free(alarm_r_w_callbcke_queue);
+    //释放资源
     free(flashdata);
 
-    if (user_http_res.eland_response_body != NULL) //释放资源
+    if (user_http_res.eland_response_body != NULL)
     {
         free(user_http_res.eland_response_body);
         user_http_res.eland_response_body = NULL;
@@ -629,7 +655,6 @@ exit:
     if (err != kNoErr)
     {
         Eland_log("<===== alarm_sound_download error <======");
-        mico_thread_msleep(200);
     }
 
     return err;

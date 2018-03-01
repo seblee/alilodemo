@@ -117,23 +117,21 @@ OSStatus hal_alilo_rabbit_init(void)
     for (i = 0; i < 35; i++)
         audio_service_volume_down(&result, 1);
     // err = user_key_init();
-    // require_noerr(err, exit);
 
-    // mico_rtos_thread_sleep(3); //wait for audio ready
+    //audio_service_sound_remind_start(&result, 1); //我的尝夥伴，快來和我玩耝坧
+    //audio_service_sound_remind_start(&result, 2);//請先幫我酝置無線網絡坧
+    //audio_service_sound_remind_start(&result, 3); //正在連接無線網絡
+    //audio_service_sound_remind_start(&result, 4); //請長安與我尝話坧
+    //audio_service_sound_remind_start(&result, 5); //這個啝題有點難，我還在學習
+    //audio_service_sound_remind_start(&result, 6); //尝丝起，沒有蝽清，請冝來一次
+    //audio_service_sound_remind_start(&result, 7); //網絡連接失敗
+    //audio_service_sound_remind_start(&result, 8); //設備正在均級中，請稝等一會坧
+    //audio_service_sound_remind_start(&result, 9); //還剩百分之二坝五電針，電針快丝足了
+    //audio_service_sound_remind_start(&result, 10); //還剩百分之五電針，快幫我衝充電坧
+    //audio_service_sound_remind_start(&result, 11); //微信發逝的蝲音 “嗚”
+    //audio_service_sound_remind_start(&result, 12); //門鈴蝲音 “坮噔”
+    //audio_service_sound_remind_start(&result, 13); //“坮坮”蝲
 
-//audio_service_sound_remind_start(&result, 1); //我的尝夥伴，快來和我玩耝坧
-//audio_service_sound_remind_start(&result, 2);//請先幫我酝置無線網絡坧
-//audio_service_sound_remind_start(&result, 3); //正在連接無線網絡
-//audio_service_sound_remind_start(&result, 4); //請長安與我尝話坧
-//audio_service_sound_remind_start(&result, 5); //這個啝題有點難，我還在學習
-//audio_service_sound_remind_start(&result, 6); //尝丝起，沒有蝽清，請冝來一次
-//audio_service_sound_remind_start(&result, 7); //網絡連接失敗
-//audio_service_sound_remind_start(&result, 8); //設備正在均級中，請稝等一會坧
-//audio_service_sound_remind_start(&result, 9); //還剩百分之二坝五電針，電針快丝足了
-//audio_service_sound_remind_start(&result, 10); //還剩百分之五電針，快幫我衝充電坧
-//audio_service_sound_remind_start(&result, 11); //微信發逝的蝲音 “嗚”
-//audio_service_sound_remind_start(&result, 12); //門鈴蝲音 “坮噔”
-//audio_service_sound_remind_start(&result, 13); //“坮坮”蝲
 exit:
     return err;
 }

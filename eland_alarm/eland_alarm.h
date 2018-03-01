@@ -26,6 +26,7 @@
 #define SECOND_ONE_DAY 86400
 #define SECOND_ONE_HOUR 3600
 #define SECOND_ONE_MINUTE 60
+
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
 {
@@ -138,12 +139,15 @@ typedef struct
     /**********************/
     /************************/
     __elsv_alarm_data_t *alarm_lib;
+    __elsv_alarm_data_t *alarm_nearest;
 } _eland_alarm_list_t;
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 extern _eland_alarm_list_t alarm_list;
 extern mico_semaphore_t alarm_update;
+extern mico_semaphore_t alarm_sound_scan_sem;
+
 extern _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
@@ -167,6 +171,8 @@ AlarmOffHistoryData_t *get_alarm_history_data(void);
 HistoryDatastate_t get_alarm_history_data_state(void);
 void set_alarm_history_data_state(HistoryDatastate_t value);
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
+void alarm_sound_scan(void);
+
 /* Private functions ---------------------------------------------------------*/
 
 #endif

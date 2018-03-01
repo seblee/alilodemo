@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-27 15:49:11
+ * @Last Modified time:2018-02-25 17:45:49
  * @brief   :
  ****************************************************************************
 **/
@@ -61,7 +61,6 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
     case NOTIFY_AP_UP:
         WifiSet_log("Wi-Fi Soft_AP ready!");
         mico_rtos_set_semaphore(&wifi_SoftAP_Sem);
-        recorde_IPStatus(Soft_AP);
         SendElandStateQueue(APStatusStart);
         break;
     case NOTIFY_AP_DOWN:
@@ -91,7 +90,6 @@ static void recorde_IPStatus(wlanInterfaceTypedef type)
     micoWlanGetIPStatus(&IPStatus_Cache, type);
     memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
     sprintf(netclock_des_g->ip_address, IPStatus_Cache.ip);
-    netclock_des_g->dhcp_enabled = IPStatus_Cache.dhcp;
     memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));
     sprintf(netclock_des_g->subnet_mask, IPStatus_Cache.mask);
     memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
@@ -102,7 +100,7 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
     OSStatus err = kNoErr;
     if (wifi_Mode == Station)
     {
-        err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi station",
+        err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "wifi station",
                                       Wifi_station_threed, 0x500, (mico_thread_arg_t)NULL);
     }
     else if (wifi_Mode == Soft_AP)
@@ -110,8 +108,8 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
         mico_rtos_set_semaphore(&TCP_Stop_Sem);
 
         // Wifi_SoftAP_fun();
-        err = mico_rtos_create_thread(NULL, MICO_NETWORK_WORKER_PRIORITY, "wifi Soft_AP",
-                                      Wifi_SoftAP_threed, 0x1000, (mico_thread_arg_t)NULL);
+        err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "wifi Soft_AP",
+                                      Wifi_SoftAP_threed, 0x500, (mico_thread_arg_t)NULL);
     }
     return err;
 }
@@ -139,7 +137,6 @@ void Wifi_station_threed(mico_thread_arg_t arg)
         memcpy(wNetConfigAdv.gateway_ip_addr, netclock_des_g->default_gateway, 16);
         memcpy(wNetConfigAdv.dnsServer_ip_addr, netclock_des_g->dnsServer, 16);
     }
-
     wNetConfigAdv.wifi_retry_interval = 100; /* Retry interval after a failure connection */
 
     /* Connect Now! */
@@ -151,15 +148,12 @@ void Wifi_station_threed(mico_thread_arg_t arg)
 }
 static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
 {
-    OSStatus err = kNoErr;
     network_InitTypeDef_st wNetConfig;
-
-    mico_rtos_thread_sleep(2);
-    err = Eland_httpd_start();
-    if (err == kNoErr)
-        SendElandStateQueue(APServerStart);
     mico_rtos_lock_mutex(&WifiConfigMutex);
+    SendElandStateQueue(APServerStart);
     micoWlanSuspend();
+    mico_rtos_thread_sleep(2);
+    Eland_httpd_start();
     WifiSet_log("Soft_ap_Server");
     memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
     strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);

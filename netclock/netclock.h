@@ -23,15 +23,12 @@
 /* Private define ------------------------------------------------------------*/
 //eland sound down load
 #define ELAND_DOWN_LOAD_METHOD HTTP_GET
-//#define ELAND_DOWN_LOAD_URI ("/mockup/browser/sound/Alarm01.mp3")
-//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_024kbps")
-//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_064kbps")
-//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_096kbps")
-//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=maki_emo_16_128kbps")
-//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
+
 #define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
-//#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_40kbps")
+
 #define ELAND_SOUND_SID_URI ("/api/sound/download?eid=%ld&sid=%ld")
+#define ELAND_SOUND_VID_URI ("/api/sound/download?eid=%ld&vid=%s")
+#define ELAND_SOUND_OID_URI ("/api/sound/download?eid=%ld&oid=%s")
 
 //eland 通信情報取得
 #define ELAND_COMMUNICATION_INFO_UPDATE_METHOD HTTP_GET
@@ -57,6 +54,7 @@ OSStatus netclock_desInit(void);
 
 OSStatus StartNetclockService(void);
 OSStatus CheckNetclockDESSetting(void);
+void eland_get_mac(char *mac_address);
 OSStatus Netclock_des_recovery(void);
 
 bool get_wifi_status(void);
@@ -69,6 +67,7 @@ OSStatus Eland_Rtc_Init(void);
 OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
 OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type);
+OSStatus eland_communication_info_get(void);
 /* Private functions ---------------------------------------------------------*/
 
 //extern static mico_semaphore_t WifiConnectSem;

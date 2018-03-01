@@ -115,10 +115,10 @@ typedef struct eland_data_2_mcu
 #define USART_RESEND_MAX_TIMES 3
 
 #define RSSI_STATE_STAGE0 (int)(-85)
-#define RSSI_STATE_STAGE1 (int)(-70)
-#define RSSI_STATE_STAGE2 (int)(-60)
-#define RSSI_STATE_STAGE3 (int)(-50)
-#define RSSI_STATE_STAGE4 (int)(-40)
+#define RSSI_STATE_STAGE1 (int)(-80)
+#define RSSI_STATE_STAGE2 (int)(-75)
+#define RSSI_STATE_STAGE3 (int)(-70)
+#define RSSI_STATE_STAGE4 (int)(-65)
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
@@ -127,7 +127,6 @@ _ELAND_MODE_t get_eland_mode(void);
 OSStatus start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
-void StateReceivethread(mico_thread_arg_t arg);
 void SendElandStateQueue(Eland_Status_type_t value);
 /* Private functions ---------------------------------------------------------*/
 

@@ -17,8 +17,8 @@
 
 #define DEVICE_MAC_LEN (17) //MAC地址长度
 
-#define ELAND_AP_SSID ("Eland")             //配置模式ssid
-#define ELAND_AP_KEY ("12345678")           //配置模式key
+#define ELAND_AP_SSID ("LinkTime_LT10")     //配置模式ssid
+#define ELAND_AP_KEY ("")                   //配置模式key
 #define ELAND_AP_LOCAL_IP ("192.168.0.1")   //本體IP
 #define ELAND_AP_NET_MASK ("255.255.255.0") //本體IP
 

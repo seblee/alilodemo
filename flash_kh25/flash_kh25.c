@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2017-12-27 17:30:48
+ * @Last Modified time:2018-02-25 14:42:01
  * @brief   :
  ****************************************************************************
 **/
@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_FLASH_KH25_DEBUG
+#define CONFIG_FLASH_KH25_DEBUG
 #ifdef CONFIG_FLASH_KH25_DEBUG
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 #else
