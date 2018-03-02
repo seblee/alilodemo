@@ -88,14 +88,20 @@ typedef struct
     bool alarm_stoped;
     mico_mutex_t AlarmStateMutex;
 } _alarm_state_t;
+typedef enum {
+    STREAM_IDEL,
+    STREAM_PLAY,
+    STREAM_STOP,
+} _stream_state_t;
+
 typedef struct
 {
-    bool stream_done;
     mico_mutex_t stream_Mutex;
     uint8_t stream_id;
-    uint32_t data_pos;
     char alarm_id[ALARM_ID_LEN + 1];
     uint8_t sound_type;
+    uint16_t stream_count;
+    _stream_state_t state;
 } _alarm_stream_t;
 typedef enum {
     ALARM_ON = (uint8_t)0,

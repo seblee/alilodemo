@@ -57,8 +57,7 @@ int application_start(void)
     err = Eland_Rtc_Init();
     require_noerr(err, exit);
 
-    wifimgr_debug_enable(0);
-
+    //wifimgr_debug_enable(0);
     /*init fog v2 service*/
     err = netclock_desInit();
     require_noerr(err, exit);
@@ -74,7 +73,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    //  start_uart_service();
+    start_uart_service();
     //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");

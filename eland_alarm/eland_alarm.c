@@ -42,7 +42,9 @@ static uint32_t GET_current_second(void);
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list);
 void Alarm_Manager(uint32_t arg);
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD);
-static void set_alarm_stream_pos(uint32_t pos);
+static void set_alarm_stream_state(_stream_state_t state);
+static _stream_state_t get_alarm_stream_state(void);
+
 static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
 static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
@@ -75,8 +77,6 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     err = mico_rtos_init_semaphore(&off_history.alarm_off_sem, 1);
     require_noerr(err, exit);
-    alarm_stream.stream_id = audio_service_system_generate_stream_id();
-    set_alarm_stream_pos(0);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager",
                                   Alarm_Manager, 0x800, 0);
@@ -164,24 +164,43 @@ void set_alarm_state(_alarm_list_state_t state)
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
 }
-static void init_alarm_stream(char *alarm_id, uint8_t sound_type)
+static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
-    alarm_stream.data_pos = 0;
-    memcpy(alarm_stream.alarm_id, alarm_id, ALARM_ID_LEN);
     alarm_stream.sound_type = sound_type;
+    if ((alarm->alarm_pattern == 3) || (sound_type == SOUND_FILE_OID))
+        alarm_stream.stream_count = 1;
+    else
+        alarm_stream.stream_count = 0xffff;
+
+    switch (sound_type)
+    {
+    case SOUND_FILE_VID:
+        memcpy(alarm_stream.alarm_id, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+        break;
+    case SOUND_FILE_SID:
+        memcpy(alarm_stream.alarm_id, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
+        break;
+    case SOUND_FILE_OID:
+        memcpy(alarm_stream.alarm_id, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+        break;
+    default:
+        break;
+    }
+
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
-static uint32_t get_alarm_stream_pos(void)
-{
-    return alarm_stream.data_pos;
-}
-static void set_alarm_stream_pos(uint32_t pos)
+
+static void set_alarm_stream_state(_stream_state_t state)
 {
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
-    alarm_stream.data_pos = pos;
+    alarm_stream.state = state;
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
+}
+static _stream_state_t get_alarm_stream_state(void)
+{
+    return alarm_stream.state;
 }
 
 static mico_utc_time_t GET_current_second(void)
@@ -363,7 +382,7 @@ void alarm_sound_scan(void)
     uint8_t i;
 wait_for_sem:
     mico_rtos_get_semaphore(&alarm_sound_scan_sem, MICO_WAIT_FOREVER);
-
+scan_again:
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 1) ||
@@ -389,6 +408,12 @@ wait_for_sem:
         }
     }
 exit:
+    if (err != kNoErr)
+    {
+        mico_rtos_thread_sleep(5);
+        goto scan_again;
+    }
+
     goto wait_for_sem;
 }
 
@@ -457,6 +482,7 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
 
     err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
+    alarm_log("unlock AlarmlibMutex");
 exit:
     set_alarm_state(ALARM_MINUS);
     return err;
@@ -548,6 +574,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                         mico_rtos_set_semaphore(&off_history.alarm_off_sem);
                         set_alarm_history_data_state(WAIT_UPLOAD);
                     }
+                    Alarm_Play_Control(alarm, 0); //stop
                     first_to_snooze = false;
                 }
                 if (utc_time > alarm_moment)
@@ -566,7 +593,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             first_to_snooze = true;
             break;
         }
-        mico_rtos_thread_msleep(500);
+        mico_rtos_thread_msleep(50);
     } while (alarm_list.state.alarm_stoped == false);
 
     if (get_alarm_history_data_state() != WAIT_UPLOAD)
@@ -586,41 +613,50 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     static bool isVoice = false;
 
     audio_service_get_audio_status(&result, &audio_status);
-    alarm_log("audio_status %d", audio_status);
     if (CMD) //play
     {
-        if (audio_status == MSCP_STATUS_IDLE)
+        if (get_alarm_stream_state() != STREAM_PLAY)
         {
+            alarm_log("audio_status %d", audio_status);
             if ((alarm->alarm_pattern == 1) || (alarm->alarm_pattern == 4))
             {
-                init_alarm_stream(alarm->alarm_id, SOUND_FILE_SID);
-                mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
+                init_alarm_stream(alarm, SOUND_FILE_SID);
+                set_alarm_stream_state(STREAM_PLAY);
+                mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
             }
             else if (alarm->alarm_pattern == 2)
             {
-                init_alarm_stream(alarm->alarm_id, SOUND_FILE_SID);
-                mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
+                init_alarm_stream(alarm, SOUND_FILE_VID);
+                set_alarm_stream_state(STREAM_PLAY);
+                mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
             }
             else if (alarm->alarm_pattern == 3)
             {
-                if (isVoice)
+                if (audio_status == MSCP_STATUS_IDLE)
                 {
-                    isVoice = false;
-                    mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x900, (uint32_t)(&alarm_stream));
-                }
-                else
-                {
-                    isVoice = true;
-                    audio_service_sound_remind_start(&result, 12);
+                    if (isVoice)
+                    {
+                        isVoice = false;
+                        init_alarm_stream(alarm, SOUND_FILE_VID);
+                        set_alarm_stream_state(STREAM_PLAY);
+                        mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
+                    }
+                    else
+                    {
+                        isVoice = true;
+                        init_alarm_stream(alarm, SOUND_FILE_SID);
+                        set_alarm_stream_state(STREAM_PLAY);
+                        mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
+                    }
                 }
             }
         }
-        else if ((audio_status == MSCP_STATUS_STREAM_PLAYING) || (audio_status == MSCP_STATUS_SOUND_REMINDING))
-            return;
     }
     else //stop
     {
-        mico_rtos_delete_thread(&play_voice_thread);
+        if (get_alarm_stream_state() == STREAM_PLAY)
+            set_alarm_stream_state(STREAM_STOP);
+
         if (audio_status == MSCP_STATUS_IDLE)
         {
         }
@@ -628,6 +664,9 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             audio_service_stream_stop(&result, alarm_stream.stream_id);
         if (alarm->alarm_pattern == 4) //alarm off oid
         {
+            init_alarm_stream(alarm, SOUND_FILE_OID);
+            set_alarm_stream_state(STREAM_PLAY);
+            mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }
     }
 }
@@ -635,76 +674,102 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
 static void play_voice(mico_thread_arg_t arg)
 {
     _alarm_stream_t *stream = (_alarm_stream_t *)arg;
-
     AUDIO_STREAM_PALY_S flash_read_stream;
+    mscp_status_t audio_status;
     OSStatus err = kGeneralErr;
     mscp_result_t result = MSCP_RST_ERROR;
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
-    _sound_read_write_type_t *alarm_w_r_queue = NULL;
+    _sound_read_write_type_t alarm_w_r_queue;
+    _stream_state_t stream_state;
 
     alarm_log("player_flash_thread");
     flashdata = malloc(SOUND_STREAM_DEFAULT_LENGTH + 1);
+start_play_voice:
+    stream_state = get_alarm_stream_state();
+    switch (stream_state)
+    {
+    case STREAM_STOP:
+        goto exit;
+        break;
+    case STREAM_PLAY:
+        audio_service_get_audio_status(&result, &audio_status);
+        if (audio_status == MSCP_STATUS_STREAM_PLAYING)
+        {
+            alarm_log("player_playing");
+            mico_rtos_thread_msleep(20);
+            goto start_play_voice;
+        }
+        break;
+    default:
+        goto exit;
+        break;
+    }
 
     flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
     flash_read_stream.pdata = flashdata;
     flash_read_stream.stream_id = stream->stream_id;
-    data_pos = get_alarm_stream_pos();
+    data_pos = 0;
 
-    alarm_w_r_queue = (_sound_read_write_type_t *)calloc(sizeof(_sound_read_write_type_t), sizeof(uint8_t));
-    memset(alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(alarm_w_r_queue->alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
-    alarm_w_r_queue->sound_type = stream->sound_type;
-    alarm_w_r_queue->is_read = true;
-    alarm_w_r_queue->sound_data = flashdata;
-    alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
-
+    memset(&alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+    memcpy(alarm_w_r_queue.alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
+    alarm_w_r_queue.sound_type = stream->sound_type;
+    alarm_w_r_queue.is_read = true;
+    alarm_w_r_queue.sound_data = flashdata;
+    alarm_w_r_queue.len = SOUND_STREAM_DEFAULT_LENGTH;
+    alarm_log("len = %ld,pos = %ld",
+              alarm_w_r_queue.total_len, alarm_w_r_queue.pos);
+    stream->stream_count--;
 falsh_read_start:
-    alarm_w_r_queue->pos = data_pos;
-    err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+    alarm_w_r_queue.pos = data_pos;
+    err = sound_file_read_write(&sound_file_list, &alarm_w_r_queue);
     require_noerr(err, exit);
     if (data_pos == 0)
     {
-        flash_read_stream.total_len = alarm_w_r_queue->total_len;
+        flash_read_stream.total_len = alarm_w_r_queue.total_len;
     }
-    flash_read_stream.stream_len = alarm_w_r_queue->len;
-
-    //alarm_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d] data_pos[%ld]",
-    //          (int)flash_read_stream.type, (int)flash_read_stream.stream_id,
-    //          (int)flash_read_stream.total_len, (int)flash_read_stream.stream_len, data_pos);
-    //          alarm_log("free_callback_queue");
+    flash_read_stream.stream_len = alarm_w_r_queue.len;
 
 audio_transfer:
-    err = audio_service_stream_play(&result, &flash_read_stream);
-
-    if (err != kNoErr)
+    if (get_alarm_stream_state() == STREAM_PLAY)
     {
-        alarm_log("audio_stream_play() error!!!!");
-        goto exit;
-    }
-    else
-    {
-        if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
+        err = audio_service_stream_play(&result, &flash_read_stream);
+        if (err != kNoErr)
         {
-            alarm_log("new slave set pause!!!");
-            mico_rtos_thread_msleep(1000); //time set 1000ms!!!
-            goto audio_transfer;
+            alarm_log("audio_stream_play() error!!!!");
+            goto exit;
         }
         else
         {
-            err = kNoErr;
+            if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
+            {
+                alarm_log("new slave set pause!!!");
+                mico_rtos_thread_msleep(1000); //time set 1000ms!!!
+                goto audio_transfer;
+            }
+            else
+            {
+                err = kNoErr;
+            }
         }
+        data_pos += flash_read_stream.stream_len;
+        if (data_pos < flash_read_stream.total_len)
+            goto falsh_read_start;
+        else
+            data_pos = 0;
+        alarm_log("state is_SUCCESS !");
     }
-    data_pos += flash_read_stream.stream_len;
-    if (data_pos < flash_read_stream.total_len)
-        goto falsh_read_start;
-    else
-        data_pos = 0;
-    alarm_log("state is_SUCCESS !");
+    if (stream->stream_count)
+        goto start_play_voice;
 exit:
-    set_alarm_stream_pos(0);
+    if (get_alarm_stream_state() == STREAM_STOP)
+    {
+        audio_service_get_audio_status(&result, &audio_status);
+        if (audio_status != MSCP_STATUS_IDLE)
+            audio_service_stream_stop(&result, alarm_stream.stream_id);
+    }
     free(flashdata);
-    free(alarm_w_r_queue);
+    set_alarm_stream_state(STREAM_IDEL);
     mico_rtos_delete_thread(NULL);
 }
 

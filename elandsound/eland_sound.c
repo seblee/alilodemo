@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_SOUND_DEBUG
+//#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -101,7 +101,6 @@ OSStatus sound_file_sort(_sound_file_lib_t *sound_list)
 
 exit:
     sound_log("read file file_number:%d", sound_list->file_number);
-
     err = mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
 }
