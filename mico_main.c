@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-25 18:06:01
+ * @Last Modified time:2018-03-05 16:51:54
  * @brief   :
  ****************************************************************************
 **/
@@ -73,8 +73,8 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
-    //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    //   start_uart_service();
+    // Start_wifi_Station_SoftSP_Thread(Soft_AP);
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);

@@ -1,34 +1,18 @@
 /**
- ******************************************************************************
- * @file    app_https.c
- * @author  QQ DING
- * @version V1.0.0
- * @date    1-September-2015
- * @brief   The main HTTPD server initialization and wsgi handle.
- ******************************************************************************
- *
- *  The MIT License
- *  Copyright (c) 2016 MXCHIP Inc.
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is furnished
- *  to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
- *  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- ******************************************************************************
- */
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-03-05 11:31:37
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-03-05 17:20:35
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "hal_alilo_rabbit.h"
 #include "netclock_httpd.h"
 #include "netclock.h"
@@ -41,6 +25,9 @@
 #include "netclock_uart.h"
 #include "netclock_ota.h"
 
+/* Private typedef -----------------------------------------------------------*/
+
+/* Private define ------------------------------------------------------------*/
 #define CONFIG_APPHTTPD_DEBUG
 #ifdef CONFIG_APPHTTPD_DEBUG
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
@@ -49,10 +36,80 @@
 #endif /* ! CONFIG_APPHTTPD_DEBUG */
 
 #define HTTPD_HDR_DEFORT (HTTPD_HDR_ADD_CONN_CLOSE)
+
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 static bool is_http_init;
 static bool is_handlers_registered;
 struct httpd_wsgi_call g_app_handlers[];
 mico_semaphore_t wifi_netclock = NULL, wifi_SoftAP_Sem = NULL;
+mico_semaphore_t http_ssid_event_Sem = NULL;
+__http_ssids_list_t wifi_scan_list;
+/* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
+static void wifi_manager_scan_complete_cb(ScanResult_adv *pApList, void *arg)
+{
+    uint8_t i;
+    __http_ssids_list_t *list = (__http_ssids_list_t *)arg;
+    list->num = pApList->ApNum;
+    if (pApList->ApNum > 0)
+        list->ssids = calloc(pApList->ApNum, sizeof(__http_ssids_result_t));
+    app_httpd_log("ap number:%d", pApList->ApNum);
+    for (i = 0; i < pApList->ApNum; i++)
+    {
+        memcpy(list->ssids[i].ssid, pApList->ApList[i].ssid, 32);
+        list->ssids[i].security = (pApList->ApList[i].security > 0) ? 1 : 0;
+        list->ssids[i].rssi = pApList->ApList[i].rssi;
+
+        app_httpd_log("ap%d--security:%d,name:%s,rssi=%d ", i,
+                      (list->ssids + i)->security,
+                      (list->ssids + i)->ssid,
+                      (list->ssids + i)->rssi);
+    }
+    mico_rtos_set_semaphore(&http_ssid_event_Sem);
+}
+static OSStatus build_ssids_json_string(char *data, __http_ssids_list_t *wifi_list)
+{
+    uint8_t i;
+    OSStatus err = kGeneralErr;
+    json_object *Json = NULL;
+    json_object *JsonList = NULL;
+    json_object *JsonSsidval = NULL;
+    const char *generate_data = NULL;
+    uint32_t generate_data_len = 0;
+
+    Json = json_object_new_object();
+    require_action_string(Json, exit, err = kNoMemoryErr, "create Json object error!");
+    JsonList = json_object_new_array();
+    require_action_string(JsonList, exit, err = kNoMemoryErr, "create JsonList object error!");
+    app_httpd_log("wifi_list->num:%d", wifi_list->num);
+
+    for (i = 0; i < wifi_list->num; i++)
+    {
+        JsonSsidval = json_object_new_object();
+        require_action_string(JsonSsidval, exit, err = kNoMemoryErr, "create JsonSsidval object error!");
+
+        json_object_object_add(JsonSsidval, "secure", json_object_new_int((wifi_list->ssids + i)->security));
+        json_object_object_add(JsonSsidval, "signal", json_object_new_int((wifi_list->ssids + i)->rssi));
+        json_object_object_add(JsonSsidval, "ssid", json_object_new_string((wifi_list->ssids + i)->ssid));
+
+        json_object_array_add(JsonList, JsonSsidval);
+    }
+    json_object_object_add(Json, "ssids", JsonList);
+
+    generate_data = json_object_to_json_string(Json);
+    require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
+    generate_data_len = strlen(generate_data);
+    require_action_string(generate_data_len < 1024, exit, err = kNoMemoryErr, "json data is too long");
+    memcpy(data, generate_data, generate_data_len);
+    app_httpd_log("data:%s", data);
+exit:
+    app_httpd_log("exit ");
+    free_json_obj(&Json);
+    return err;
+}
 static void eland_check_ssid(void)
 {
     msg_wify_queue received;
@@ -218,11 +275,41 @@ exit:
     free(buf);
     return err;
 }
+/*****************web_send_Get_ssids_Request******************************************/
+static int web_send_Get_ssids_Request(httpd_request_t *req)
+{
+    OSStatus err = kNoErr;
+    char *upload_data = NULL;
+    uint32_t upload_data_len = 1024;
+    app_httpd_log("Get_ssids_Request");
+    upload_data = malloc(upload_data_len);
+    memset(upload_data, 0, upload_data_len);
+    memset(&wifi_scan_list, 0, sizeof(__http_ssids_list_t));
+    micoWlanStartScanAdv();
+    err = mico_rtos_get_semaphore(&http_ssid_event_Sem, 5000);
+    require_noerr(err, exit);
 
+    build_ssids_json_string(upload_data, &wifi_scan_list);
+    app_httpd_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+
+    err = httpd_send_all_header(req, HTTP_RES_200, strlen(upload_data), HTTP_CONTENT_JSON_STR);
+    require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
+
+    err = httpd_send_body(req->sock, (const unsigned char *)upload_data, strlen(upload_data));
+    require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+    SendElandStateQueue(ELAPPConnected);
+exit:
+    if (wifi_scan_list.num > 0)
+        free(wifi_scan_list.ssids);
+    free(upload_data);
+    app_httpd_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+
+    return err;
+}
 struct httpd_wsgi_call g_app_handlers[] = {
     {"/", HTTPD_HDR_DEFORT, 0, web_send_Get_Request, web_send_Post_Request, NULL, NULL},
-    {"/result.htm", HTTPD_HDR_DEFORT, 0, web_send_Get_Request, web_send_Post_Request, NULL, NULL},
-    {"/setting.htm", HTTPD_HDR_DEFORT, 0, web_send_Get_Request, web_send_Post_Request, NULL, NULL},
+    {"/ssids", HTTPD_HDR_DEFORT, 0, web_send_Get_ssids_Request, NULL, NULL, NULL},
+    {"/setting.htm", HTTPD_HDR_DEFORT, 0, NULL, NULL, NULL, NULL},
 };
 
 static int g_app_handlers_no = sizeof(g_app_handlers) / sizeof(struct httpd_wsgi_call);
@@ -267,6 +354,12 @@ int Eland_httpd_start(void)
     err = _app_httpd_start();
     require_noerr(err, exit);
 
+    err = mico_rtos_init_semaphore(&http_ssid_event_Sem, 1);
+    require_noerr(err, exit);
+
+    err = mico_system_notify_register(mico_notify_WIFI_SCAN_ADV_COMPLETED, (void *)wifi_manager_scan_complete_cb, &wifi_scan_list);
+    require_noerr(err, exit);
+
     if (is_handlers_registered == false)
     {
         app_http_register_handlers();
@@ -280,6 +373,11 @@ int Eland_httpd_stop()
 {
     OSStatus err = kNoErr;
 
+    err = mico_rtos_deinit_semaphore(&http_ssid_event_Sem);
+    require_noerr(err, exit);
+
+    err = mico_system_notify_remove(mico_notify_WIFI_SCAN_ADV_COMPLETED, (void *)wifi_manager_scan_complete_cb);
+    require_noerr(err, exit);
     /* HTTPD and services */
     app_httpd_log("stopping down httpd");
     err = httpd_stop();

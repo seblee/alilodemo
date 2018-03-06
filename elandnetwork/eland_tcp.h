@@ -173,30 +173,28 @@ typedef enum _TCP_CMD {
     TCPCMD_NONE,
 } _TCP_CMD_t;
 
-
-
-    /**
+/**
  * @brief MQTT Client State Type
  *
  * Defining a type for MQTT Client State
  *
  */
-    typedef enum _ClientState {
-        CLIENT_STATE_INVALID = 0,
-        CLIENT_STATE_INITIALIZED = 1,
-        CLIENT_STATE_CONNECTING = 2,
-        CLIENT_STATE_CONNECTED_IDLE = 3,
-        CLIENT_STATE_CONNECTED_YIELD_IN_PROGRESS = 4,
-        CLIENT_STATE_CONNECTED_PUBLISH_IN_PROGRESS = 5,
-        CLIENT_STATE_CONNECTED_SUBSCRIBE_IN_PROGRESS = 6,
-        CLIENT_STATE_CONNECTED_UNSUBSCRIBE_IN_PROGRESS = 7,
-        CLIENT_STATE_CONNECTED_RESUBSCRIBE_IN_PROGRESS = 8,
-        CLIENT_STATE_CONNECTED_WAIT_FOR_CB_RETURN = 9,
-        CLIENT_STATE_DISCONNECTING = 10,
-        CLIENT_STATE_DISCONNECTED_ERROR = 11,
-        CLIENT_STATE_DISCONNECTED_MANUALLY = 12,
-        CLIENT_STATE_PENDING_RECONNECT = 13
-    } ClientState_t;
+typedef enum _ClientState {
+    CLIENT_STATE_INVALID = 0,
+    CLIENT_STATE_INITIALIZED = 1,
+    CLIENT_STATE_CONNECTING = 2,
+    CLIENT_STATE_CONNECTED_IDLE = 3,
+    CLIENT_STATE_CONNECTED_YIELD_IN_PROGRESS = 4,
+    CLIENT_STATE_CONNECTED_PUBLISH_IN_PROGRESS = 5,
+    CLIENT_STATE_CONNECTED_SUBSCRIBE_IN_PROGRESS = 6,
+    CLIENT_STATE_CONNECTED_UNSUBSCRIBE_IN_PROGRESS = 7,
+    CLIENT_STATE_CONNECTED_RESUBSCRIBE_IN_PROGRESS = 8,
+    CLIENT_STATE_CONNECTED_WAIT_FOR_CB_RETURN = 9,
+    CLIENT_STATE_DISCONNECTING = 10,
+    CLIENT_STATE_DISCONNECTED_ERROR = 11,
+    CLIENT_STATE_DISCONNECTED_MANUALLY = 12,
+    CLIENT_STATE_PENDING_RECONNECT = 13
+} ClientState_t;
 typedef struct _ClientStatus
 {
     ClientState_t clientState;
@@ -358,6 +356,7 @@ typedef enum TIME_RECORD_T {
 
 /* Private variables ---------------------------------------------------------*/
 extern mico_semaphore_t TCP_Stop_Sem;
+extern mico_semaphore_t TCP_HT00_Sem;
 /* Private function prototypes -----------------------------------------------*/
 TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params);
 TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *written_len);

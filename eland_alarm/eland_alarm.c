@@ -268,6 +268,9 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
         }
         alarm_mcu_data->alarm_on_days_of_week = alarm_eland_data->alarm_on_days_of_week;
     }
+    else if (elsv_alarm_data->alarm_repeat == 5)
+    {
+    }
     else
     {
         alarm_eland_data->alarm_on_days_of_week = 0;
@@ -494,7 +497,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     int8_t snooze_count;
     mico_utc_time_t utc_time;
     mico_utc_time_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
-    bool first_to_snooze = true;
+    bool first_to_snooze = true, first_to_alarming = true;
     mscp_result_t result;
     uint8_t volume_value = 0;
     uint8_t volume_change_counter = 0;
@@ -523,6 +526,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         switch (current_state)
         {
         case ALARM_ING:
+            if (first_to_alarming)
+            {
+                mico_rtos_set_semaphore(&TCP_HT00_Sem);
+                first_to_alarming = false;
+                first_to_snooze = true;
+            }
             if (alarm->volume_stepup_enabled)
             {
                 if ((volume_change_counter++ > 1) &&
@@ -543,13 +552,11 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             }
             else
                 Alarm_Play_Control(alarm, 1); //play with delay
-            first_to_snooze = true;
             break;
         case ALARM_ADD:
         case ALARM_MINUS:
         case ALARM_SORT:
         case ALARM_STOP:
-            first_to_snooze = true;
             Alarm_Play_Control(alarm, 0); //stop
             alarm_list.state.alarm_stoped = true;
             break;
@@ -576,6 +583,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     }
                     Alarm_Play_Control(alarm, 0); //stop
                     first_to_snooze = false;
+                    first_to_alarming = true;
                 }
                 if (utc_time > alarm_moment)
                 {
@@ -696,7 +704,6 @@ start_play_voice:
         audio_service_get_audio_status(&result, &audio_status);
         if (audio_status == MSCP_STATUS_STREAM_PLAYING)
         {
-            alarm_log("player_playing");
             mico_rtos_thread_msleep(20);
             goto start_play_voice;
         }
@@ -792,7 +799,6 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("volume_stepup_enabled:%d", alarm_data->volume_stepup_enabled);
     alarm_log("alarm_continue_min:%d", alarm_data->alarm_continue_min);
     alarm_log("alarm_repeat:%d", alarm_data->alarm_repeat);
-    alarm_log("alarm_on_dates:%s", alarm_data->alarm_on_dates);
     alarm_log("alarm_on_days_of_week:%s", alarm_data->alarm_on_days_of_week);
     alarm_log("\r\alarm_data_for_eland");
     alarm_log("moment_second:%ld", alarm_data->alarm_data_for_eland.moment_second);
@@ -928,10 +934,25 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         }
         break;
     case 5:
-        date_time.iYear = 2000 + alarm->alarm_data_for_mcu.moment_time.year;
-        date_time.iMon = (int16_t)alarm->alarm_data_for_mcu.moment_time.month;
-        date_time.iDay = (int16_t)alarm->alarm_data_for_mcu.moment_time.date;
-        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        mico_time_get_utc_time(&utc_time);
+        alarm_log("utc_time:%ld", utc_time);
+
+        for (i = 0; i < ALARM_ON_DATES_COUNT; i++)
+        {
+            if (alarm->alarm_on_dates[i] == 0)
+                break;
+            alarm_log("alarm_on_dates%d:%d", i, alarm->alarm_on_dates[i]);
+            date_time.iYear = 2000 + alarm->alarm_on_dates[i] / SIMULATE_DAYS_OF_YEAR;
+            date_time.iDay = alarm->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR;
+            date_time.iMon = date_time.iDay / SIMULATE_DAYS_OF_MONTH;
+            date_time.iDay = date_time.iDay % SIMULATE_DAYS_OF_MONTH;
+
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+            if (alarm->alarm_data_for_eland.moment_second > utc_time)
+                break;
+            alarm_log("date:%d-%02d-%02d", date_time.iYear, date_time.iMon, date_time.iDay);
+            alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);
+        }
         break;
     default:
         alarm->alarm_data_for_eland.moment_second = 0;
@@ -1032,4 +1053,98 @@ void set_alarm_history_data_state(HistoryDatastate_t value)
 AlarmOffHistoryData_t *get_alarm_history_data(void)
 {
     return &off_history.HistoryData;
+}
+/**
+ ****************************************************************************
+ * @Function : RTC_Weekday_TypeDef CaculateWeekDay(int y, int m, int d)
+ * @File     : rtc.c
+ * @Program  : y:year m:month d:day
+ * @Created  : 2017/12/16 by seblee
+ * @Brief    : Caculat get week
+ * @Version  : V1.0
+**/
+uint8_t CaculateWeekDay(int y, int m, int d)
+{
+    int iWeek;
+    if (m == 1 || m == 2)
+    {
+        m += 12;
+        y--;
+    }
+    iWeek = (d + 2 * m + 3 * (m + 1) / 5 + y + y / 4 - y / 100 + y / 400) % 7;
+    return (iWeek < 6) ? (uint8_t)(iWeek + 1) : 0;
+}
+/**
+ ****************************************************************************
+ * @Function : void Alarm_build_JSON(char *json_str)
+ * @File     : rtc.c
+ * @Program  : y:year m:month d:day
+ * @Created  : 2017/12/16 by seblee
+ * @Brief    : Caculat get week
+ * @Version  : V1.0
+**/
+OSStatus Alarm_build_JSON(char *json_str)
+{
+    OSStatus err = kNoErr;
+    json_object *Json = NULL;
+    json_object *AlarmJson = NULL;
+    json_object *AlarmOnDaysJson = NULL;
+    uint8_t alarm_now_serial;
+    __elsv_alarm_data_t *alarm_now;
+    const char *generate_data = NULL;
+    uint32_t generate_data_len = 0;
+    uint8_t i;
+    char stringbuf[20];
+
+    Json = json_object_new_object();
+    alarm_now_serial = get_waiting_alarm_serial();
+    alarm_now = (alarm_list.alarm_lib + alarm_now_serial);
+    require_action_string(Json, exit, err = kNoMemoryErr, "create Json object error!");
+    AlarmJson = json_object_new_object();
+    require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmJson object error!");
+    AlarmOnDaysJson = json_object_new_array();
+    require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmJson object error!");
+
+    alarm_log("Begin add AlarmJson object");
+    json_object_object_add(AlarmJson, "alarm_id", json_object_new_string(alarm_now->alarm_id));
+    json_object_object_add(AlarmJson, "alarm_color", json_object_new_int(alarm_now->alarm_color));
+    json_object_object_add(AlarmJson, "alarm_time", json_object_new_string(alarm_now->alarm_time));
+    json_object_object_add(AlarmJson, "alarm_off_dates", json_object_new_string(alarm_now->alarm_off_dates));
+    json_object_object_add(AlarmJson, "snooze_enabled", json_object_new_int(alarm_now->snooze_enabled));
+    json_object_object_add(AlarmJson, "snooze_count", json_object_new_int(alarm_now->snooze_count));
+    json_object_object_add(AlarmJson, "snooze_interval_min", json_object_new_int(alarm_now->snooze_interval_min));
+    json_object_object_add(AlarmJson, "alarm_pattern", json_object_new_int(alarm_now->alarm_pattern));
+    json_object_object_add(AlarmJson, "alarm_sound_id", json_object_new_int(alarm_now->alarm_sound_id));
+
+    json_object_object_add(AlarmJson, "voice_alarm_id", json_object_new_string(alarm_now->voice_alarm_id));
+    json_object_object_add(AlarmJson, "alarm_off_voice_alarm_id", json_object_new_string(alarm_now->alarm_off_voice_alarm_id));
+    json_object_object_add(AlarmJson, "alarm_volume", json_object_new_int(alarm_now->alarm_volume));
+    json_object_object_add(AlarmJson, "volume_stepup_enabled", json_object_new_int(alarm_now->volume_stepup_enabled));
+    json_object_object_add(AlarmJson, "alarm_continue_min", json_object_new_int(alarm_now->alarm_continue_min));
+    json_object_object_add(AlarmJson, "alarm_repeat", json_object_new_int(alarm_now->alarm_repeat));
+    json_object_object_add(AlarmJson, "alarm_continue_min", json_object_new_int(alarm_now->alarm_continue_min));
+    for (i = 0; i < ALARM_ON_DATES_COUNT; i++)
+    {
+        if (alarm_now->alarm_on_dates[i] == 0)
+            break;
+        memset(stringbuf, 0, 20);
+        sprintf(stringbuf, "%d-%02d-%02d",
+                alarm_now->alarm_on_dates[i] / SIMULATE_DAYS_OF_YEAR + 2000,
+                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR / 32,
+                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR % 32);
+        json_object_array_add(AlarmOnDaysJson, json_object_new_string(stringbuf));
+    }
+    json_object_object_add(AlarmJson, "alarm_on_dates", AlarmOnDaysJson);
+    json_object_object_add(AlarmJson, "alarm_on_days_of_week", json_object_new_string(alarm_now->alarm_on_days_of_week));
+
+    json_object_object_add(Json, "alarm", AlarmJson);
+
+    generate_data = json_object_to_json_string(Json);
+    require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
+    generate_data_len = strlen(generate_data);
+    memcpy(json_str, generate_data, generate_data_len);
+
+exit:
+    free_json_obj(&Json);
+    return err;
 }

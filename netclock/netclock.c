@@ -408,10 +408,10 @@ OSStatus ProcessPostJson(char *InputJson)
             memset(netclock_des_g->eland_name, 0, sizeof(netclock_des_g->eland_name));
             sprintf(netclock_des_g->eland_name, "%s", json_object_get_string(val));
         }
-        else if (!strcmp(key, "timezone_offset_sec"))
-        {
-            netclock_des_g->timezone_offset_sec = json_object_get_int(val);
-        }
+        // else if (!strcmp(key, "timezone_offset_sec"))
+        // {
+        //     netclock_des_g->timezone_offset_sec = json_object_get_int(val);
+        // }
         else if (!strcmp(key, "dhcp_enabled"))
         {
             netclock_des_g->dhcp_enabled = json_object_get_int(val);
@@ -441,16 +441,16 @@ OSStatus ProcessPostJson(char *InputJson)
             memset(netclock_des_g->default_gateway, 0, ip_address_Len);
             sprintf(netclock_des_g->default_gateway, "%s", json_object_get_string(val));
         }
-        else if (!strcmp(key, "night_mode_end_time"))
-        {
-            memset(netclock_des_g->night_mode_end_time, 0, sizeof(netclock_des_g->night_mode_end_time));
-            sprintf(netclock_des_g->night_mode_end_time, "%s", json_object_get_string(val));
-        }
-        else if (!strcmp(key, "night_mode_begin_time"))
-        {
-            memset(netclock_des_g->night_mode_begin_time, 0, sizeof(netclock_des_g->night_mode_begin_time));
-            sprintf(netclock_des_g->night_mode_begin_time, "%s", json_object_get_string(val));
-        }
+        // else if (!strcmp(key, "night_mode_end_time"))
+        // {
+        //     memset(netclock_des_g->night_mode_end_time, 0, sizeof(netclock_des_g->night_mode_end_time));
+        //     sprintf(netclock_des_g->night_mode_end_time, "%s", json_object_get_string(val));
+        // }
+        // else if (!strcmp(key, "night_mode_begin_time"))
+        // {
+        //     memset(netclock_des_g->night_mode_begin_time, 0, sizeof(netclock_des_g->night_mode_begin_time));
+        //     sprintf(netclock_des_g->night_mode_begin_time, "%s", json_object_get_string(val));
+        // }
     }
 
     if (device_state->dhcp_enabled == 0)

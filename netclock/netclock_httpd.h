@@ -1,46 +1,47 @@
 /**
- ******************************************************************************
- * @file    netclock_httpd.h
- * @author  QQ DING
- * @version V1.0.0
- * @date    1-September-2015
- * @brief   This header contains function prototypes called by httpd protocol
- *          operations
- ******************************************************************************
- *
- *  The MIT License
- *  Copyright (c) 2016 MXCHIP Inc.
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is furnished
- *  to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
- *  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
- ******************************************************************************
- */
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-03-05 11:21:53
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-03-05 16:09:06
+ * @brief   :
+ ****************************************************************************
+**/
 #ifndef NETCLOCK_HTTPD_H_
 #define NETCLOCK_HTTPD_H_
+
+/* Private include -----------------------------------------------------------*/
 #include "mico.h"
-extern const unsigned char wififail[0xAC9];
-extern const unsigned char wifisetting[0xD5E];
-extern const unsigned char wifisuccess[0x9BC];
 
-extern mico_semaphore_t httpServer_softAP_event_Sem;
+/* Private typedef -----------------------------------------------------------*/
+typedef struct _HTTP_SSIDS_RESULT
+{
+    uint8_t security;
+    char ssid[32];
+    int16_t rssi;
+} __http_ssids_result_t;
 
+typedef struct _HTTP_SSIDS_LIST
+{
+    uint8_t num;
+    __http_ssids_result_t *ssids;
+} __http_ssids_list_t;
+
+/* Private define ------------------------------------------------------------*/
+
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
+extern mico_semaphore_t http_ssid_event_Sem;
+
+/* Private function prototypes -----------------------------------------------*/
 int Eland_httpd_start(void);
-
 int Eland_httpd_stop();
+
+/* Private functions ---------------------------------------------------------*/
 
 #endif

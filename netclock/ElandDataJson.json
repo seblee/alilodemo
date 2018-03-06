@@ -108,3 +108,62 @@ Content-Length: 730
         "night_mode_end_time": "06:00:00"
     }
 }
+{
+    "ssids": [
+        {
+            "secure": 1,
+            "signal": -27,
+            "ssid": "TP-LINK_eland"
+        },
+        {
+            "secure": 1,
+            "signal": -31,
+            "ssid": "TP-LINK_4850"
+        },
+        {
+            "secure": 0,
+            "signal": -57,
+            "ssid": "Guest_2.4GHz"
+        },
+        {
+            "secure": 1,
+            "signal": -59,
+            "ssid": "office1_2.4GHz"
+        },
+        {
+            "secure": 1,
+            "signal": -66,
+            "ssid": "leevai.com"
+        },
+        {
+            "secure": 1,
+            "signal": -70,
+            "ssid": "AOYAGI-CQ"
+        },
+        {
+            "secure": 1,
+            "signal": -77,
+            "ssid": "360?????-C5"
+        },
+        {
+            "secure": 1,
+            "signal": -83,
+            "ssid": "Bet"
+        },
+        {
+            "secure": 1,
+            "signal": -88,
+            "ssid": "TP-LINK_B70502"
+        },
+        {
+            "secure": 1,
+            "signal": -89,
+            "ssid": "ChinaNet-c2kX"
+        },
+        {
+            "secure": 1,
+            "signal": -90,
+            "ssid": "OUYA001"
+        },
+    ]
+}
