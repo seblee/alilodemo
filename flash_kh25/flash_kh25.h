@@ -61,8 +61,6 @@ typedef enum {
 
 extern uint8_t *elandSPIBuffer;
 
-OSStatus start_spi_test_service(void);
-void KH25_TEST_Thread(mico_thread_arg_t arts);
 OSStatus flash_kh25_init(void);
 void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
 //void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
@@ -71,6 +69,6 @@ void flash_kh25_block_erase(uint32_t address);
 void flash_kh25_chip_erase(void);
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
 
-#define flash_kh25_check_string "flash_kh25_check_str2ng"
+#define FLASH_KH25_CHECK_STRING "flash_kh25_check_str2ng"
 
 #endif

@@ -1020,6 +1020,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
         rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
         break;
     case DV03: //07 eland info remove Notification
+        reset_eland_flash_para();
         break;
     case AL00: //08 alarm info request
         break;

@@ -44,7 +44,7 @@
 
 /************************************************************************
  * Application thread stack size */
-#define MICO_DEFAULT_APPLICATION_STACK_SIZE         (2000)
+#define MICO_DEFAULT_APPLICATION_STACK_SIZE (0x2000)
 
 /************************************************************************
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */
@@ -54,7 +54,7 @@
 
 #define EasyLink_TimeOut 60000 /**< EasyLink timeout 60 seconds. */
 
-#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \
+#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \
                                                 Restart easylink after timeout: 20 seconds. */
 
 /************************************************************************

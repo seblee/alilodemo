@@ -128,6 +128,7 @@ OSStatus start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void SendElandStateQueue(Eland_Status_type_t value);
+void reset_eland_flash_para(void);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

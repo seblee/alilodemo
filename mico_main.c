@@ -73,8 +73,9 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    //   start_uart_service();
-    // Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    //  start_uart_service();
+    //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
+
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi on");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);

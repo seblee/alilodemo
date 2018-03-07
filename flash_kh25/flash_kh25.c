@@ -71,15 +71,6 @@ static void flash_kh25_wait_for_WIP(uint32_t time)
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
 }
-/*************************/
-OSStatus start_spi_test_service(void)
-{
-    OSStatus err = kGeneralErr;
-
-    err = flash_kh25_init();
-
-    return err;
-}
 
 void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length)
 {
@@ -328,21 +319,21 @@ OSStatus flash_kh25_init(void)
     err = flash_kh25_check_device();
     require_noerr_string(err, exit, "check kh25 flash failed");
 
-    elandSPIBuffer = malloc(strlen(flash_kh25_check_string) + 2);
-    memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
-    flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
-    if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
+    elandSPIBuffer = malloc(strlen(FLASH_KH25_CHECK_STRING) + 2);
+    memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);
+    flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
+    if (strcmp(FLASH_KH25_CHECK_STRING, (char *)(elandSPIBuffer)) == 0)
         flash_kh25_log("read out:%s", elandSPIBuffer);
     else
     {
         flash_kh25_log("first read:%s", elandSPIBuffer);
-        memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
+        memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);
         flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
-        sprintf((char *)(elandSPIBuffer), "%s", flash_kh25_check_string);
-        flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
-        memset(elandSPIBuffer, 0, strlen(flash_kh25_check_string) + 2);
-        flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(flash_kh25_check_string));
-        if (strcmp(flash_kh25_check_string, (char *)(elandSPIBuffer)) == 0)
+        sprintf((char *)(elandSPIBuffer), "%s", FLASH_KH25_CHECK_STRING);
+        flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
+        memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);
+        flash_kh25_read(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
+        if (strcmp(FLASH_KH25_CHECK_STRING, (char *)(elandSPIBuffer)) == 0)
             flash_kh25_log("check again:%s", elandSPIBuffer);
         else
             err = kGeneralErr;

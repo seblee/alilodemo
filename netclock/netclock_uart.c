@@ -68,7 +68,6 @@ static void Opration_Packet(uint8_t *data);
 
 static void set_eland_mode(_ELAND_MODE_t mode);
 static void set_eland_state(Eland_Status_type_t state);
-static void reset_eland_flash_para(void);
 /* Private functions ---------------------------------------------------------*/
 
 OSStatus start_uart_service(void)
@@ -308,7 +307,7 @@ static void uart_thread_DDE(uint32_t arg)
         case ELAND_DATA_0C: /* SEND ELAND DATA TO MCU */
             ELAND_H0C_Send(inDataBuffer);
             break;
-        case ELAND_RESET_0D: /* SEND ELAND DATA TO MCU */
+        case ELAND_RESET_0D: /* RESET SYSTEM */
             ELAND_H0D_Send(inDataBuffer);
             break;
         default:
@@ -728,7 +727,7 @@ static void ELAND_H0D_Send(uint8_t *Cache)
 
     err = elandUsartSendData(Cache, 4 + (*(Cache + 2)));
     require_noerr(err, exit);
-
+    mico_rtos_delete_thread(NULL);
 exit:
     return;
 }
@@ -915,16 +914,20 @@ static void set_eland_state(Eland_Status_type_t state)
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
 }
 
-static void reset_eland_flash_para(void)
+void reset_eland_flash_para(void)
 {
     OSStatus err = kNoErr;
-    __msg_function_t eland_cmd = ELAND_RESET_0D;
+    uint8_t BUF[20] = {0};
+    __msg_function_t eland_cmd;
     do
     {
         err = mico_rtos_pop_from_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
     } while (err == kNoErr);
+    eland_cmd = ELAND_RESET_0D;
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     err = Netclock_des_recovery();
-    flash_kh25_chip_erase();
+
+    flash_kh25_write_page(BUF, KH25_CHECK_ADDRESS, sizeof(BUF));
+
     MicoSystemReboot();
 }

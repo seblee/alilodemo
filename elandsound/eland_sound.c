@@ -50,7 +50,7 @@ OSStatus start_eland_flash_service(void)
     require_noerr(err, exit);
 
     /*start init eland SPI*/
-    start_spi_test_service();
+    err = flash_kh25_init();
     require_noerr(err, exit);
 
     err = sound_file_sort(&sound_file_list);

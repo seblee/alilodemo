@@ -126,6 +126,7 @@ static void eland_check_ssid(void)
     mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
     if (received.value == Wify_Station_Connect_Successed)
     {
+        SendElandStateQueue(ELAPPConnected);
         app_httpd_log("Wifi parameter is correct");
         device_state->IsActivate = true;
         app_httpd_log("save wifi para,update flash"); //save
@@ -148,13 +149,10 @@ static void eland_check_ssid(void)
             memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
             memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
         }
-
         context->micoSystemConfig.configured = allConfigured;
         mico_system_context_update(context);
-        SendElandStateQueue(ELAPPConnected);
         app_httpd_log("system restart");
-        MicoSystemReboot();
-        //   mico_system_power_perform(context, eState_Software_Reset);
+        mico_system_power_perform(context, eState_Software_Reset);
         mico_rtos_thread_sleep(2);
     }
     SendElandStateQueue(WifyConnectedFailed);
