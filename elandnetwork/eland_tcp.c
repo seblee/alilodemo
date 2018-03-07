@@ -885,7 +885,6 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     char *telegram_data = NULL;
     AlarmOffHistoryData_t *history_data_p = NULL;
     static uint16_t telegram_squence_num = 0;
-    uint8_t i;
 
     memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
 
