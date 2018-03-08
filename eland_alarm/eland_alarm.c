@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-25 16:42:05
+ * @Last Modified time:2018-03-08 14:30:01
  * @brief   :
  ****************************************************************************
 **/
@@ -49,7 +49,8 @@ static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
 static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
 /* Private functions ---------------------------------------------------------*/
-OSStatus Start_Alarm_service(void)
+OSStatus
+Start_Alarm_service(void)
 {
     OSStatus err;
     /**init flash**/
@@ -277,30 +278,31 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
         alarm_mcu_data->alarm_on_days_of_week = 0;
     }
 }
-void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data)
+OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
 {
-    if ((elsv_alarm_data == NULL) || (alarm_mcu_data == NULL))
+    OSStatus err = kGeneralErr
+        __elsv_alarm_data_t alarm_data_cache;
+    if (alarm_mcu_data == NULL)
         return;
-    memset(elsv_alarm_data, 0, sizeof(__elsv_alarm_data_t));
-    memcpy(&elsv_alarm_data->alarm_data_for_mcu, alarm_mcu_data, sizeof(_alarm_mcu_data_t));
-    strcpy(elsv_alarm_data->alarm_id, ALARM_ID_OF_SIMPLE_CLOCK);
-    elsv_alarm_data->alarm_color = 0;
-    sprintf(elsv_alarm_data->alarm_time, "%02d:%02d:%02d", alarm_mcu_data->moment_time.hr, alarm_mcu_data->moment_time.min, alarm_mcu_data->moment_time.sec);
-    elsv_alarm_data->snooze_enabled = 0;
-    elsv_alarm_data->snooze_count = 1;
-    elsv_alarm_data->snooze_interval_min = 0;
-    elsv_alarm_data->alarm_pattern = 1;
-    elsv_alarm_data->alarm_sound_id = 1;
-    elsv_alarm_data->alarm_volume = 80;
-    elsv_alarm_data->alarm_continue_min = 10; //測試用 1分鐘
-    elsv_alarm_data->alarm_repeat = 1;
-
-    elsv_alarm_data->alarm_data_for_eland.moment_second = (uint32_t)alarm_mcu_data->moment_time.hr * 3600 +
-                                                          (uint32_t)alarm_mcu_data->moment_time.min * 60 +
-                                                          (uint32_t)alarm_mcu_data->moment_time.sec;
-    elsv_alarm_data->alarm_data_for_eland.color = alarm_mcu_data->color;
-    elsv_alarm_data->alarm_data_for_eland.snooze_count = 0;
-    elsv_alarm_data->alarm_data_for_eland.alarm_on_days_of_week = 0x7f;
+    memset(&alarm_data_cache, 0, sizeof(__elsv_alarm_data_t));
+    memcpy(&alarm_data_cache.alarm_data_for_mcu, alarm_mcu_data, sizeof(_alarm_mcu_data_t));
+    strcpy(alarm_data_cache.alarm_id, ALARM_ID_OF_SIMPLE_CLOCK);
+    alarm_data_cache.alarm_color = 0;
+    sprintf(alarm_data_cache.alarm_time, "%02d:%02d:%02d", alarm_mcu_data->moment_time.hr, alarm_mcu_data->moment_time.min, alarm_mcu_data->moment_time.sec);
+    alarm_data_cache.snooze_enabled = 0;
+    alarm_data_cache.snooze_count = 1;
+    alarm_data_cache.snooze_interval_min = 0;
+    alarm_data_cache.alarm_pattern = 1;
+    alarm_data_cache.alarm_sound_id = 1;
+    alarm_data_cache.alarm_volume = 80;
+    alarm_data_cache.alarm_continue_min = 10;
+    alarm_data_cache.alarm_repeat = 1;
+    elsv_alarm_data_sort_out(&alarm_data_cache);
+    err = alarm_list_clear(&alarm_list);
+    require_noerr(err, exit);
+    alarm_list_add(&alarm_list, &alarm_data_cache);
+exit:
+    return err;
 }
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 {
@@ -482,6 +484,24 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
     }
     if (AlarmList->alarm_number == 0)
         memset((uint8_t *)(AlarmList->alarm_lib), 0, ALARM_DATA_SIZE);
+
+    err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+    require_noerr(err, exit);
+    alarm_log("unlock AlarmlibMutex");
+exit:
+    set_alarm_state(ALARM_MINUS);
+    return err;
+}
+OSStatus alarm_list_clear(_eland_alarm_list_t *AlarmList)
+{
+    OSStatus err = kNoErr;
+    uint8_t i;
+    alarm_log("lock AlarmlibMutex");
+    err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    require_noerr(err, exit);
+
+    AlarmList->alarm_number = 0;
+    AlarmList->list_refreshed = true;
 
     err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);

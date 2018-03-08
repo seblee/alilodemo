@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-05 16:51:54
+ * @Last Modified time:2018-03-08 10:01:39
  * @brief   :
  ****************************************************************************
 **/
@@ -73,7 +73,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    //  start_uart_service();
+    start_uart_service();
     //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
 
     /* Wait for wlan connection*/

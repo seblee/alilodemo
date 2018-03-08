@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-27 17:59:53
+ * @Last Modified time:2018-03-08 18:07:03
  * @brief   :
  ****************************************************************************
 **/
@@ -787,6 +787,60 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         default:
             break;
         }
+
+        switch (get_eland_mode())
+        {
+        case ELAND_CLOCK_MON:
+            if (Key_Count & KEY_AlarmMode)
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_cmd = ALARM_READ_0A;
+                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+            }
+            break;
+        case ELAND_CLOCK_ALARM:
+            if (Key_Count & KEY_MON)
+            {
+                err = alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            }
+            break;
+        case ELAND_NC:
+        case ELAND_NA:
+            /**stop tcp communication**/
+            mico_rtos_set_semaphore(&TCP_Stop_Sem);
+            if (Key_Count & KEY_MON)
+            {
+                err = alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            } /****alarm mode**********/
+            else if (Key_Count & KEY_AlarmMode)
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_cmd = ALARM_READ_0A;
+                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+            }
+            break;
+        case ELAND_AP:
+            /**stop tcp communication**/
+            micoWlanSuspend();
+            if (Key_Count & KEY_MON)
+            {
+                err = alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            } /****alarm mode**********/
+            else if (Key_Count & KEY_AlarmMode)
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_cmd = ALARM_READ_0A;
+                mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+            }
+            break;
+
+        default:
+            set_eland_mode(ELAND_CLOCK_MON);
+            break;
+        }
     }
     else //eland net clock mode
     {
@@ -845,6 +899,10 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 MicoSystemReboot();
             }
             break;
+        case ELAND_CLOCK_MON:
+        case ELAND_CLOCK_ALARM:
+            MicoSystemReboot();
+            break;
         default:
             set_eland_mode(ELAND_NC);
             break;
@@ -881,9 +939,8 @@ static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec)
 static void MODH_Opration_0AH(uint8_t *usart_rec)
 {
     _alarm_mcu_data_t cache;
-    __elsv_alarm_data_t elsv_alarm_data;
     memcpy(&cache, (usart_rec + 3), sizeof(_alarm_mcu_data_t));
-    elsv_alarm_data_init_MCU(&elsv_alarm_data, &cache);
+    elsv_alarm_data_init_MCU(&cache);
 }
 
 uint16_t get_eland_mode_state(void)
@@ -926,8 +983,6 @@ void reset_eland_flash_para(void)
     eland_cmd = ELAND_RESET_0D;
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     err = Netclock_des_recovery();
-
     flash_kh25_write_page(BUF, KH25_CHECK_ADDRESS, sizeof(BUF));
-
     MicoSystemReboot();
 }

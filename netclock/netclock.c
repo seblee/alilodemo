@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-25 14:53:38
+ * @Last Modified time:2018-03-08 11:11:15
  * @brief   :
  ****************************************************************************
 **/
@@ -102,7 +102,8 @@ OSStatus start_eland_service(void)
     OSStatus err = kGeneralErr;
 
     require_string(get_wifi_status() == true, exit, "wifi is not connect");
-
+    err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
+    require_noerr(err, exit);
     /*初始化互斥信号量*/
     err = mico_rtos_init_mutex(&http_send_setting_mutex);
     require_noerr(err, exit);

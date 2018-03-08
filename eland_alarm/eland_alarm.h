@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-04 17:47:03
+ * @Last Modified time:2018-03-08 14:12:43
  * @brief   :
  ****************************************************************************
 **/
@@ -161,6 +161,7 @@ extern _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
+OSStatus alarm_list_clear(_eland_alarm_list_t *AlarmList);
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
 OSStatus Start_Alarm_service(void);
 void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data);
