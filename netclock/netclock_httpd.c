@@ -155,15 +155,15 @@ static void eland_check_ssid(void)
         mico_system_power_perform(context, eState_Software_Reset);
         mico_rtos_thread_sleep(2);
     }
-    SendElandStateQueue(WifyConnectedFailed);
-    //Eland_httpd_stop(); //stop http server mode
+    else
+    {
+        SendElandStateQueue(WifyConnectedFailed);
+        //Eland_httpd_stop(); //stop http server mode
+        app_httpd_log("connect wifi failed");
+        mico_system_power_perform(context, eState_Software_Reset);
+        //Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    }
     flagHttpdServerAP = 1;
-    // else
-    // {
-    //     app_httpd_log("connect wifi failed");
-    //     Start_wifi_Station_SoftSP_Thread(Soft_AP);
-    //     SendElandStateQueue(ElandWifyConnectedFailed);
-    // }
 }
 /*****************Get_Request******************************************/
 static int web_send_Get_Request(httpd_request_t *req)

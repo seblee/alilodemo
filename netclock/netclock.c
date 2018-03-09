@@ -102,16 +102,10 @@ OSStatus start_eland_service(void)
     OSStatus err = kGeneralErr;
 
     require_string(get_wifi_status() == true, exit, "wifi is not connect");
-    err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
-    require_noerr(err, exit);
+    // err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
+    // require_noerr(err, exit);
     /*初始化互斥信号量*/
     err = mico_rtos_init_mutex(&http_send_setting_mutex);
-    require_noerr(err, exit);
-
-    Eland_log("#####https disconnect#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-
-    //3.eland test  下載音頻到flash
-    //err = alarm_sound_download(); //暫時做測試用
     require_noerr(err, exit);
 
 exit:
@@ -598,6 +592,8 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
     else if (sound_type == SOUND_FILE_OID)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+    else if (sound_type == SOUND_FILE_DEFAULT)
+        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK));
     else
         goto exit;
     HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;

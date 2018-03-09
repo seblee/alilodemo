@@ -70,7 +70,7 @@ Start_Alarm_service(void)
     require_noerr(err, exit);
     alarm_list.alarm_nearest = NULL;
     /*need to ergonic alarm*/
-    err = mico_rtos_init_semaphore(&alarm_update, 1);
+    err = mico_rtos_init_semaphore(&alarm_update, 5);
     require_noerr(err, exit);
     err = mico_rtos_init_semaphore(&alarm_sound_scan_sem, 1);
     require_noerr(err, exit);
@@ -110,7 +110,7 @@ void Alarm_Manager(uint32_t arg)
     }
     while (1)
     {
-        err = mico_rtos_get_semaphore(&alarm_update, 0);
+        err = mico_rtos_get_semaphore(&alarm_update, 500);
         if ((alarm_list.list_refreshed) ||
             (alarm_list.state.alarm_stoped == true) ||
             (err == kNoErr))
@@ -144,7 +144,6 @@ void Alarm_Manager(uint32_t arg)
             }
         }
         /* check current time per second */
-        mico_rtos_thread_sleep(1);
     }
     mico_rtos_delete_thread(NULL);
 }
@@ -280,10 +279,10 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
 }
 OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
 {
-    OSStatus err = kGeneralErr
-        __elsv_alarm_data_t alarm_data_cache;
+    OSStatus err = kGeneralErr;
+    __elsv_alarm_data_t alarm_data_cache;
     if (alarm_mcu_data == NULL)
-        return;
+        goto exit;
     memset(&alarm_data_cache, 0, sizeof(__elsv_alarm_data_t));
     memcpy(&alarm_data_cache.alarm_data_for_mcu, alarm_mcu_data, sizeof(_alarm_mcu_data_t));
     strcpy(alarm_data_cache.alarm_id, ALARM_ID_OF_SIMPLE_CLOCK);
@@ -495,7 +494,6 @@ exit:
 OSStatus alarm_list_clear(_eland_alarm_list_t *AlarmList)
 {
     OSStatus err = kNoErr;
-    uint8_t i;
     alarm_log("lock AlarmlibMutex");
     err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);

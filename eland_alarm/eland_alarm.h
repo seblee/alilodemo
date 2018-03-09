@@ -164,7 +164,7 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
 OSStatus alarm_list_clear(_eland_alarm_list_t *AlarmList);
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
 OSStatus Start_Alarm_service(void);
-void elsv_alarm_data_init_MCU(__elsv_alarm_data_t *elsv_alarm_data, _alarm_mcu_data_t *alarm_mcu_data);
+OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data);
 void alarm_print(__elsv_alarm_data_t *alarm_data);
 _alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial);
 uint8_t get_display_alarm_serial(void);

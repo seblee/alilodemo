@@ -556,28 +556,11 @@ cycle_loop:
         }
     }
 
-    if (tcp_HC_flag)
-    {
-        rc = eland_IF_health_check(&Eland_Client);
-        if (TCP_SUCCESS != rc)
-        {
-            mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
-        }
-        else
-            tcp_HC_flag = false;
-    }
-
-    rc = eland_IF_update_alarm(&Eland_Client);
+    rc = eland_IF_health_check(&Eland_Client);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-        {
-            tcp_write_flag[2]++;
-            goto exit;
-        }
     }
 
     rc = eland_IF_update_holiday(&Eland_Client);
@@ -588,6 +571,18 @@ cycle_loop:
         if (rc == NETWORK_SSL_READ_ERROR)
         {
             tcp_write_flag[3]++;
+            goto exit;
+        }
+    }
+
+    rc = eland_IF_update_alarm(&Eland_Client);
+    if (TCP_SUCCESS != rc)
+    {
+        mico_thread_sleep(1);
+        elan_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
+        {
+            tcp_write_flag[2]++;
             goto exit;
         }
     }
@@ -1081,7 +1076,6 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
             sprintf(time_str_cache, "%s", json_object_get_string(val));
             sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
             iMsecond = (mico_utc_time_t)GetSecondTime(&datetimeTemp);
-            //  iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
             time_record(SET_ELSV_RECE_TIME, &iMsecond);
         }
         else if (!strcmp(key, "send_at"))
@@ -1089,7 +1083,6 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
             sprintf(time_str_cache, "%s", json_object_get_string(val));
             sscanf(time_str_cache, "%04hd-%02hd-%02hd %02hd:%02hd:%02hd.%03hd", &datetimeTemp.iYear, &datetimeTemp.iMon, &datetimeTemp.iDay, &datetimeTemp.iHour, &datetimeTemp.iMin, &datetimeTemp.iSec, &datetimeTemp.iMsec);
             iMsecond = (mico_utc_time_t)GetSecondTime(&datetimeTemp);
-            //   iMsecond = iMsecond * 1000 + datetimeTemp.iMsec;
             time_record(SET_ELSV_SEND_TIME, &iMsecond);
         }
     }

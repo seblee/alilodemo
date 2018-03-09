@@ -772,7 +772,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         }
     }
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/
-    if (Key_Count & (KEY_MON | KEY_AlarmMode))
+    if ((Key_Count & KEY_MON) | (Key_Count & KEY_AlarmMode))
     {
         switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
         {
@@ -801,7 +801,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         case ELAND_CLOCK_ALARM:
             if (Key_Count & KEY_MON)
             {
-                err = alarm_list_clear(&alarm_list);
+                alarm_list_clear(&alarm_list);
                 set_eland_mode(ELAND_CLOCK_MON);
             }
             break;
@@ -809,9 +809,10 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         case ELAND_NA:
             /**stop tcp communication**/
             mico_rtos_set_semaphore(&TCP_Stop_Sem);
+            set_eland_state(ElandBegin);
             if (Key_Count & KEY_MON)
             {
-                err = alarm_list_clear(&alarm_list);
+                alarm_list_clear(&alarm_list);
                 set_eland_mode(ELAND_CLOCK_MON);
             } /****alarm mode**********/
             else if (Key_Count & KEY_AlarmMode)
@@ -826,7 +827,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             micoWlanSuspend();
             if (Key_Count & KEY_MON)
             {
-                err = alarm_list_clear(&alarm_list);
+                alarm_list_clear(&alarm_list);
                 set_eland_mode(ELAND_CLOCK_MON);
             } /****alarm mode**********/
             else if (Key_Count & KEY_AlarmMode)
@@ -901,6 +902,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             break;
         case ELAND_CLOCK_MON:
         case ELAND_CLOCK_ALARM:
+            alarm_list_clear(&alarm_list);
             MicoSystemReboot();
             break;
         default:
@@ -946,7 +948,7 @@ static void MODH_Opration_0AH(uint8_t *usart_rec)
 uint16_t get_eland_mode_state(void)
 {
     uint16_t Cache = 0;
-    Cache = eland_mode_state.eland_mode << 16;
+    Cache = eland_mode_state.eland_mode << 8;
     Cache |= eland_mode_state.eland_status;
     return Cache;
 }
