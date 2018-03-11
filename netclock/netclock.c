@@ -100,10 +100,15 @@ exit:
 OSStatus start_eland_service(void)
 {
     OSStatus err = kGeneralErr;
-
+    __elsv_alarm_data_t alarm_simple;
     require_string(get_wifi_status() == true, exit, "wifi is not connect");
-    // err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
-    // require_noerr(err, exit);
+
+    err = SOUND_CHECK_DEFAULT_FILE();
+    if (err != kNoErr)
+    {
+        err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
+        require_noerr(err, exit);
+    }
     /*初始化互斥信号量*/
     err = mico_rtos_init_mutex(&http_send_setting_mutex);
     require_noerr(err, exit);
@@ -656,7 +661,6 @@ exit:
 
     return err;
 }
-
 OSStatus Eland_Rtc_Init(void)
 {
     OSStatus status = kNoErr;
@@ -668,7 +672,7 @@ OSStatus Eland_Rtc_Init(void)
 
     cur_time.year = 18; //设置时间
     cur_time.month = 1;
-    cur_time.date = 18;
+    cur_time.date = 21;
     cur_time.weekday = 4;
     cur_time.hr = 14;
     cur_time.min = 29;
@@ -690,5 +694,6 @@ OSStatus Eland_Rtc_Init(void)
     Eland_log("Current time: %.26s", (char *)&iso8601_time);
     mico_time_get_utc_time(&utc_time);
     Eland_log("utc_time:%ld", utc_time);
+
     return status;
 }

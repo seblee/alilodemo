@@ -896,19 +896,23 @@ _alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial)
 static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
 {
     DATE_TIME_t date_time;
-    mico_rtc_time_t rtc_time = {0};
     mico_utc_time_t utc_time = 0;
     struct tm *currentTime;
+    uint8_t week_day;
     int8_t i;
-    MicoRtcGetTime(&rtc_time);
-    date_time.iYear = 2000 + rtc_time.year;
-    date_time.iMon = (int16_t)rtc_time.month;
-    date_time.iDay = (int16_t)rtc_time.date;
+
+    utc_time = GET_current_second();
+    currentTime = localtime((const time_t *)&utc_time);
+
+    date_time.iYear = 1900 + currentTime->tm_year;
+    date_time.iMon = (int16_t)(currentTime->tm_mon + 1);
+    date_time.iDay = (int16_t)currentTime->tm_mday;
     date_time.iHour = (int16_t)alarm->alarm_data_for_mcu.moment_time.hr;
     date_time.iMin = (int16_t)alarm->alarm_data_for_mcu.moment_time.min;
     date_time.iSec = (int16_t)alarm->alarm_data_for_mcu.moment_time.sec;
     date_time.iMsec = 0;
-    utc_time = GET_current_second();
+        week_day = currentTime->tm_wday+1;
+
     switch (alarm->alarm_repeat)
     {
     case 0: //只在新数据导入时候计算一次
@@ -923,25 +927,25 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
             alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
         break;
     case 2:
-        if (rtc_time.weekday < 2)
+        if (week_day < 2)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + SECOND_ONE_DAY;
-        else if (rtc_time.weekday < 7)
+        else if (week_day < 7)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         else
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + SECOND_ONE_DAY + SECOND_ONE_DAY;
         break;
     case 3:
-        if (rtc_time.weekday < 2)
+        if (week_day < 2)
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-        else if (rtc_time.weekday < 7)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - rtc_time.weekday) * SECOND_ONE_DAY;
+        else if (week_day < 7)
+            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - week_day) * SECOND_ONE_DAY;
         else
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         break;
     case 4:
         for (i = 0; i < 7; i++)
         {
-            if (alarm->alarm_data_for_mcu.alarm_on_days_of_week & (1 << ((rtc_time.weekday + i - 1) % 7)))
+            if (alarm->alarm_data_for_mcu.alarm_on_days_of_week & (1 << ((week_day + i - 1) % 7)))
             {
                 alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * SECOND_ONE_DAY);
                 if (alarm->alarm_data_for_eland.moment_second < utc_time)
@@ -982,7 +986,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
     alarm->alarm_data_for_mcu.moment_time.min = currentTime->tm_min;
     alarm->alarm_data_for_mcu.moment_time.hr = currentTime->tm_hour;
     alarm->alarm_data_for_mcu.moment_time.date = currentTime->tm_mday;
-    alarm->alarm_data_for_mcu.moment_time.weekday = currentTime->tm_wday;
+        alarm->alarm_data_for_mcu.moment_time.weekday = currentTime->tm_wday+1;
     alarm->alarm_data_for_mcu.moment_time.month = currentTime->tm_mon + 1;
     alarm->alarm_data_for_mcu.moment_time.year = (currentTime->tm_year + 1900) % 100;
 

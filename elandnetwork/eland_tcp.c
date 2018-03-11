@@ -555,13 +555,13 @@ cycle_loop:
             goto exit;
         }
     }
-
     rc = eland_IF_health_check(&Eland_Client);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
     }
+    mico_rtos_thread_msleep(1000);
 
     rc = eland_IF_update_holiday(&Eland_Client);
     if (TCP_SUCCESS != rc)
