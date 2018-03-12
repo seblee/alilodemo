@@ -440,7 +440,7 @@ static void Eland_H03_Send(uint8_t *Cache)
     cur_time.min = currentTime->tm_min;
     cur_time.hr = currentTime->tm_hour;
     cur_time.date = currentTime->tm_mday;
-    cur_time.weekday = currentTime->tm_wday;
+    cur_time.weekday = currentTime->tm_wday + 1;
     cur_time.month = currentTime->tm_mon + 1;
     cur_time.year = (currentTime->tm_year + 1900) % 100;
 

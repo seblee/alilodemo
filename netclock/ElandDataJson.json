@@ -1,6 +1,7 @@
 {
     "ssid": "TP-LINK_4850",
     "password": "cq68794850",
+    "eland_id": 12,
     "device": {
         "eland_id": "0123456789ABCDEF",
         "user_id": "00000001",
@@ -28,8 +29,9 @@
 //ota_op start
 //2017年12月18日17: 11: 34
 {
-    "ssid": "TP-LINK_eland",
-    "password": "eland1234",
+    "ssid": "TP-LINK_4850",
+    "password": "cq68794850",
+    "eland_id": 15,
     "device": {
         "eland_id": 5,
         "user_id": "e5c18be0-82f2-44cb-abd5-2550323decf1",
@@ -53,28 +55,18 @@
 Host: 192.168.0.1
 Content-Type: application/json; charset=utf-8
 Content-Length: 730
-
 {
-    "user_id": [
-        "20dfd19c-61b0-4dc9-ab1a-d451027c4ede"
-    ],
-    "alarm_ids": [
-        "6a388330-fbe1-4691-8aaf-415e3dde23a6",
-        "bb4856bc-615b-4aa8-9463-5ce05c21deb5",
-        "e5c18be0-82f2-44cb-abd5-2550323decf1"
-    ]
-}
-{
-    "ssid": "TP-LINK_eland",
-    "password": "eland1234",
+    "ssid": "TP-LINK_4850",
+    "password": "cq68794850",
+    "eland_id": 15,
     "device": {
-        "eland_id": 5,
+        "eland_id": 15,
         "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
-        "eland_name": "Sebleetest",
-        "timezone_offset_sec": 28800,
-        "serial_number": "AM1A8000005",
-        "firmware_version": "01.02",
-        "mac_address": "B0:F8:93:19:22:BB",
+        "eland_name": "15",
+        "timezone_offset_sec": 0,
+        "serial_number": "AM1A8000012",
+        "firmware_version": "01.04",
+        "mac_address": "B0:F8:93:15:25:B2",
         "dhcp_enabled": 1,
         "ip_address": "",
         "subnet_mask": "",
@@ -86,84 +78,4 @@ Content-Length: 730
         "night_mode_begin_time": "22:00:00",
         "night_mode_end_time": "06:00:00"
     }
-}
-{
-    "device": {
-        "eland_id": 5,
-        "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
-        "eland_name": "",
-        "timezone_offset_sec": 28800,
-        "serial_number": "AM1A8000005",
-        "firmware_version": "01.02",
-        "mac_address": "00:00:00:00:00:00",
-        "dhcp_enabled": 0,
-        "ip_address": "192.168.0.101",
-        "subnet_mask": "255.255.255.0",
-        "default_gateway": "192.168.0.1",
-        "time_display_format": 1,
-        "brightness_normal": 80,
-        "brightness_night": 20,
-        "night_mode_enabled": 0,
-        "night_mode_begin_time": "22:00:00",
-        "night_mode_end_time": "06:00:00"
-    }
-}
-{
-    "ssids": [
-        {
-            "secure": 1,
-            "signal": -27,
-            "ssid": "TP-LINK_eland"
-        },
-        {
-            "secure": 1,
-            "signal": -31,
-            "ssid": "TP-LINK_4850"
-        },
-        {
-            "secure": 0,
-            "signal": -57,
-            "ssid": "Guest_2.4GHz"
-        },
-        {
-            "secure": 1,
-            "signal": -59,
-            "ssid": "office1_2.4GHz"
-        },
-        {
-            "secure": 1,
-            "signal": -66,
-            "ssid": "leevai.com"
-        },
-        {
-            "secure": 1,
-            "signal": -70,
-            "ssid": "AOYAGI-CQ"
-        },
-        {
-            "secure": 1,
-            "signal": -77,
-            "ssid": "360?????-C5"
-        },
-        {
-            "secure": 1,
-            "signal": -83,
-            "ssid": "Bet"
-        },
-        {
-            "secure": 1,
-            "signal": -88,
-            "ssid": "TP-LINK_B70502"
-        },
-        {
-            "secure": 1,
-            "signal": -89,
-            "ssid": "ChinaNet-c2kX"
-        },
-        {
-            "secure": 1,
-            "signal": -90,
-            "ssid": "OUYA001"
-        },
-    ]
 }

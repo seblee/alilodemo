@@ -305,6 +305,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     {
         sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: 0\r\n\r\n"); //增加Content-Length
     }
+
 HTTP_SSL_START:
     if (client_ssl)
     {
@@ -321,16 +322,16 @@ HTTP_SSL_START:
     if (err != kNoErr)
     {
         client_log("dns error!!! doamin:%s", eland_host);
-        mico_thread_msleep(200);
-        goto HTTP_SSL_START;
+        err = kGeneralErr;
+        goto exit;
     }
     /*HTTPHeaderCreateWithCallback set some callback functions */
     httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData, onClearData, &context);
     if (httpHeader == NULL)
     {
-        mico_thread_msleep(200);
         client_log("HTTPHeaderCreateWithCallback() error");
-        goto HTTP_SSL_START;
+        err = kGeneralErr;
+        goto exit;
     }
     SocketClose(&http_fd);
     http_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -356,11 +357,10 @@ HTTP_SSL_START:
     require_noerr_string(err, exit, "connect https server failed");
     // 設置 證書
     ssl_set_client_cert(certificate, private_key);
-    //ssl_version_set(TLS_V1_2_MODE);    //设置SSL版本
     ssl_set_client_version(TLS_V1_2_MODE);
     client_log("start ssl_connect");
-    //client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
-    client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
+    client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    // client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
 
     /* Send HTTP Request */

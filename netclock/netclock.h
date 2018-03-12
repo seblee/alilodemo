@@ -24,11 +24,10 @@
 //eland sound down load
 #define ELAND_DOWN_LOAD_METHOD HTTP_GET
 
-#define ELAND_DOWN_LOAD_URI ("/api/download.php?vid=01_128kbps")
-
 #define ELAND_SOUND_SID_URI ("/api/sound/download?eid=%ld&sid=%ld")
 #define ELAND_SOUND_VID_URI ("/api/sound/download?eid=%ld&vid=%s")
 #define ELAND_SOUND_OID_URI ("/api/sound/download?eid=%ld&oid=%s")
+#define ELAND_SOUND_DEFAULT_URI ("/api/sound/default")
 
 //eland 通信情報取得
 #define ELAND_COMMUNICATION_INFO_UPDATE_METHOD HTTP_GET

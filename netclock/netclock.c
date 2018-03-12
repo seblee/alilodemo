@@ -100,16 +100,7 @@ exit:
 OSStatus start_eland_service(void)
 {
     OSStatus err = kGeneralErr;
-    __elsv_alarm_data_t alarm_simple;
-    require_string(get_wifi_status() == true, exit, "wifi is not connect");
 
-    err = SOUND_CHECK_DEFAULT_FILE();
-    if (err != kNoErr)
-    {
-        err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
-        require_noerr(err, exit);
-    }
-    /*初始化互斥信号量*/
     err = mico_rtos_init_mutex(&http_send_setting_mutex);
     require_noerr(err, exit);
 
@@ -130,7 +121,7 @@ start_Check:
         if ((device_state->eland_id == 0) || (device_state->eland_id > 999999))
         {
             Eland_log("eland_id wrong");
-            err = Netclock_des_recovery();
+            device_state->IsAlreadySet = 0;
             goto start_Check;
         }
         if (strlen(device_state->serial_number) == 0)
@@ -191,6 +182,9 @@ start_Check:
     strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
     strncpy(netclock_des_g->night_mode_end_time, "06:00:00", Time_Format_Len);
     netclock_des_g->health_check_moment = (netclock_des_g->eland_id) % 100 % 60;
+
+    Eland_log("eland_id %ld", device_state->eland_id);
+
     return kNoErr;
 exit:
     err = Netclock_des_recovery();
@@ -217,7 +211,7 @@ OSStatus Netclock_des_recovery(void)
     /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
     device_state->IsAlreadySet = true;
-    device_state->eland_id = 12; // device_temp.eland_id;
+    device_state->eland_id = device_temp.eland_id;
     sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
     // memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
@@ -381,6 +375,13 @@ OSStatus ProcessPostJson(char *InputJson)
                 goto exit;
             }
         }
+        else if (!strcmp(key1, "eland_id"))
+        {
+            device_state->eland_id = json_object_get_int(val1);
+            memset(device_state->serial_number, 0, serial_number_len);
+            sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
+            needupdateflash = true;
+        }
     }
     Eland_log("process device");
     //解析Elanddata
@@ -513,7 +514,7 @@ OSStatus eland_communication_info_get(void)
     json_object *ReceivedJsonCache = NULL, *ServerJsonCache = NULL;
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-DEVICE_INFO_GET_START:
+
     err = eland_http_request(ELAND_COMMUNICATION_INFO_UPDATE_METHOD, //請求方式
                              ELAND_COMMUNICATION_INFO_GET,           //請求類型
                              ELAND_COMMUNICATION_INFO_UPDATE_URI,    //URI參數
@@ -570,10 +571,9 @@ exit:
     if (err != kNoErr)
     {
         Eland_log("<===== device_sync_status error <======");
-        mico_thread_msleep(200);
-        goto DEVICE_INFO_GET_START;
     }
-    SendElandStateQueue(HTTP_Get_HOST_INFO);
+    else
+        SendElandStateQueue(HTTP_Get_HOST_INFO);
     return err;
 }
 
@@ -621,7 +621,8 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         sprintf(uri_str, ELAND_SOUND_VID_URI, netclock_des_g->eland_id, alarm->voice_alarm_id);
     else if (sound_type == SOUND_FILE_OID)
         sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, alarm->alarm_off_voice_alarm_id);
-
+    else if (sound_type == SOUND_FILE_DEFAULT)
+        sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
     Eland_log("=====> alarm_sound_download send ======>");
 
     err = eland_http_request(ELAND_DOWN_LOAD_METHOD, //請求方式
