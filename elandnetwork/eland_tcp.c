@@ -83,6 +83,8 @@ static TCP_Error_t TCP_Operate(const char *buff);
 static TCP_Error_t TCP_Operate_HC01(char *buf);
 static TCP_Error_t TCP_Operate_DV01(char *buf);
 static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd);
+static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list);
+
 static void time_record(TIME_RECORD_T_t type, mico_utc_time_t *value);
 static void eland_set_time(void);
 /* Private functions ---------------------------------------------------------*/
@@ -570,7 +572,7 @@ cycle_loop:
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
     }
-    mico_rtos_thread_msleep(1000);
+    // mico_rtos_thread_msleep(1000);
 
     rc = eland_IF_update_holiday(&Eland_Client);
     if (TCP_SUCCESS != rc)
@@ -645,7 +647,7 @@ little_cycle_loop:
         }
         mico_rtos_delete_thread(NULL);
     }
-    //   mico_rtos_delete_thread(NULL);
+
     goto little_cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
@@ -1040,8 +1042,9 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case HD00: //13 holiday data request
         break;
     case HD01: //14 holiday data response
-        break;
     case HD02: //15 holiday data change notice
+        rc = TCP_Operate_HD0X((char *)(buff + sizeof(_TELEGRAM_t)), &holiday_list);
+        elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case HT00: //16 alarm on notification
         break;
@@ -1242,7 +1245,6 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
             alarm = json_object_array_get_idx(alarm_array, i);
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
             elan_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
-            //  elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             elsv_alarm_data_sort_out(&alarm_data_cache);
             alarm_list_add(&alarm_list, &alarm_data_cache);
         }
@@ -1405,6 +1407,60 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
         free_json_obj(&alarm_on_dates);
     }
 }
+static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
+{
+    json_object *ReceivedJsonCache = NULL, *holiday_array = NULL;
+    char holiday_dates_buffer[ALARM_OFF_DATES_LEN + 1]; //holiday buf
+    int year, month, day;
+    TCP_Error_t rc = TCP_SUCCESS;
+    uint8_t list_len = 0, i;
+    if (*buf != '{')
+    {
+        elan_tcp_log("error:received err json format data");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    ReceivedJsonCache = json_tokener_parse((const char *)(buf));
+    if (ReceivedJsonCache == NULL)
+    {
+        elan_tcp_log("json_tokener_parse error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    holiday_array = json_object_object_get(ReceivedJsonCache, "holidays");
+    if ((holiday_array == NULL) || ((json_object_get_object(holiday_array)->head) == NULL))
+    {
+        elan_tcp_log("get holiday_array error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    mico_rtos_lock_mutex(&list->holidaymutex);
+    if (list->number > 0)
+    {
+        list->number = 0;
+        free(list->list);
+        list->list = NULL;
+    }
+    list_len = json_object_array_length(holiday_array);
+    list->list = calloc(list_len, sizeof(uint16_t));
+    elan_tcp_log("holiday_array list_len:%d", list_len);
+    for (i = 0; i < list_len; i++)
+    {
+        memset(holiday_dates_buffer, 0, ALARM_OFF_DATES_LEN + 1);
+        sprintf(holiday_dates_buffer, "%s",
+                json_object_get_string(json_object_array_get_idx(holiday_array, i)));
+        sscanf((const char *)holiday_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
+        *(list->list + i) = (year % 100) * SIMULATE_DAYS_OF_YEAR +
+                            month * SIMULATE_DAYS_OF_MONTH + day;
+        //  elan_tcp_log("holiday%d:%04d-%02d-%02d", i, year, month, day);
+    }
+    list->number = list_len;
+    mico_rtos_unlock_mutex(&list->holidaymutex);
+exit:
+    free_json_obj(&ReceivedJsonCache);
+    return rc;
+}
+
 mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time)
 {
     int16_t iYear, iMon, iDay, iHour, iMin, iSec; //, iMsec;

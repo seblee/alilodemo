@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-08 14:12:43
+ * @Last Modified time:2018-03-15 09:58:38
  * @brief   :
  ****************************************************************************
 **/
@@ -28,7 +28,7 @@
 #define SECOND_ONE_HOUR 3600
 #define SECOND_ONE_MINUTE 60
 
-#define SIMULATE_DAYS_OF_YEAR 400
+#define SIMULATE_DAYS_OF_YEAR 410
 #define SIMULATE_DAYS_OF_MONTH 32
 /* Private typedef -----------------------------------------------------------*/
 typedef struct
@@ -75,6 +75,13 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     _alarm_mcu_data_t alarm_data_for_mcu;
 } __elsv_alarm_data_t;
 
+typedef struct _ELSV_HOLIDAY //闹钟情報结构体
+{
+    uint8_t number;
+    uint16_t *list;
+    mico_mutex_t holidaymutex;
+} _elsv_holiday_t;
+
 typedef enum {
     ALARM_IDEL,
     ALARM_ADD,
@@ -83,6 +90,7 @@ typedef enum {
     ALARM_ING,
     ALARM_SNOOZ_STOP,
     ALARM_STOP,
+    ALARM_JUMP,
 } _alarm_list_state_t;
 
 typedef struct
@@ -138,6 +146,7 @@ typedef struct
 typedef struct
 {
     bool list_refreshed;
+    bool alarm_jump_flag;
     uint8_t alarm_number;
     mico_mutex_t AlarmlibMutex;
     _alarm_state_t state;
@@ -154,8 +163,10 @@ typedef struct
 
 /* Private variables ---------------------------------------------------------*/
 extern _eland_alarm_list_t alarm_list;
+extern _elsv_holiday_t holiday_list;
 extern mico_semaphore_t alarm_update;
 extern mico_semaphore_t alarm_sound_scan_sem;
+extern mico_semaphore_t alarm_jump_sem;
 
 extern _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
@@ -175,6 +186,8 @@ uint8_t get_waiting_alarm_serial(void);
 void set_waiting_alarm_serial(uint8_t now_serial);
 _alarm_list_state_t get_alarm_state(void);
 void set_alarm_state(_alarm_list_state_t state);
+uint8_t get_alarm_jump_flag(void);
+
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
 
 AlarmOffHistoryData_t *get_alarm_history_data(void);
@@ -183,6 +196,8 @@ void set_alarm_history_data_state(HistoryDatastate_t value);
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
 void alarm_sound_scan(void);
 OSStatus Alarm_build_JSON(char *json_str);
+
+void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

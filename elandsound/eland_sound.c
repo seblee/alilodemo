@@ -242,7 +242,7 @@ OSStatus SOUND_FILE_CLEAR(void)
         flash_kh25_sector_erase((uint32_t)sector_count * KH25L8006_BLOCK_SIZE);
     }
 
-exit:
+
     mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
 }
