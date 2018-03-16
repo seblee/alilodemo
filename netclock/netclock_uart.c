@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-08 18:07:03
+ * @Last Modified time:2018-03-15 09:59:10
  * @brief   :
  ****************************************************************************
 **/
@@ -588,14 +588,15 @@ static void ELAND_H08_Send(uint8_t *Cache)
     mode_state_temp = get_eland_mode_state();
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_LINK_STATE_08;
-    *(Cache + 2) = 3;
+    *(Cache + 2) = 4;
     *(Cache + 3) = rssi_level;
     *(Cache + 4) = (uint8_t)(mode_state_temp >> 8);
     *(Cache + 5) = (uint8_t)(mode_state_temp & 0xff);
-    *(Cache + 6) = Uart_Packet_Trail;
+    *(Cache + 6) = get_alarm_jump_flag();
+    *(Cache + 7) = Uart_Packet_Trail;
 start_send:
     sended_times--;
-    err = elandUsartSendData(Cache, 7);
+    err = elandUsartSendData(Cache, 8);
     require_noerr(err, exit);
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);
@@ -740,6 +741,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     iso8601_time_t iso8601_time;
     uint8_t cache = 0;
     static uint16_t time_delay_counter;
+    _alarm_list_state_t alarm_status;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
@@ -754,9 +756,10 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         reset_eland_flash_para();
 
     /*alarm control*/
-    if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
+    alarm_status = get_alarm_state();
+    if (alarm_status == ALARM_ING)
     {
-        if (get_alarm_state() == ALARM_ING)
+        if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
         {
             mico_time_get_iso8601_time(&iso8601_time);
             if (Key_Count_Trg & KEY_Snooze)
@@ -769,6 +772,18 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 set_alarm_state(ALARM_STOP);
                 alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             }
+        }
+    }
+    else
+    {
+        if (Key_Restain_Trg & KEY_Alarm) //alarm jump
+        {
+            if (alarm_status == ALARM_SNOOZ_STOP)
+            {
+                set_alarm_state(ALARM_JUMP);
+                //  alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
+            }
+            mico_rtos_set_semaphore(&alarm_jump_sem);
         }
     }
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/

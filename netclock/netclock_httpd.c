@@ -151,18 +151,16 @@ static void eland_check_ssid(void)
         }
         context->micoSystemConfig.configured = allConfigured;
         mico_system_context_update(context);
-        app_httpd_log("system restart");
-        mico_system_power_perform(context, eState_Software_Reset);
-        mico_rtos_thread_sleep(2);
     }
     else
     {
         SendElandStateQueue(WifyConnectedFailed);
         //Eland_httpd_stop(); //stop http server mode
         app_httpd_log("connect wifi failed");
-        mico_system_power_perform(context, eState_Software_Reset);
         //Start_wifi_Station_SoftSP_Thread(Soft_AP);
     }
+    app_httpd_log("system restart");
+    mico_system_power_perform(context, eState_Software_Reset);
     flagHttpdServerAP = 1;
 }
 /*****************Get_Request******************************************/
@@ -271,6 +269,8 @@ static int web_send_Post_Request(httpd_request_t *req)
     app_httpd_log("POST OVER");
 exit:
     free(buf);
+    app_httpd_log("system restart");
+    mico_system_power_perform(mico_system_context_get(), eState_Software_Reset);
     return err;
 }
 /*****************web_send_Get_ssids_Request******************************************/

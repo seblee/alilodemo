@@ -306,7 +306,6 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
         sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: 0\r\n\r\n"); //增加Content-Length
     }
 
-HTTP_SSL_START:
     if (client_ssl)
     {
         ssl_close(client_ssl);
@@ -317,7 +316,7 @@ HTTP_SSL_START:
         SocketClose(&http_fd);
         http_fd = -1;
     }
-    client_log("start dns annlysis, domain:%s", eland_host);
+    client_log("start dns analysis, domain:%s", eland_host);
     err = usergethostbyname(eland_host, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
     {

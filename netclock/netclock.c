@@ -145,8 +145,12 @@ start_Check:
             mico_Context_t *context = NULL;
             Eland_log("Is not Activate clear the wifi para");
             context = mico_system_context_get();
-            context->micoSystemConfig.configured = unConfigured;
-            mico_system_context_update(context);
+            if (context->micoSystemConfig.configured != unConfigured)
+            {
+                Eland_log("Is not Activate clear the wifi para");
+                context->micoSystemConfig.configured = unConfigured;
+                mico_system_context_update(context);
+            }
         }
     }
     else
@@ -409,10 +413,6 @@ OSStatus ProcessPostJson(char *InputJson)
             memset(netclock_des_g->eland_name, 0, sizeof(netclock_des_g->eland_name));
             sprintf(netclock_des_g->eland_name, "%s", json_object_get_string(val));
         }
-        // else if (!strcmp(key, "timezone_offset_sec"))
-        // {
-        //     netclock_des_g->timezone_offset_sec = json_object_get_int(val);
-        // }
         else if (!strcmp(key, "dhcp_enabled"))
         {
             netclock_des_g->dhcp_enabled = json_object_get_int(val);
@@ -488,11 +488,6 @@ OSStatus ProcessPostJson(char *InputJson)
     {
         needupdateflash = true;
         memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
-    }
-    if (device_state->timezone_offset_sec != netclock_des_g->timezone_offset_sec)
-    {
-        needupdateflash = true;
-        device_state->timezone_offset_sec = netclock_des_g->timezone_offset_sec;
     }
 
     if (needupdateflash == true)
