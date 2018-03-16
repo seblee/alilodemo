@@ -452,7 +452,9 @@ TCP_Error_t TCP_Client_Init(_Client_t *pClient, ServerParams_t *ServerParams)
 
 OSStatus TCP_Service_Start(void)
 {
-    OSStatus err = kNoErr;
+    OSStatus err = kGeneralErr;
+    require_string(get_wifi_status() == true, exit, "wifi is not connect");
+    /*初始化互斥信号量*/
     err = mico_rtos_init_semaphore(&TCP_Stop_Sem, 1);
     require_noerr(err, exit);
     err = mico_rtos_init_semaphore(&TCP_HT00_Sem, 1);
@@ -478,7 +480,12 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     mico_rtc_time_t cur_time = {0};
     HC00_moment_sec = netclock_des_g->health_check_moment;
 GET_CONNECT_INFO:
-    if (TCP_Physical_is_connected(&(Eland_Client.networkStack)) != NETWORK_PHYSICAL_LAYER_CONNECTED)
+    err = mico_rtos_get_semaphore(&TCP_Stop_Sem, 0);
+    if (err == kNoErr)
+    {
+        mico_rtos_delete_thread(NULL);
+    }
+    if (TCP_Physical_is_connected(&(Eland_Client.networkStack)) == NETWORK_MANUALLY_DISCONNECTED)
     {
         elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
         mico_rtos_thread_sleep(1);
@@ -488,13 +495,15 @@ GET_CONNECT_INFO:
     require_noerr(err, GET_CONNECT_INFO);
 
     memset(tcp_write_flag, 1, 5);
-    if ((netclock_des_g == NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
+    if ((netclock_des_g != NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
     {
+        elan_tcp_log("tcpIP_host");
         serverPara.pDestinationURL = netclock_des_g->tcpIP_host;
         serverPara.DestinationPort = netclock_des_g->tcpIP_port;
     }
     else
     {
+        elan_tcp_log("default");
         serverPara.pDestinationURL = ELAND_HTTP_DOMAIN_NAME;
         serverPara.DestinationPort = 6380;
     }
@@ -555,13 +564,13 @@ cycle_loop:
             goto exit;
         }
     }
-
     rc = eland_IF_health_check(&Eland_Client);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
     }
+    mico_rtos_thread_msleep(1000);
 
     rc = eland_IF_update_holiday(&Eland_Client);
     if (TCP_SUCCESS != rc)

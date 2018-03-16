@@ -212,10 +212,10 @@ exit:
 
 OSStatus SOUND_FILE_CLEAR(void)
 {
-    KH25L8006_SECTOR_SIZE
     OSStatus err = kGeneralErr;
     uint8_t block_count;
     uint16_t sector_count;
+    _sound_file_type_t alarm_file_temp;
     mico_rtos_lock_mutex(&eland_sound_mutex);
 
     flash_kh25_read((uint8_t *)(&alarm_file_temp), 0, sizeof(_sound_file_type_t));
@@ -226,16 +226,20 @@ OSStatus SOUND_FILE_CLEAR(void)
         sector_count += (((alarm_file_temp.file_len + sizeof(_sound_file_type_t)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
     }
     else
-        sound_file_list.file_number = 0;
+    {
+        free(sound_file_list.lib);
+        sound_file_list.sector_start = 0;
+        sound_file_list.sector_end = 0;
+    }
 
     for (block_count = 0; block_count < KH25_BLOCKCOUNT - 1; block_count++)
     {
-        flash_kh25_block_erase((uint32_t)block_count * KH25L8006_BLOCK_SIZE)
+        flash_kh25_block_erase((uint32_t)block_count * KH25L8006_BLOCK_SIZE);
     }
     sector_count = 16 * (KH25_BLOCKCOUNT - 1);
     for (sector_count = sector_count; sector_count < KH25_FLASH_FILE_COUNT; sector_count++)
     {
-        flash_kh25_sector_erase((uint32_t)sector_count * KH25L8006_BLOCK_SIZE)
+        flash_kh25_sector_erase((uint32_t)sector_count * KH25L8006_BLOCK_SIZE);
     }
 
 exit:
