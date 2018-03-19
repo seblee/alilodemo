@@ -15,7 +15,6 @@
 /* Private include -----------------------------------------------------------*/
 #include "../alilodemo/audio_test.h"
 #include "../alilodemo/hal_alilo_rabbit.h"
-//#include "../alilodemo/mico_app_define.h"
 #include "mico.h"
 #include "netclockconfig.h"
 #include "netclock.h"
@@ -102,7 +101,7 @@ exit:
     {
         MicoSystemReboot();
     }
-    alarm_sound_scan();
+    file_download();
     mico_rtos_delete_thread(NULL);
     return err;
 }

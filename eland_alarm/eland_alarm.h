@@ -159,14 +159,22 @@ typedef struct
     __elsv_alarm_data_t *alarm_lib;
     __elsv_alarm_data_t *alarm_nearest;
 } _eland_alarm_list_t;
+
+typedef enum {
+    DOWNLOAD_IDEL,
+    DOWNLOAD_SCAN,
+    DOWNLOAD_OID,
+    DOWNLOAD_OTA,
+} _download_type_t;
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
 extern _eland_alarm_list_t alarm_list;
 extern _elsv_holiday_t holiday_list;
+extern _alarm_stream_t alarm_stream;
 extern mico_semaphore_t alarm_update;
-extern mico_semaphore_t alarm_sound_scan_sem;
 extern mico_semaphore_t alarm_jump_sem;
+extern mico_queue_t download_queue;
 
 extern _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/

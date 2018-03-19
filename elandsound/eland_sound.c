@@ -242,7 +242,30 @@ OSStatus SOUND_FILE_CLEAR(void)
         flash_kh25_sector_erase((uint32_t)sector_count * KH25L8006_BLOCK_SIZE);
     }
 
-
     mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
+}
+
+void file_download(void)
+{
+    OSStatus err;
+    _download_type_t download_type;
+wait_for_queue:
+    err = mico_rtos_pop_from_queue(&download_queue, &download_type, MICO_WAIT_FOREVER);
+    require_noerr(err, exit);
+    switch (download_type)
+    {
+    case DOWNLOAD_SCAN:
+        alarm_sound_scan();
+        break;
+    case DOWNLOAD_OID:
+        //   alarm_sound_oid();
+        break;
+    case DOWNLOAD_OTA:
+        break;
+    default:
+        break;
+    }
+exit:
+    goto wait_for_queue;
 }

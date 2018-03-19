@@ -590,7 +590,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
     else if (sound_type == SOUND_FILE_VID)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
-    else if (sound_type == SOUND_FILE_OID)
+    else if (sound_type == SOUND_FILE_OFID)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
     else if (sound_type == SOUND_FILE_DEFAULT)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK));
@@ -614,8 +614,8 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         sprintf(uri_str, ELAND_SOUND_SID_URI, netclock_des_g->eland_id, alarm->alarm_sound_id);
     else if (sound_type == SOUND_FILE_VID)
         sprintf(uri_str, ELAND_SOUND_VID_URI, netclock_des_g->eland_id, alarm->voice_alarm_id);
-    else if (sound_type == SOUND_FILE_OID)
-        sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, alarm->alarm_off_voice_alarm_id);
+    else if (sound_type == SOUND_FILE_OFID)
+        sprintf(uri_str, ELAND_SOUND_OFID_URI, netclock_des_g->eland_id, alarm->alarm_off_voice_alarm_id);
     else if (sound_type == SOUND_FILE_DEFAULT)
         sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
     Eland_log("=====> alarm_sound_download send ======>");

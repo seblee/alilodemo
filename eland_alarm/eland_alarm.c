@@ -13,13 +13,13 @@
 **/
 
 /* Private include -----------------------------------------------------------*/
-
 #include "eland_alarm.h"
 #include "audio_service.h"
 #include "eland_sound.h"
 #include "netclock.h"
 #include "eland_tcp.h"
 #include "netclock_uart.h"
+#include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
 #define alarm_log(format, ...) custom_log("alarm", format, ##__VA_ARGS__)
 
@@ -31,8 +31,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 mico_semaphore_t alarm_update = NULL;
-mico_semaphore_t alarm_sound_scan_sem = NULL;
 mico_semaphore_t alarm_jump_sem = NULL;
+mico_queue_t download_queue = NULL;
 
 _eland_alarm_list_t alarm_list;
 _elsv_holiday_t holiday_list;
@@ -72,14 +72,17 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_list.state.AlarmStateMutex);
     require_noerr(err, exit);
+    alarm_stream.stream_id = audio_service_system_generate_stream_id();
     err = mico_rtos_init_mutex(&alarm_stream.stream_Mutex);
     require_noerr(err, exit);
     alarm_list.alarm_nearest = NULL;
     /*need to ergonic alarm*/
     err = mico_rtos_init_semaphore(&alarm_update, 5);
     require_noerr(err, exit);
-    err = mico_rtos_init_semaphore(&alarm_sound_scan_sem, 1);
+    //eland_state_queue
+    err = mico_rtos_init_queue(&download_queue, "download_queue", sizeof(_download_type_t), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
+
     err = mico_rtos_init_semaphore(&alarm_jump_sem, 1);
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&off_history.off_Mutex);
@@ -373,31 +376,29 @@ exit:
     return elsv_alarm_data;
 }
 
-void alarm_sound_scan(void)
+OSStatus alarm_sound_scan(void)
 {
     OSStatus err;
     uint8_t i;
-    uint8_t flag = 0;
+    static bool flag = true;
     __elsv_alarm_data_t alarm_simple;
 
-wait_for_sem:
-    mico_rtos_get_semaphore(&alarm_sound_scan_sem, MICO_WAIT_FOREVER);
-    if (flag == 0)
+scan_again:
+    if (flag)
     {
-        flag = 1;
+
         alarm_log("check default sound");
         err = SOUND_CHECK_DEFAULT_FILE();
         if (err != kNoErr)
         {
             SOUND_FILE_CLEAR();
-        REDOWNLOAD:
             alarm_log("download default sound");
             memset(&alarm_simple, 0, sizeof(__elsv_alarm_data_t));
             err = alarm_sound_download(&alarm_simple, SOUND_FILE_DEFAULT);
-            require_noerr(err, REDOWNLOAD);
+            require_noerr(err, exit);
         }
+        flag = false;
     }
-scan_again:
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 1) ||
@@ -409,7 +410,8 @@ scan_again:
             require_noerr(err, exit);
         }
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 2) ||
-            ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 3) ||
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 4))
         {
             alarm_log("VID:%d", i);
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
@@ -418,7 +420,7 @@ scan_again:
         if ((alarm_list.alarm_lib + i)->alarm_pattern == 4)
         {
             alarm_log("OID:%d", i);
-            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OID);
+            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
             require_noerr(err, exit);
         }
     }
@@ -428,8 +430,6 @@ exit:
         mico_rtos_thread_sleep(5);
         goto scan_again;
     }
-
-    goto wait_for_sem;
 }
 
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
@@ -1218,6 +1218,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
 {
     OSStatus err = kGeneralErr, jumperr = kGeneralErr;
     __msg_function_t eland_cmd;
+    _download_type_t download_type;
     uint8_t serial = 0;
     err = mico_rtos_get_semaphore(&alarm_update, 500);
     jumperr = mico_rtos_get_semaphore(&alarm_jump_sem, 0);
@@ -1250,7 +1251,9 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
                 set_display_alarm_serial(serial);
                 *alarm_nearest = list->alarm_lib + serial;
             }
-            mico_rtos_set_semaphore(&alarm_sound_scan_sem);
+            download_type = DOWNLOAD_SCAN;
+            mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+
             set_display_alarm_serial(get_waiting_alarm_serial());
             alarm_log("get alarm_nearest alarm_id:%s", (*alarm_nearest)->alarm_id);
         }
@@ -1267,4 +1270,33 @@ uint8_t get_alarm_jump_flag(void)
         return (uint8_t)0x01;
     else
         return (uint8_t)0x00;
+}
+OSStatus alarm_sound_oid(void)
+{
+    OSStatus err;
+    char uri_str[100] = {0};
+    mscp_result_t result = MSCP_RST_ERROR;
+    mscp_status_t audio_status;
+
+    set_alarm_stream_state(STREAM_PLAY);
+    /******************/
+    sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, 1);
+
+    err = eland_http_file_download(ELAND_DOWN_LOAD_METHOD, uri_str, ELAND_HTTP_DOMAIN_NAME, NULL, DOWNLOAD_OID);
+    require_noerr(err, exit);
+    /******************/
+check_audio:
+    audio_service_get_audio_status(&result, &audio_status);
+    if (audio_status == MSCP_STATUS_STREAM_PLAYING)
+    {
+        mico_rtos_thread_msleep(500);
+        goto check_audio;
+    }
+
+exit:
+    if (audio_status != MSCP_STATUS_IDLE)
+        audio_service_stream_stop(&result, alarm_stream.stream_id);
+    if (err != kNoErr)
+        set_alarm_stream_state(STREAM_STOP);
+    return err;
 }

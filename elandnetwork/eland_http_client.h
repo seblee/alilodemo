@@ -15,7 +15,7 @@
 #define __ELAND_HTTP_CLIENT_H_
 
 /* Private include -----------------------------------------------------------*/
-
+#include "eland_alarm.h"
 /* Private define ------------------------------------------------------------*/
 #define ELAND_HTTP_SEND_TIME_OUT (3000)
 #define ELAND_HTTP_RECV_TIME_OUT (3000)
@@ -112,4 +112,11 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,             //POST 或者 
                             char *host_name,                      //host
                             char *http_body,                      //BODY
                             ELAND_HTTP_RESPONSE_SETTING_S *user_http_response);
+
+OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
+                                  char *request_uri,        //uri
+                                  char *host_name,          //host
+                                  char *http_body,          //BODY
+                                  _download_type_t download_type);
+
 #endif

@@ -27,7 +27,7 @@
 
 #define SOUND_FILE_VID (uint8_t)0X01
 #define SOUND_FILE_SID (uint8_t)0X02
-#define SOUND_FILE_OID (uint8_t)0X03
+#define SOUND_FILE_OFID (uint8_t)0X03
 #define SOUND_FILE_DEFAULT (uint8_t)0X04
 /* Private typedef -----------------------------------------------------------*/
 typedef struct __SOUND_FILE_TYPE_
@@ -92,6 +92,7 @@ OSStatus sound_file_sort(_sound_file_lib_t *sound_list);
 OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_type_t *alarm_w_r_temp);
 OSStatus SOUND_CHECK_DEFAULT_FILE(void);
 OSStatus SOUND_FILE_CLEAR(void);
+void file_download(void);
 /*************************/
 
 #endif

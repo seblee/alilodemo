@@ -37,6 +37,7 @@
 #include "eland_sound.h"
 #include "netclock.h"
 #include "netclock_uart.h"
+#include "audio_service.h"
 
 #define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
@@ -62,6 +63,12 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader,
                                uint8_t *inData,
                                size_t inLen,
                                void *inUserContext);
+/**download oid sound**/
+static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader,
+                                   uint32_t inPos,
+                                   uint8_t *inData,
+                                   size_t inLen,
+                                   void *inUserContext);
 
 //给response的消息队列发送消息
 void send_response_to_queue(ELAND_HTTP_RESPONSE_E status,
@@ -566,4 +573,269 @@ static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext)
         context->content = NULL;
     }
     eland_sound_download_pos = 0;
+}
+
+//发送http请求 single mode
+OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
+                                  char *request_uri,        //uri
+                                  char *host_name,          //host
+                                  char *http_body,          //BODY
+                                  _download_type_t download_type)
+{
+    OSStatus err = kGeneralErr;
+    uint32_t http_req_all_len;
+    char ipstr[20] = {0};
+    HTTPHeader_t *httpHeader = NULL;
+    http_context_t context = {NULL, 0};
+    struct sockaddr_in addr;
+    int http_fd = -1;
+    int ret = 0;
+    int ssl_errno = 0;
+    mico_ssl_t client_ssl = NULL;
+    fd_set readfds;
+    struct timeval t = {0, HTTP_YIELD_TMIE * 1000};
+
+    if (http_body)
+        http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
+    else
+        http_req_all_len = 1024; //为head部分预留1024字节 need free
+    eland_http_requeset = malloc(http_req_all_len);
+    if (eland_http_requeset == NULL)
+    {
+        client_log("[ERROR]malloc error!!! malloc len is %ld", http_req_all_len);
+        return kGeneralErr;
+    }
+    memset(eland_http_requeset, 0, http_req_all_len);
+    if (method != HTTP_POST && method != HTTP_GET)
+    {
+        client_log("http method error!");
+        err = kGeneralErr;
+        goto exit;
+    }
+    mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
+    /******set request mode******/
+    if (method == HTTP_POST)
+    {
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, request_uri);
+    }
+    else if (method == HTTP_GET)
+    {
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, request_uri);
+    }
+    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", host_name); //增加hostname
+    //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
+    sprintf(eland_http_requeset + strlen(eland_http_requeset), "Connection: Keep-Alive\r\n"); //增加Connection设置
+
+    //增加http body部分
+    if (http_body != NULL)
+    {
+        /*增加Content-Length*/
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: %d\r\n\r\n", strlen((const char *)http_body));
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "%s", http_body);
+        if (http_body != NULL)
+        {
+            free(http_body);
+            http_body = NULL;
+        }
+    }
+    else
+        sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: 0\r\n\r\n"); //增加Content-Length
+
+    client_log("start dns analysis, domain:%s", host_name);
+    err = usergethostbyname(host_name, (uint8_t *)ipstr, sizeof(ipstr));
+    if (err != kNoErr)
+    {
+        client_log("dns error!!! doamin:%s", host_name);
+        err = kGeneralErr;
+        goto exit;
+    }
+    /*HTTPHeaderCreateWithCallback set some callback functions */
+    if (download_type == DOWNLOAD_OID)
+        httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData_oid, onClearData, &context);
+    else
+        goto exit;
+    if (httpHeader == NULL)
+    {
+        client_log("HTTPHeaderCreateWithCallback() error");
+        err = kGeneralErr;
+        goto exit;
+    }
+    http_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(ipstr);
+    addr.sin_port = htons(ELAND_HTTP_PORT_SSL); //HTTP SSL端口 443
+
+    //设置tcp keep_alive 参数
+    ret = user_set_tcp_keepalive(http_fd,
+                                 ELAND_HTTP_SEND_TIME_OUT,   //http tcp 發送超時
+                                 ELAND_HTTP_RECV_TIME_OUT,   //http tcp 接收超時
+                                 ELAND_HTTP_KEEP_IDLE_TIME,  //http tcp 如该连接在xx秒内没有任何数据往来,则进行此TCP层的探测
+                                 ELAND_HTTP_KEEP_INTVL_TIME, // 探测发包间隔为x秒
+                                 ELAND_HTTP_KEEP_COUNT);     // 尝试探测的次数.如果第1次探测包就收到响应了,则后2次的不再发
+    if (ret < 0)
+    {
+        err = kGeneralErr;
+        client_log("user_set_tcp_keepalive() error ret:%d", ret);
+        goto exit;
+    }
+    client_log("start connect");
+    err = connect(http_fd, (struct sockaddr *)&addr, sizeof(addr));
+    require_noerr_string(err, exit, "connect https server failed");
+    // 設置 證書
+    ssl_set_client_cert(certificate, private_key);
+    ssl_set_client_version(TLS_V1_2_MODE);
+    client_log("start ssl_connect");
+    client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
+    /* Send HTTP Request */
+    ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
+    if (ret > 0)
+    {
+        client_log("ssl_send success [%d] [%d]", strlen((const char *)eland_http_requeset), ret);
+        //client_log("%s", eland_http_requeset);
+    }
+    else
+    {
+        client_log("-----------------ssl_send error, ret = %d", ret);
+        err = kGeneralErr;
+        goto exit;
+    }
+    FD_ZERO(&readfds);
+    FD_SET(http_fd, &readfds);
+    ret = select(http_fd + 1, &readfds, NULL, NULL, &t);
+    if (ret == -1 || ret == 0)
+    {
+        client_log("-----------------select error, ret = %d", ret);
+        err = kGeneralErr;
+        goto exit;
+    }
+    if (FD_ISSET(http_fd, &readfds))
+    {
+        /*parse header*/
+        err = SocketReadHTTPSHeader(client_ssl, httpHeader);
+        switch (err)
+        {
+        case kNoErr:
+        {
+            if (httpHeader->statusCode >= 500)
+            {
+                client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
+                break;
+            }
+            if (httpHeader->statusCode == 400) //認證錯誤
+            {
+                client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
+                break;
+            }
+
+            if (httpHeader->statusCode == 404) //沒找到文件
+            {
+                client_log("[FAILURE]eland http response fail, code:%d", httpHeader->statusCode);
+                break;
+            }
+            if (httpHeader->statusCode == 204) //文件為空 不需要播放
+            {
+                client_log("[SUCCESS]eland http responsed, code:%d", httpHeader->statusCode);
+                break;
+            }
+
+            //只有code正确才解析返回数据,错误情况下解析容易造成内存溢出
+            if (httpHeader->statusCode == 200) //正常應答
+            {
+                //PrintHTTPHeader(httpHeader);
+                err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
+                client_log("data lenth = %ld", (uint32_t)context.content_length);
+                require_noerr(err, exit);
+            }
+            break;
+        }
+        case EWOULDBLOCK:
+            break;
+
+        case kNoSpaceErr:
+            client_log("SocketReadHTTPSHeader kNoSpaceErr");
+            break;
+        case kConnectionErr:
+            client_log("SocketReadHTTPSHeader kConnectionErr");
+            break;
+        default:
+            client_log("ERROR: HTTP Header parse error: %d", err);
+            break;
+        }
+    }
+exit:
+    if (client_ssl)
+    {
+        ssl_close(client_ssl);
+        client_ssl = NULL;
+    }
+
+    SocketClose(&http_fd);
+
+    /*free request buf*/
+    if (eland_http_requeset != NULL)
+    {
+        free(eland_http_requeset);
+        eland_http_requeset = NULL;
+    }
+    HTTPHeaderDestory(&httpHeader);
+    mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
+    return err;
+}
+
+/*one request may receive multi reply */
+static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
+                                   size_t inLen, void *inUserContext)
+{
+    OSStatus err = kNoErr;
+    mscp_result_t result = MSCP_RST_ERROR;
+    http_context_t *context = inUserContext;
+    static AUDIO_STREAM_PALY_S fm_stream;
+    static uint8_t fm_test_cnt;
+
+    if (inHeader->chunkedData == false)
+        client_log("This is not a chunked data");
+    //Extra data with a content length value
+    if (inPos == 0 && context->content == NULL)
+    {
+        context->content = calloc(1501, sizeof(uint8_t));
+        require_action(context->content, exit, err = kNoMemoryErr);
+        context->content_length = inHeader->contentLength;
+        fm_stream.type = AUDIO_STREAM_TYPE_MP3;
+        fm_stream.stream_id = alarm_stream.stream_id;
+        fm_stream.total_len = context->content_length;
+        fm_stream.pdata = (const uint8_t *)context->content;
+    }
+    memcpy(context->content, inData, inLen);
+    fm_stream.stream_len = (uint16_t)(inLen & 0xFFFF); //len
+
+    if ((++fm_test_cnt) >= 10)
+    {
+        fm_test_cnt = 0;
+        client_log("fm_stream.type[%d],fm_stream.stream_id[%d],fm_stream.total_len[%d],fm_stream.stream_len[%d]",
+                   (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
+    }
+audio_transfer:
+    err = audio_service_stream_play(&result, &fm_stream);
+    if (err != kNoErr)
+    {
+        client_log("audio_stream_play() error!!!!");
+        return false;
+    }
+    else
+    {
+        if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
+        {
+            client_log("new slave set pause!!!");
+            mico_rtos_thread_msleep(1000); //time set 1000ms!!!
+            goto audio_transfer;
+        }
+        else
+        {
+            err = kNoErr;
+        }
+    }
+
+exit:
+    return err;
 }
