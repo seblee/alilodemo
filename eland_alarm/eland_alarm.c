@@ -378,7 +378,7 @@ exit:
 
 OSStatus alarm_sound_scan(void)
 {
-    OSStatus err;
+    OSStatus err = kNoErr;
     uint8_t i;
     static bool flag = true;
     __elsv_alarm_data_t alarm_simple;
@@ -430,6 +430,7 @@ exit:
         mico_rtos_thread_sleep(5);
         goto scan_again;
     }
+    return err;
 }
 
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
@@ -528,6 +529,9 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     uint8_t volume_change_counter = 0;
     iso8601_time_t iso8601_time;
     uint8_t i = 0;
+    uint8_t volume_stepup_count = 0;
+    _tcp_cmd_sem_t tcp_message;
+
     if (alarm->volume_stepup_enabled == 0)
     {
         for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
@@ -552,13 +556,16 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         {
         case ALARM_ING:
             if (first_to_alarming)
-            {
-                mico_rtos_set_semaphore(&TCP_HT00_Sem);
+            { /**stop tcp communication**/
+                tcp_message = TCP_HT00_Sem;
+                mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
                 first_to_alarming = false;
                 first_to_snooze = true;
             }
-            if (alarm->volume_stepup_enabled)
+            if ((alarm->volume_stepup_enabled) &&
+                (++volume_stepup_count > 10))
             {
+                volume_stepup_count = 0;
                 if ((volume_change_counter++ > 1) &&
                     (volume_value < (alarm->alarm_volume * 32 / 100 + 1)))
                 {
@@ -1274,14 +1281,18 @@ uint8_t get_alarm_jump_flag(void)
 OSStatus alarm_sound_oid(void)
 {
     OSStatus err;
+    uint8_t i;
     char uri_str[100] = {0};
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
 
     set_alarm_stream_state(STREAM_PLAY);
-    /******************/
-    sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, 1);
+    for (i = 0; i < 33; i++)
+        audio_service_volume_up(&result, 1);
 
+    /******************/
+    sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
+    alarm_log("uri_str:%s", uri_str);
     err = eland_http_file_download(ELAND_DOWN_LOAD_METHOD, uri_str, ELAND_HTTP_DOMAIN_NAME, NULL, DOWNLOAD_OID);
     require_noerr(err, exit);
     /******************/
@@ -1290,13 +1301,18 @@ check_audio:
     if (audio_status == MSCP_STATUS_STREAM_PLAYING)
     {
         mico_rtos_thread_msleep(500);
+        alarm_log("oid playing");
         goto check_audio;
     }
-
 exit:
     if (audio_status != MSCP_STATUS_IDLE)
+    {
+        alarm_log("stop playing");
         audio_service_stream_stop(&result, alarm_stream.stream_id);
-    if (err != kNoErr)
-        set_alarm_stream_state(STREAM_STOP);
+    }
+    alarm_log("play stopped");
+    for (i = 0; i < 33; i++)
+        audio_service_volume_down(&result, 1);
+    set_alarm_stream_state(STREAM_STOP);
     return err;
 }

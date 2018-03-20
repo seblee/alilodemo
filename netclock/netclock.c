@@ -217,6 +217,7 @@ OSStatus Netclock_des_recovery(void)
     device_state->IsAlreadySet = true;
     device_state->eland_id = device_temp.eland_id;
     sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
+    device_state->timezone_offset_sec = DEFAULT_TIMEZONE;
     // memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
     context = mico_system_context_get();

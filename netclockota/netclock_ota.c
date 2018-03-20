@@ -15,7 +15,10 @@
 /* Private include -----------------------------------------------------------*/
 #include "netclock_ota.h"
 #include "ota_server.h"
-
+#include "url.h"
+#include "netclock.h"
+#include "eland_tcp.h"
+#include "eland_http_client.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -32,8 +35,8 @@ uint32_t ota_offset = 0;
 static CRC16_Context crc_context;
 static md5_context md5;
 
-char ota_url[128];
-char ota_md5[33];
+char ota_url[URL_Len];
+char ota_md5[hash_Len];
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -99,7 +102,6 @@ void start_ota_thread(void)
 OSStatus eland_ota_data_init(uint32_t length)
 {
     OSStatus err;
-
     ota_log("ota Start!");
     mico_system_notify_remove_all(mico_notify_WIFI_STATUS_CHANGED);
     mico_system_notify_remove_all(mico_notify_WiFI_PARA_CHANGED);
@@ -217,4 +219,36 @@ void eland_ota_operation(void)
     }
 
     ota_log("ota server will delete");
+    mico_system_power_perform(mico_system_context_get(), eState_Software_Reset);
+}
+
+OSStatus eland_ota(void)
+{
+    OSStatus err = kNoErr;
+    char uri_str[100] = {0};
+    url_field_t *url_c;
+    _tcp_cmd_sem_t tcp_message;
+    /********check url********/
+    url_c = url_parse(netclock_des_g->OTA_url);
+    require_action(url_c, exit, err = kParamErr);
+    //url_field_print(url_c);
+    if (strcmp(url_c->schema, "https"))
+    {
+        err = kGeneralErr;
+        goto exit;
+    }
+    memset(ota_md5, 0, hash_Len);
+    memcpy(ota_md5, netclock_des_g->OTA_hash, hash_Len);
+
+    tcp_message = TCP_Stop_Sem;
+    mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
+    mico_rtos_thread_sleep(2);
+    sprintf(uri_str, "%s%s", "/", url_c->path);
+    ota_log("uri_str:%s", uri_str);
+    err = eland_http_file_download(ELAND_DOWN_LOAD_METHOD, uri_str, url_c->host, NULL, DOWNLOAD_OTA);
+    require_noerr(err, exit);
+    eland_ota_operation();
+exit:
+    url_free(url_c);
+    return err;
 }

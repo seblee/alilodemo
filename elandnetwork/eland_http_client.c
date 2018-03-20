@@ -38,6 +38,7 @@
 #include "netclock.h"
 #include "netclock_uart.h"
 #include "audio_service.h"
+#include "netclock_ota.h"
 
 #define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
@@ -65,6 +66,12 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader,
                                void *inUserContext);
 /**download oid sound**/
 static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader,
+                                   uint32_t inPos,
+                                   uint8_t *inData,
+                                   size_t inLen,
+                                   void *inUserContext);
+/**download ota file**/
+static OSStatus onReceivedData_ota(struct _HTTPHeader_t *inHeader,
                                    uint32_t inPos,
                                    uint8_t *inData,
                                    size_t inLen,
@@ -593,7 +600,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     int ssl_errno = 0;
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
-    struct timeval t = {0, HTTP_YIELD_TMIE * 1000};
+    struct timeval t = {1, HTTP_YIELD_TMIE * 1000};
 
     if (http_body)
         http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
@@ -652,6 +659,8 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     /*HTTPHeaderCreateWithCallback set some callback functions */
     if (download_type == DOWNLOAD_OID)
         httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData_oid, onClearData, &context);
+    else if (download_type == DOWNLOAD_OTA)
+        httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData_ota, onClearData, &context);
     else
         goto exit;
     if (httpHeader == NULL)
@@ -692,7 +701,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     if (ret > 0)
     {
         client_log("ssl_send success [%d] [%d]", strlen((const char *)eland_http_requeset), ret);
-        //client_log("%s", eland_http_requeset);
+        client_log("%s", eland_http_requeset);
     }
     else
     {
@@ -836,6 +845,28 @@ audio_transfer:
         }
     }
 
+exit:
+    return err;
+}
+/*one request may receive multi reply */
+static OSStatus onReceivedData_ota(struct _HTTPHeader_t *inHeader, uint32_t inPos, uint8_t *inData,
+                                   size_t inLen, void *inUserContext)
+{
+    OSStatus err = kNoErr;
+    http_context_t *context = inUserContext;
+
+    if (inHeader->chunkedData == false)
+        client_log("This is not a chunked data");
+    //Extra data with a content length value
+    if (inPos == 0 && context->content == NULL)
+    {
+        context->content = calloc(1, sizeof(uint8_t));
+        require_action(context->content, exit, err = kNoMemoryErr);
+        context->content_length = inHeader->contentLength;
+        eland_ota_data_init(context->content_length);
+        client_log("This is not a chunked data");
+    }
+    eland_ota_data_write(inData, inLen);
 exit:
     return err;
 }

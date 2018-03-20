@@ -36,5 +36,6 @@ void Eland_ota_thread(mico_thread_arg_t args);
 OSStatus eland_ota_data_init(uint32_t length);
 OSStatus eland_ota_data_write(uint8_t *data, uint16_t len);
 void eland_ota_operation(void);
+OSStatus eland_ota(void);
 
 #endif

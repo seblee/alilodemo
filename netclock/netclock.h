@@ -27,7 +27,7 @@
 #define ELAND_SOUND_SID_URI ("/api/sound/download?eid=%ld&sid=%ld")
 #define ELAND_SOUND_VID_URI ("/api/sound/download?eid=%ld&vid=%s")
 #define ELAND_SOUND_OFID_URI ("/api/sound/download?eid=%ld&vid=%s")
-#define ELAND_SOUND_OID_URI ("/api/sound/download?eid=%ld&oid=%d")
+#define ELAND_SOUND_OID_URI ("/api/sound/download?eid=%ld&oid=%ld")
 #define ELAND_SOUND_DEFAULT_URI ("/api/sound/default")
 
 //eland 通信情報取得

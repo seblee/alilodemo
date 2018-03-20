@@ -98,6 +98,7 @@ static void recorde_IPStatus(wlanInterfaceTypedef type)
 OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
 {
     OSStatus err = kNoErr;
+    _tcp_cmd_sem_t tcp_message;
     if (wifi_Mode == Station)
     {
         err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "wifi station",
@@ -105,8 +106,10 @@ OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
     }
     else if (wifi_Mode == Soft_AP)
     {
-        mico_rtos_set_semaphore(&TCP_Stop_Sem);
 
+        /**stop tcp communication**/
+        tcp_message = TCP_Stop_Sem;
+        mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
         // Wifi_SoftAP_fun();
         err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "wifi Soft_AP",
                                       Wifi_SoftAP_threed, 0x500, (mico_thread_arg_t)NULL);

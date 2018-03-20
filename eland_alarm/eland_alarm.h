@@ -15,6 +15,7 @@
 #define __ELAND_ALARM_H_
 /* Private include -----------------------------------------------------------*/
 #include "mico.h"
+#include "netclock_uart.h"
 /* Private define ------------------------------------------------------------*/
 #define ALARM_ID_LEN 36        //闹钟唯一识别的ID。
 #define ALARM_TIME_LEN 8       //時刻是"HH:mm:ss"的形式。
@@ -38,6 +39,7 @@ typedef struct
     int8_t snooze_count;
     int8_t alarm_repeat;
     uint8_t alarm_on_days_of_week;
+    _ELAND_MODE_t mode;
 } _alarm_mcu_data_t;
 typedef struct __SOUND_FILE_INFO_
 {
@@ -202,7 +204,8 @@ AlarmOffHistoryData_t *get_alarm_history_data(void);
 HistoryDatastate_t get_alarm_history_data_state(void);
 void set_alarm_history_data_state(HistoryDatastate_t value);
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
-void alarm_sound_scan(void);
+OSStatus alarm_sound_scan(void);
+OSStatus alarm_sound_oid(void);
 OSStatus Alarm_build_JSON(char *json_str);
 
 void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time);

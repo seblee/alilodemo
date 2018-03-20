@@ -151,7 +151,7 @@ static int ota_start_command(void)
             {
                 sscanf((char const *)&outDatabuf[3], "%02d.%02d", &version_major_cache, &version_minor_cache);
                 if ((version_major_cache == MCU_VERSION_MAJOR) && (version_minor_cache == MCU_VERSION_MINOR))
-                    return kNoErr;
+                    return 2;
                 else
                     break;
             }
@@ -168,6 +168,7 @@ static int ota_start_command(void)
     inDatabuf[1] = 0x09;
     inDatabuf[2] = 0x00;
     inDatabuf[3] = 0xaa;
+    memset(outDatabuf, 0, sizeof(outDatabuf));
     do
     {
         times--;
@@ -214,16 +215,25 @@ void mcu_ota_thread(mico_thread_arg_t arg)
                      memory is not virgin and the bootloader restores the registersï¿½ï¿½ reset status and jumps
                      to the memory address given by the reset vector (located at 0x00 8000).*/
 
-            //stm8 mcu reset  (power off-->power on)
-            // MicoGpioOutputLow((mico_gpio_t)MICO_ADF7030_POWER);
-            // mico_rtos_delay_milliseconds(200);
-            // MicoGpioOutputHigh((mico_gpio_t)MICO_ADF7030_POWER);
-            // mico_rtos_delay_milliseconds(200);
             *err = ota_start_command();
             if (*err == 2)
                 goto exit;
             else if (*err == kGeneralErr)
-                goto exit_err;
+            {
+                for (i = 0; i < 30; i++)
+                    MicoUartSend(MICO_UART_2, err, 1);
+                mico_rtos_thread_sleep(5);
+                MicoGpioInitialize((mico_gpio_t)MCU_POWER_GPIO, OUTPUT_PUSH_PULL);
+
+                /***stm8 mcu reset  (power off-->power on)**/
+                for (i = 0; i < 230; i++)
+                {
+                    MicoGpioOutputLow((mico_gpio_t)MCU_POWER_GPIO);
+                    mico_rtos_thread_sleep(1);
+                    MicoGpioOutputHigh((mico_gpio_t)MCU_POWER_GPIO);
+                    mico_rtos_thread_sleep(1);
+                }
+            }
             OTA_uart_init();
             mico_rtos_thread_msleep(50);
             inDataBuffer[0] = 0x7f; //Synchronization byte
@@ -317,7 +327,7 @@ void mcu_ota_thread(mico_thread_arg_t arg)
             if (kNoErr != stm8_ota_command_once(inDataBuffer, 5, 2))
                 goto exit_err;
             OTA_Step_No = 4;
-            mico_rtos_thread_msleep(10);
+            mico_rtos_thread_msleep(1100);
             break;
         case 4:
             goto exit;

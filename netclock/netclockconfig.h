@@ -14,6 +14,7 @@
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
 #define Timezone_offset_elsv ((int32_t)32400)     //elsv time zone
+#define DEFAULT_TIMEZONE ((int32_t)32400)
 
 #define DEVICE_MAC_LEN (17) //MAC地址长度
 
@@ -34,6 +35,7 @@
 #define DateTime_Len 19         //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
 #define Date_formate_len 11     //日期为"yyyy-MM-dd"的形式
 #define URL_Len 128             //URL长度
+#define hash_Len 33             //URL长度
 
 typedef struct _TIME_FORMAT_
 {
@@ -73,6 +75,10 @@ typedef struct _ELAND_DES_S //设备状态结构
     char tcpIP_host[ip_address_Len];
     uint16_t tcpIP_port;
 
+    char OTA_version[firmware_version_len];
+    char OTA_url[URL_Len];
+    char OTA_hash[hash_Len];
+
     mico_mutex_t des_mutex;
 } ELAND_DES_S;
 
@@ -94,4 +100,5 @@ typedef struct _ELAND_DEVICE //设备状态结构
     char default_gateway[ip_address_Len]; //Eland 的IPv4默认网关。
     char dnsServer[ip_address_Len];       //DNS server ip address
 } _ELAND_DEVICE_t;
+
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

@@ -63,8 +63,7 @@ mico_utc_time_t elsv_receive_time;
 mico_utc_time_t elsv_send_time;
 mico_utc_time_t eland_receive_time;
 
-mico_semaphore_t TCP_Stop_Sem = NULL;
-mico_semaphore_t TCP_HT00_Sem = NULL;
+mico_queue_t TCP_queue = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
 static void TCP_thread_main(mico_thread_arg_t arg);
@@ -84,7 +83,7 @@ static TCP_Error_t TCP_Operate_HC01(char *buf);
 static TCP_Error_t TCP_Operate_DV01(char *buf);
 static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd);
 static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list);
-
+static TCP_Error_t TCP_Operate_FW00(char *buf);
 static void time_record(TIME_RECORD_T_t type, mico_utc_time_t *value);
 static void eland_set_time(void);
 /* Private functions ---------------------------------------------------------*/
@@ -457,9 +456,9 @@ OSStatus TCP_Service_Start(void)
     OSStatus err = kGeneralErr;
     require_string(get_wifi_status() == true, exit, "wifi is not connect");
     /*初始化互斥信号量*/
-    err = mico_rtos_init_semaphore(&TCP_Stop_Sem, 1);
-    require_noerr(err, exit);
-    err = mico_rtos_init_semaphore(&TCP_HT00_Sem, 1);
+
+    //TCP_queue connect message
+    err = mico_rtos_init_queue(&TCP_queue, "TCP_queue", sizeof(_tcp_cmd_sem_t), 5);
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
@@ -480,13 +479,16 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     ServerParams_t serverPara;
     _time_t timer;
     mico_rtc_time_t cur_time = {0};
+    _tcp_cmd_sem_t tcp_message;
+    _download_type_t download_type;
+
     HC00_moment_sec = netclock_des_g->health_check_moment;
 GET_CONNECT_INFO:
-    err = mico_rtos_get_semaphore(&TCP_Stop_Sem, 0);
-    if (err == kNoErr)
-    {
+    /*pop queue*/
+    err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
+    if ((err == kNoErr) && (tcp_message = TCP_Stop_Sem))
         mico_rtos_delete_thread(NULL);
-    }
+
     if (TCP_Physical_is_connected(&(Eland_Client.networkStack)) == NETWORK_MANUALLY_DISCONNECTED)
     {
         elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
@@ -517,13 +519,14 @@ GET_CONNECT_INFO:
     }
 
 RECONN:
-    err = mico_rtos_get_semaphore(&TCP_Stop_Sem, 0);
-    if (err == kNoErr)
+    err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
+    if ((err == kNoErr) && (tcp_message = TCP_Stop_Sem))
     {
         Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
         Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
         mico_rtos_delete_thread(NULL);
     }
+
     elan_tcp_log("Shadow Connect...");
     rc = eland_tcp_connect(&Eland_Client, NULL);
     elan_tcp_log("Connect.over..");
@@ -626,27 +629,53 @@ little_cycle_loop:
         else
             tcp_HC_flag = false;
     }
+    /*pop queue*/
+    err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
+    if (err == kNoErr)
+    {
+        /*******upload alarm on notification********/
+        if (tcp_message == TCP_HT00_Sem)
+            rc = eland_IF_upload(&Eland_Client, HT00);
+        /*******delete tcp thread***********/
+        else if (tcp_message == TCP_Stop_Sem)
+        {
+            elan_tcp_log("TCP_Stop_Sem");
+            Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
+            Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
+            if (Eland_Client.clientData.readBuf != NULL)
+            {
+                free(Eland_Client.clientData.readBuf);
+                Eland_Client.clientData.readBuf = NULL;
+            }
+            mico_rtos_delete_thread(NULL);
+        }
+        else if (tcp_message == TCP_HC00_Sem)
+        {
+            tcp_HC_flag = true;
+        }
+        else if (tcp_message == TCP_FW01_Sem)
+        {
+            rc = eland_IF_upload(&Eland_Client, FW01);
+            if (TCP_SUCCESS == rc)
+            {
+                download_type = DOWNLOAD_OTA;
+                mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+            }
+        }
+
+        if (TCP_SUCCESS != rc)
+        {
+            mico_thread_sleep(1);
+            elan_tcp_log("Connection Error rc = %d", rc);
+        }
+    }
+
     /*******upload alarm history********/
     if (mico_rtos_get_semaphore(&off_history.alarm_off_sem, 0) == kNoErr)
         rc = eland_IF_upload(&Eland_Client, HT01);
-
-    /*******upload alarm on notification********/
-    if (mico_rtos_get_semaphore(&TCP_HT00_Sem, 0) == kNoErr)
-        rc = eland_IF_upload(&Eland_Client, HT00);
-
-    /*******delete tcp thread***********/
-    err = mico_rtos_get_semaphore(&TCP_Stop_Sem, 0);
-    if (err == kNoErr)
-    {
-        Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
-        Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
-        if (Eland_Client.clientData.readBuf != NULL)
-        {
-            free(Eland_Client.clientData.readBuf);
-            Eland_Client.clientData.readBuf = NULL;
-        }
-        mico_rtos_delete_thread(NULL);
-    }
+    /*******upload alarm history********/
+    if (mico_rtos_get_semaphore(&off_history.alarm_off_sem, 0) == kNoErr)
+        rc = eland_IF_upload(&Eland_Client, HT01);
 
     goto little_cycle_loop;
 exit:
@@ -921,6 +950,8 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
         elan_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
         set_alarm_history_data_state(DONE_UPLOAD);
         break;
+    case FW01:
+        break;
     default:
         break;
     }
@@ -1051,6 +1082,8 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case HT01: //17 alarm off notification
         break;
     case FW00: //18 firmware update start request
+        rc = TCP_Operate_FW00((char *)(buff + sizeof(_TELEGRAM_t)));
+        elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case FW01: //19 firmwart update start response
         break;
@@ -1105,6 +1138,9 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
 {
     TCP_Error_t rc = TCP_SUCCESS;
     __msg_function_t eland_cmd = ELAND_DATA_0C;
+    bool des_data_chang_flag = false;
+    _tcp_cmd_sem_t tcp_message;
+
     json_object *ReceivedJsonCache = NULL, *device_JSON = NULL;
     ELAND_DES_S des_data_cache;
     memset(&des_data_cache, 0, sizeof(ELAND_DES_S));
@@ -1202,9 +1238,18 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         }
     }
     mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
+    if (des_data_cache.timezone_offset_sec !=
+        netclock_des_g->timezone_offset_sec)
+        des_data_chang_flag = true;
     memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
+    /**stop tcp communication**/
+    if (des_data_chang_flag)
+    {
+        tcp_message = TCP_HC00_Sem;
+        mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
+    }
 exit:
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1456,6 +1501,82 @@ static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
     }
     list->number = list_len;
     mico_rtos_unlock_mutex(&list->holidaymutex);
+exit:
+    free_json_obj(&ReceivedJsonCache);
+    return rc;
+}
+static TCP_Error_t TCP_Operate_FW00(char *buf)
+{
+    json_object *ReceivedJsonCache = NULL, *firmware_json = NULL;
+    TCP_Error_t rc = TCP_SUCCESS;
+    char Cache_version[firmware_version_len];
+    char Cache_url[URL_Len];
+    char Cache_hash[hash_Len];
+    _tcp_cmd_sem_t tcp_message;
+    if (*buf != '{')
+    {
+        elan_tcp_log("error:received err json format data");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    ReceivedJsonCache = json_tokener_parse((const char *)(buf));
+    if (ReceivedJsonCache == NULL)
+    {
+        elan_tcp_log("json_tokener_parse error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    firmware_json = json_object_object_get(ReceivedJsonCache, "FirmwareUpdateData");
+    if ((firmware_json == NULL) || ((json_object_get_object(firmware_json)->head) == NULL))
+    {
+        elan_tcp_log("get firmware_json error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    json_object_object_foreach(firmware_json, key, val)
+    {
+        if (!strcmp(key, "version"))
+        {
+            memset(Cache_version, 0, firmware_version_len);
+            sprintf(Cache_version, "%s", json_object_get_string(val));
+            elan_tcp_log("version:%s", Cache_version);
+            if (!strncmp(Cache_version, "\0", 1))
+            {
+                elan_tcp_log("version not Available");
+                goto exit;
+            }
+        }
+        else if (!strcmp(key, "download_url"))
+        {
+            memset(Cache_url, 0, URL_Len);
+            sprintf(Cache_url, "%s", json_object_get_string(val));
+            elan_tcp_log("download_url:%s", Cache_url);
+            if (!strncmp(Cache_url, "\0", 1))
+            {
+                elan_tcp_log("download_url not Available");
+                goto exit;
+            }
+        }
+        else if (!strcmp(key, "hash"))
+        {
+            memset(Cache_hash, 0, hash_Len);
+            sprintf(Cache_hash, "%s", json_object_get_string(val));
+            elan_tcp_log("hash:%s", Cache_hash);
+            if (!strncmp(Cache_hash, "\0", 1))
+            {
+                elan_tcp_log("hash not Available");
+                goto exit;
+            }
+        }
+    }
+    mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
+    memcpy(netclock_des_g->OTA_version, Cache_version, firmware_version_len);
+    memcpy(netclock_des_g->OTA_url, Cache_url, URL_Len);
+    memcpy(netclock_des_g->OTA_hash, Cache_hash, hash_Len);
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
+    tcp_message = TCP_FW01_Sem;
+    mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
+
 exit:
     free_json_obj(&ReceivedJsonCache);
     return rc;

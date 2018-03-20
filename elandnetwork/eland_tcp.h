@@ -349,14 +349,20 @@ typedef enum TIME_RECORD_T {
     SET_ELSV_SEND_TIME,
     SET_ELSV_RECE_TIME,
 } TIME_RECORD_T_t;
+
+typedef enum TCP_CMD_SEM {
+    TCP_Stop_Sem,
+    TCP_HT00_Sem,
+    TCP_HC00_Sem,
+    TCP_FW01_Sem,
+} _tcp_cmd_sem_t;
 /* Private define ------------------------------------------------------------*/
 #define TELEGRAMHEADER "EL"
 #define COMMAND_LEN 4
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-extern mico_semaphore_t TCP_Stop_Sem;
-extern mico_semaphore_t TCP_HT00_Sem;
+extern mico_queue_t TCP_queue;
 /* Private function prototypes -----------------------------------------------*/
 TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params);
 TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *written_len);

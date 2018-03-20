@@ -15,7 +15,7 @@
 /* Private include -----------------------------------------------------------*/
 #include "mico.h"
 #include "eland_sound.h"
-
+#include "netclock_ota.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -259,9 +259,10 @@ wait_for_queue:
         alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
-        //   alarm_sound_oid();
+        alarm_sound_oid();
         break;
     case DOWNLOAD_OTA:
+        eland_ota();
         break;
     default:
         break;

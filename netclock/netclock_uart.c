@@ -70,14 +70,93 @@ static void set_eland_mode(_ELAND_MODE_t mode);
 static void set_eland_state(Eland_Status_type_t state);
 /* Private functions ---------------------------------------------------------*/
 
+// OSStatus start_uart_service(void)
+// {
+//     OSStatus err = kNoErr;
+//     /*Register user function for MiCO nitification: WiFi status changed*/
+//     err = mico_rtos_init_mutex(&eland_mode_state.state_mutex);
+//     require_noerr(err, exit);
+
+//     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_service", uart_service, 0x1000, 0);
+
+// exit:
+//     return err;
+// }
 OSStatus start_uart_service(void)
 {
     OSStatus err = kNoErr;
+    mico_uart_config_t uart_config;
+    mico_Context_t *mico_context;
+    uint32_t ota_arg;
+    __msg_function_t eland_cmd = KEY_FUN_NONE;
     /*Register user function for MiCO nitification: WiFi status changed*/
     err = mico_rtos_init_mutex(&eland_mode_state.state_mutex);
     require_noerr(err, exit);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_service", uart_service, 0x1000, 0);
+    /*wait mcu passed bootloader*/
+    mico_rtos_thread_msleep(1100);
+    /*creat mcu_ota thread*/
+
+    err = mico_rtos_create_thread(&MCU_OTA_thread, MICO_APPLICATION_PRIORITY, "mcu_ota_thread", mcu_ota_thread, 0x500, (uint32_t)&ota_arg);
+    require_noerr(err, exit);
+    /*wait ota thread*/
+    mico_rtos_thread_join(&MCU_OTA_thread);
+
+    if (ota_arg == kGeneralErr)
+        Eland_uart_log("mcu ota err");
+    goto exit;
+    //eland 状态数据互锁
+    err = mico_rtos_init_semaphore(&Is_usart_complete_sem, 2);
+    //初始化eland_uart_CMD_queue 發送 CMD 消息 初始化eland uart 發送 send 消息
+    err = mico_rtos_init_queue(&eland_uart_CMD_queue, "eland_uart_CMD_queue", sizeof(__msg_function_t), 5); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
+    //eland_state_queue
+    err = mico_rtos_init_queue(&eland_state_queue, "eland_state_queue", sizeof(Eland_Status_type_t), 5); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
+    //初始化eland uart 發送 receive 消息 CMD
+    err = mico_rtos_init_queue(&eland_uart_receive_queue, "eland_uart_receive_queue", sizeof(__msg_function_t), 1); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
+    Eland_uart_log("start uart");
+    /*Register uart thread*/
+    mico_context = mico_system_context_get();
+    uart_config.baud_rate = 115200;
+    uart_config.data_width = DATA_WIDTH_8BIT;
+    uart_config.parity = NO_PARITY;
+    uart_config.stop_bits = STOP_BITS_1;
+    uart_config.flow_control = FLOW_CONTROL_DISABLED;
+    if (mico_context->micoSystemConfig.mcuPowerSaveEnable == true)
+        uart_config.flags = UART_WAKEUP_ENABLE;
+    else
+        uart_config.flags = UART_WAKEUP_DISABLE;
+    ring_buffer_init((ring_buffer_t *)&rx_buffer, (uint8_t *)rx_data, UART_BUFFER_LENGTH);
+    MicoUartInitialize(MICO_UART_2, &uart_config, (ring_buffer_t *)&rx_buffer);
+    Eland_uart_log("start thread");
+
+    /*UART receive thread*/
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "UART Recv", uart_recv_thread_DDE, STACK_SIZE_UART_RECV_THREAD, 0);
+    require_noerr(err, exit);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_thread_DDE", uart_thread_DDE, 0x1000, 0);
+    require_noerr(err, exit);
+    /*Register queue receive thread*/
+    err = mico_rtos_get_semaphore(&Is_usart_complete_sem, MICO_WAIT_FOREVER); //two threads
+    require_noerr(err, exit);
+    err = mico_rtos_get_semaphore(&Is_usart_complete_sem, MICO_WAIT_FOREVER); //two times
+    require_noerr(err, exit);
+
+    err = mico_rtos_deinit_semaphore(&Is_usart_complete_sem);
+    require_noerr(err, exit);
+    /*read mcu rtc time*/
+    eland_cmd = TIME_READ_04;
+    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+    SendElandStateQueue(ElandBegin);
+    Eland_uart_log("start usart timer");
+    /*configuration usart timer*/
+    err = mico_init_timer(&timer100_key, 100, timer100_key_handle, NULL); //100ms 讀取一次
+    require_noerr(err, exit);
+    /*start key read timer*/
+    err = mico_start_timer(&timer100_key); //開始定時器
+    require_noerr(err, exit);
+
 exit:
     return err;
 }
@@ -656,6 +735,7 @@ static void ELAND_H0B_Send(uint8_t *Cache)
         *(Cache + 2) = 0;
     else
     {
+        alarm_data_mcu->mode = get_eland_mode();
         *(Cache + 2) = sizeof(_alarm_mcu_data_t);
         memcpy(Cache + 3, (uint8_t *)alarm_data_mcu, sizeof(_alarm_mcu_data_t));
     }
@@ -742,6 +822,8 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     uint8_t cache = 0;
     static uint16_t time_delay_counter;
     _alarm_list_state_t alarm_status;
+    _download_type_t download_type;
+    _tcp_cmd_sem_t tcp_message;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
@@ -785,6 +867,11 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             }
             mico_rtos_set_semaphore(&alarm_jump_sem);
         }
+        if (Key_Count_Trg & KEY_Snooze) //alarm jump
+        {
+            download_type = DOWNLOAD_OID;
+            mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+        }
     }
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/
     if ((Key_Count & KEY_MON) | (Key_Count & KEY_AlarmMode))
@@ -823,7 +910,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         case ELAND_NC:
         case ELAND_NA:
             /**stop tcp communication**/
-            mico_rtos_set_semaphore(&TCP_Stop_Sem);
+            tcp_message = TCP_Stop_Sem;
+            mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
+
             set_eland_state(ElandBegin);
             if (Key_Count & KEY_MON)
             {
