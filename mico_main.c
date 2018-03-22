@@ -72,10 +72,10 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
+    //  start_uart_service();
 
     /*start Soft_AP mode*/
-    //    Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    Start_wifi_Station_SoftSP_Thread(Soft_AP);
 
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi");

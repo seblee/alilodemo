@@ -85,7 +85,7 @@ static void ota_server_progress_set(OTA_STATE_E state)
     progress = progress * 100;
     ota_server_status_handler(state, progress);
 }
-/***************啟動 OTA thread*****************************/
+/***************start OTA thread*****************************/
 void start_ota_thread(void)
 {
     ota_log("ota Start!");
@@ -101,7 +101,7 @@ void start_ota_thread(void)
 
 OSStatus eland_ota_data_init(uint32_t length)
 {
-    OSStatus err;
+    OSStatus err = kNoErr;
     ota_log("ota Start!");
     mico_system_notify_remove_all(mico_notify_WIFI_STATUS_CHANGED);
     mico_system_notify_remove_all(mico_notify_WiFI_PARA_CHANGED);
@@ -249,6 +249,7 @@ OSStatus eland_ota(void)
     require_noerr(err, exit);
     eland_ota_operation();
 exit:
+    mico_system_power_perform(mico_system_context_get(), eState_Software_Reset);
     url_free(url_c);
     return err;
 }
