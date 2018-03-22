@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-05 17:20:35
+ * @Last Modified time:2018-03-22 11:21:11
  * @brief   :
  ****************************************************************************
 **/
@@ -112,9 +112,11 @@ exit:
 }
 static void eland_check_ssid(void)
 {
+    OSStatus err;
     msg_wify_queue received;
     mico_Context_t *context = NULL;
     /********清空消息隊列*************/
+    context = mico_system_context_get();
     while (!mico_rtos_is_queue_empty(&wifistate_queue))
     {
         app_httpd_log("clear wifistate_queue");
@@ -130,7 +132,6 @@ static void eland_check_ssid(void)
         app_httpd_log("Wifi parameter is correct");
         device_state->IsActivate = true;
         app_httpd_log("save wifi para,update flash"); //save
-        context = mico_system_context_get();
         strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
         strncpy(context->micoSystemConfig.key, netclock_des_g->WifiKey, ElandKey_Len);
         strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
@@ -150,7 +151,8 @@ static void eland_check_ssid(void)
             memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
         }
         context->micoSystemConfig.configured = allConfigured;
-        mico_system_context_update(context);
+        err = mico_system_context_update(context);
+        app_httpd_log("err = %d", err);
     }
     else
     {
@@ -161,6 +163,7 @@ static void eland_check_ssid(void)
     }
     app_httpd_log("system restart");
     mico_system_power_perform(context, eState_Software_Reset);
+    mico_rtos_thread_sleep(2);
     flagHttpdServerAP = 1;
 }
 /*****************Get_Request******************************************/

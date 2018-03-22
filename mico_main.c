@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-08 10:01:39
+ * @Last Modified time:2018-03-22 11:28:39
  * @brief   :
  ****************************************************************************
 **/
@@ -75,7 +75,7 @@ int application_start(void)
     start_uart_service();
 
     /*start Soft_AP mode*/
-    //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    //    Start_wifi_Station_SoftSP_Thread(Soft_AP);
 
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi");

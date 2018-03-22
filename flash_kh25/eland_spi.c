@@ -1,5 +1,37 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-03-22 09:15:02
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-03-22 09:26:03
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "mico.h"
 #include "eland_spi.h"
+
+/* Private typedef -----------------------------------------------------------*/
+
+/* Private define ------------------------------------------------------------*/
+#define CONFIG_SPI_DEBUG
+#ifdef CONFIG_SPI_DEBUG
+#define spi_log(M, ...) custom_log("SPI", M, ##__VA_ARGS__)
+#else
+#define client_log(...)
+#endif /* ! CONFIG_CLIENT_DEBUG */
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
+
+/* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
 
 /*
 Brief: SPI protocol initiate
@@ -27,6 +59,7 @@ void v_SPIInitSimulate(Spi_t *p_Spi)
         MicoGpioInitialize((mico_gpio_t)p_Spi->ui_MISO, OUTPUT_OPEN_DRAIN_PULL_UP);
     }
     v_CSIsEnableSimulate(p_Spi, 0);
+
     switch (p_Spi->spiMode)
     {
     case Mode0_0:

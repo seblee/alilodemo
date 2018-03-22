@@ -9,7 +9,7 @@
 #define NETCLOCK_NETCLOCKCONFIG_H_
 #include "mico.h"
 
-#define Eland_Firmware_Version ("01.04") //Eland固件版本号
+#define Eland_Firmware_Version ("01.05") //Eland固件版本号
 
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值

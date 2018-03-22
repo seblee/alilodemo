@@ -1,33 +1,18 @@
 /**
- ******************************************************************************
- * @file    http_client.c
- * @author  William Xu
- * @version V1.0.0
- * @date    21-May-2015
- * @brief   MiCO http client demo to read data from www.baidu.com
- ******************************************************************************
- *  The MIT License
- *  Copyright (c) 2016 MXCHIP Inc.
- *
- *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is furnished
- *  to do so, subject to the following conditions:
- *
- *  The above copyright notice and this permission notice shall be included in
- *  all copies or substantial portions of the Software.
- *
- *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- *  WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
- *  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- ******************************************************************************
- */
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-03-22 09:26:21
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-03-22 09:28:26
+ * @brief   :
+ ****************************************************************************
+**/
 
+/* Private include -----------------------------------------------------------*/
 #include "mico.h"
 #include "HTTPUtils.h"
 #include "SocketUtils.h"
@@ -40,6 +25,9 @@
 #include "audio_service.h"
 #include "netclock_ota.h"
 
+/* Private typedef -----------------------------------------------------------*/
+
+/* Private define ------------------------------------------------------------*/
 #define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
@@ -47,44 +35,22 @@
 #define client_log(...)
 #endif /* ! CONFIG_CLIENT_DEBUG */
 
+#define SIMPLE_GET_REQUEST                                     \
+    "GET /api/download.php?vid=taichi_16_024kbps HTTP/1.1\r\n" \
+    "Host: 160.16.237.210\r\n"                                 \
+    "Content-Type: audio/x-mp3\r\n"                            \
+    "\r\n"                                                     \
+    ""
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 static char *eland_http_requeset = NULL;
 
 uint32_t eland_sound_download_pos = 0;
 uint32_t eland_sound_download_len = 0;
 SOUND_DOWNLOAD_STATUS sound_download_status = SOUND_DOWNLOAD_IDLE;
-/**********************************************************/
-
-/**********************************************/
-
-static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext);
-
-/*one request may receive multi reply*/
-static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader,
-                               uint32_t inPos,
-                               uint8_t *inData,
-                               size_t inLen,
-                               void *inUserContext);
-/**download oid sound**/
-static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader,
-                                   uint32_t inPos,
-                                   uint8_t *inData,
-                                   size_t inLen,
-                                   void *inUserContext);
-/**download ota file**/
-static OSStatus onReceivedData_ota(struct _HTTPHeader_t *inHeader,
-                                   uint32_t inPos,
-                                   uint8_t *inData,
-                                   size_t inLen,
-                                   void *inUserContext);
-
-//给response的消息队列发送消息
-void send_response_to_queue(ELAND_HTTP_RESPONSE_E status,
-                            uint32_t http_id,
-                            int32_t status_code,
-                            const char *response_body);
 
 /*************certificate********************************/
-
 char *certificate =
     "-----BEGIN CERTIFICATE-----\n\
 MIIESzCCAzOgAwIBAgIJAMuHDGTAVpi1MA0GCSqGSIb3DQEBCwUAMIGTMQswCQYD\n\
@@ -166,13 +132,37 @@ SdE0WebPo0V0j6bBvtiPEt2q7SLlNk6oCvra2b8tRvZQZC6hIfkk1PtDBgavL87k\n\
 9r7mdVFee0dLXDjGfsxQ9tm59xTacuOKYE0Zrw5OUkNn7OrS\n\
 -----END CERTIFICATE-----";
 
-#define SIMPLE_GET_REQUEST                                     \
-    "GET /api/download.php?vid=taichi_16_024kbps HTTP/1.1\r\n" \
-    "Host: 160.16.237.210\r\n"                                 \
-    "Content-Type: audio/x-mp3\r\n"                            \
-    "\r\n"                                                     \
-    ""
 /*******************************************************/
+
+/* Private function prototypes -----------------------------------------------*/
+static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext);
+
+/*one request may receive multi reply*/
+static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader,
+                               uint32_t inPos,
+                               uint8_t *inData,
+                               size_t inLen,
+                               void *inUserContext);
+/**download oid sound**/
+static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader,
+                                   uint32_t inPos,
+                                   uint8_t *inData,
+                                   size_t inLen,
+                                   void *inUserContext);
+/**download ota file**/
+static OSStatus onReceivedData_ota(struct _HTTPHeader_t *inHeader,
+                                   uint32_t inPos,
+                                   uint8_t *inData,
+                                   size_t inLen,
+                                   void *inUserContext);
+
+//给response的消息队列发送消息
+void send_response_to_queue(ELAND_HTTP_RESPONSE_E status,
+                            uint32_t http_id,
+                            int32_t status_code,
+                            const char *response_body);
+
+/* Private functions ---------------------------------------------------------*/
 
 //域名域名DNS解析
 OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
@@ -863,10 +853,12 @@ static OSStatus onReceivedData_ota(struct _HTTPHeader_t *inHeader, uint32_t inPo
         context->content = calloc(1, sizeof(uint8_t));
         require_action(context->content, exit, err = kNoMemoryErr);
         context->content_length = inHeader->contentLength;
-        eland_ota_data_init(context->content_length);
+        err = eland_ota_data_init(context->content_length);
+        require_noerr(err, exit);
         client_log("This is not a chunked data");
     }
-    eland_ota_data_write(inData, inLen);
+    err = eland_ota_data_write(inData, inLen);
+    require_noerr(err, exit);
 exit:
     return err;
 }

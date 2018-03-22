@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-05 15:12:16
+ * @Last Modified time:2018-03-22 09:40:59
  * @brief   :
  ****************************************************************************
 **/
@@ -19,8 +19,8 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define MCU_VERSION_MAJOR 2
-#define MCU_VERSION_MINOR 4
+#define MCU_VERSION_MAJOR 1
+#define MCU_VERSION_MINOR 5
 
 /* Define mcu power pin */
 #define MCU_POWER_GPIO MICO_GPIO_1

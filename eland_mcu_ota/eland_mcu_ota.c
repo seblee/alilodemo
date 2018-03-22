@@ -220,19 +220,27 @@ void mcu_ota_thread(mico_thread_arg_t arg)
                 goto exit;
             else if (*err == kGeneralErr)
             {
-                for (i = 0; i < 30; i++)
-                    MicoUartSend(MICO_UART_2, err, 1);
-                mico_rtos_thread_sleep(5);
-                MicoGpioInitialize((mico_gpio_t)MCU_POWER_GPIO, OUTPUT_PUSH_PULL);
-
-                /***stm8 mcu reset  (power off-->power on)**/
-                for (i = 0; i < 230; i++)
-                {
-                    MicoGpioOutputLow((mico_gpio_t)MCU_POWER_GPIO);
-                    mico_rtos_thread_sleep(1);
-                    MicoGpioOutputHigh((mico_gpio_t)MCU_POWER_GPIO);
-                    mico_rtos_thread_sleep(1);
-                }
+                goto exit_err;
+                // for (i = 0; i < 30; i++)
+                // {
+                //     MicoUartSend(MICO_UART_2, err, 1);
+                // }
+                // mico_rtos_thread_sleep(5);
+                // MicoGpioInitialize(MCU_POWER_GPIO, OUTPUT_OPEN_DRAIN_NO_PULL);
+                // mico_rtos_thread_sleep(1);
+                // *err += 1;
+                // MicoUartSend(MICO_UART_2, err, 1);
+                // mico_rtos_thread_sleep(1);
+                // /***stm8 mcu reset  (power off-->power on)**/
+                // for (i = 0; i < 230; i++)
+                // {
+                //     *err += 1;
+                //     MicoUartSend(MICO_UART_2, err, 1);
+                //     mico_rtos_thread_sleep(1);
+                //     MicoGpioOutputLow(MCU_POWER_GPIO);
+                //     mico_rtos_thread_sleep(1);
+                //     MicoGpioOutputHigh(MCU_POWER_GPIO);
+                // }
             }
             OTA_uart_init();
             mico_rtos_thread_msleep(50);
