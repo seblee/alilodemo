@@ -224,7 +224,6 @@ static int web_send_Post_Request(httpd_request_t *req)
         if (ProcessPostJson(buf) == kNoErr)
         {
             app_httpd_log("Json useful");
-
             eland_check_ssid();
         }
         else

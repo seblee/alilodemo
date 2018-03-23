@@ -29,27 +29,24 @@
 //ota_op start
 //2017年12月18日17: 11: 34
 {
-    "ssid": "TP-LINK_4850",
-    "password": "cq68794850",
-    "eland_id": 15,
     "device": {
-        "eland_id": 5,
-        "user_id": "e5c18be0-82f2-44cb-abd5-2550323decf1",
-        "eland_name": "seblee_test",
+        "eland_id": 12,
+        "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
+        "eland_name": "AM1A8000012",
         "timezone_offset_sec": 28800,
-        "serial_number": "ALMA0000005",
-        "firmware_version": "01.00",
+        "serial_number": "AM1A8000012",
+        "firmware_version": "01.05",
         "mac_address": "B0:F8:93:15:25:B2",
         "dhcp_enabled": 1,
-        "ip_address": "192.168.0.1",
+        "ip_address": "192.168.1.112",
         "subnet_mask": "255.255.255.0",
-        "default_gateway": "255.255.255.255",
+        "default_gateway": "192.168.1.1",
         "time_display_format": 1,
-        "brightness_normal": 80,
-        "brightness_night": 20,
-        "night_mode_enabled": 0,
-        "night_mode_begin_time": "22:00:00",
-        "night_mode_end_time": "06:00:00"
+        "brightness_normal": 32,
+        "brightness_night": 12,
+        "night_mode_enabled": 1,
+        "night_mode_begin_time": "23:00:00",
+        "night_mode_end_time": "07:20:00"
     }
 }
 Host: 192.168.0.1

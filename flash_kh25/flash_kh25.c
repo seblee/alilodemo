@@ -254,6 +254,7 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
     count = KH25L8006_PAGE_SIZE - Addr;
     NumOfPage = NumByteToWrite / KH25L8006_PAGE_SIZE;
     NumOfSingle = NumByteToWrite % KH25L8006_PAGE_SIZE;
+
     if (Addr == 0) /* writeaddr is KH25L8006_PAGE_SIZE aligned  */
     {
         if (NumOfPage == 0) /* NumByteToWrite < KH25L8006_PAGE_SIZE */
@@ -328,7 +329,10 @@ OSStatus flash_kh25_init(void)
     {
         flash_kh25_log("first read:%s", elandSPIBuffer);
         memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);
-        flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
+        // flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
+        SOUND_FILE_CLEAR();
+        flash_kh25_sector_erase(KH25_CHECK_ADDRESS);
+        flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待300ms
         sprintf((char *)(elandSPIBuffer), "%s", FLASH_KH25_CHECK_STRING);
         flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
         memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);

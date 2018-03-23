@@ -169,6 +169,7 @@ start_Check:
     netclock_des_g->eland_id = device_state->eland_id; // des_g_Temp.eland_id; //Eland唯一识别的ID
     memcpy(netclock_des_g->user_id, device_state->user_id, user_id_len);
     memcpy(netclock_des_g->serial_number, device_state->serial_number, serial_number_len);
+    memcpy(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len);
     /***initialize by device flash***/
     netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
     memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
@@ -339,12 +340,10 @@ void destory_upload_data(void)
 //解析接收到的数据包
 OSStatus ProcessPostJson(char *InputJson)
 {
-    bool needupdateflash = false;
-    json_object *ReceivedJsonCache = NULL, *ElandJsonCache = NULL;
-    mico_Context_t *context = NULL;
+    json_object *ReceivedJsonCache = NULL;
+    json_object *ElandJsonCache = NULL;
 
     mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
-    context = mico_system_context_get();
     if (*InputJson != '{')
     {
         Eland_log("error:received err json format data");
@@ -383,9 +382,6 @@ OSStatus ProcessPostJson(char *InputJson)
         else if (!strcmp(key1, "eland_id"))
         {
             device_state->eland_id = json_object_get_int(val1);
-            memset(device_state->serial_number, 0, serial_number_len);
-            sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
-            needupdateflash = true;
         }
     }
     Eland_log("process device");
@@ -417,16 +413,6 @@ OSStatus ProcessPostJson(char *InputJson)
         else if (!strcmp(key, "dhcp_enabled"))
         {
             netclock_des_g->dhcp_enabled = json_object_get_int(val);
-            if (device_state->dhcp_enabled != netclock_des_g->dhcp_enabled)
-            {
-                device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
-
-                if (netclock_des_g->dhcp_enabled == 1)
-                    context->micoSystemConfig.dhcpEnable = DHCP_Client; /* Fetch Ip address from DHCP server */
-                else if (netclock_des_g->dhcp_enabled == 0)
-                    context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
-                needupdateflash = true;
-            }
         }
         else if (!strcmp(key, "ip_address"))
         {
@@ -443,57 +429,9 @@ OSStatus ProcessPostJson(char *InputJson)
             memset(netclock_des_g->default_gateway, 0, ip_address_Len);
             sprintf(netclock_des_g->default_gateway, "%s", json_object_get_string(val));
         }
-        // else if (!strcmp(key, "night_mode_end_time"))
-        // {
-        //     memset(netclock_des_g->night_mode_end_time, 0, sizeof(netclock_des_g->night_mode_end_time));
-        //     sprintf(netclock_des_g->night_mode_end_time, "%s", json_object_get_string(val));
-        // }
-        // else if (!strcmp(key, "night_mode_begin_time"))
-        // {
-        //     memset(netclock_des_g->night_mode_begin_time, 0, sizeof(netclock_des_g->night_mode_begin_time));
-        //     sprintf(netclock_des_g->night_mode_begin_time, "%s", json_object_get_string(val));
-        // }
     }
-
-    if (device_state->dhcp_enabled == 0)
-    {
-        if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
-        {
-            needupdateflash = true;
-            memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
-        }
-        if ((strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0) ||
-            (strncmp(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len) != 0) ||
-            (strncmp(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len) != 0) ||
-            (strncmp(device_state->dnsServer, netclock_des_g->dnsServer, ip_address_Len) != 0))
-        {
-            needupdateflash = true;
-            memcpy(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len);
-            memcpy(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len);
-            memcpy(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len);
-        }
-        if (needupdateflash)
-        {
-            memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
-            memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
-            memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
-            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
-        }
-    }
-    if (strncmp(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len) != 0)
-    {
-        needupdateflash = true;
-        memcpy(device_state->eland_name, netclock_des_g->eland_name, eland_name_Len);
-    }
-    if (strncmp(netclock_des_g->user_id, device_state->user_id, user_id_len) != 0)
-    {
-        needupdateflash = true;
-        memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
-    }
-
-    if (needupdateflash == true)
-        mico_system_context_update(context);
-
+    /**refresh flash inside**/
+    eland_update_flash();
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     return kNoErr;
@@ -693,4 +631,70 @@ OSStatus Eland_Rtc_Init(void)
     Eland_log("utc_time:%ld", utc_time);
 
     return status;
+}
+
+void eland_update_flash(void)
+{
+    bool needupdateflash = false;
+    mico_Context_t *context = NULL;
+    context = mico_system_context_get();
+    char serial_number_temp[serial_number_len];
+
+    memset(serial_number_temp, 0, serial_number_len);
+    sprintf(serial_number_temp, "AM1A8%06ld", device_state->eland_id);
+    if (strncmp(serial_number_temp, device_state->serial_number, serial_number_len) != 0)
+    {
+        memcpy(device_state->serial_number, serial_number_temp, serial_number_len);
+        needupdateflash = true;
+    }
+
+    if (device_state->dhcp_enabled != netclock_des_g->dhcp_enabled)
+    {
+        device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
+
+        if (netclock_des_g->dhcp_enabled == 1)
+            context->micoSystemConfig.dhcpEnable = DHCP_Client; /* Fetch Ip address from DHCP server */
+        else if (netclock_des_g->dhcp_enabled == 0)
+            context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
+        needupdateflash = true;
+    }
+
+    if (device_state->dhcp_enabled == 0)
+    {
+        if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
+        {
+            needupdateflash = true;
+            memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
+        }
+        if ((strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0) ||
+            (strncmp(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len) != 0) ||
+            (strncmp(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len) != 0) ||
+            (strncmp(device_state->dnsServer, netclock_des_g->dnsServer, ip_address_Len) != 0))
+        {
+            needupdateflash = true;
+            memcpy(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len);
+            memcpy(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len);
+            memcpy(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len);
+        }
+        if (needupdateflash)
+        {
+            memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
+            memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
+            memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
+            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
+        }
+    }
+    if (strncmp(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len) != 0)
+    {
+        needupdateflash = true;
+        memcpy(device_state->eland_name, netclock_des_g->eland_name, eland_name_Len);
+    }
+    if (strncmp(netclock_des_g->user_id, device_state->user_id, user_id_len) != 0)
+    {
+        needupdateflash = true;
+        memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
+    }
+
+    if (needupdateflash == true)
+        mico_system_context_update(context);
 }

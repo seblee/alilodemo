@@ -1078,8 +1078,8 @@ static void set_eland_state(Eland_Status_type_t state)
 void reset_eland_flash_para(void)
 {
     OSStatus err = kNoErr;
-    uint8_t BUF[20] = {0};
     __msg_function_t eland_cmd;
+    uint8_t BUF[5] = {0};
     do
     {
         err = mico_rtos_pop_from_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
@@ -1087,6 +1087,7 @@ void reset_eland_flash_para(void)
     eland_cmd = ELAND_RESET_0D;
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     err = Netclock_des_recovery();
+
     flash_kh25_write_page(BUF, KH25_CHECK_ADDRESS, sizeof(BUF));
     MicoSystemReboot();
 }

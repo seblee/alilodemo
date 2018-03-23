@@ -1244,6 +1244,8 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
     memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
+    /**refresh flash inside**/
+    eland_update_flash();
     /**stop tcp communication**/
     if (des_data_chang_flag)
     {

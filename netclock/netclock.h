@@ -68,6 +68,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
 OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type);
 OSStatus eland_communication_info_get(void);
+void eland_update_flash(void);
 /* Private functions ---------------------------------------------------------*/
 
 //extern static mico_semaphore_t WifiConnectSem;
