@@ -162,7 +162,7 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     alarm_stream.sound_type = sound_type;
 
     if ((alarm->alarm_pattern == 3) ||
-        ((alarm->alarm_pattern == 4) && (sound_type = SOUND_FILE_VID)))
+        (sound_type == SOUND_FILE_OFID))
         alarm_stream.stream_count = 1;
     else
         alarm_stream.stream_count = 0xffff;
@@ -174,6 +174,9 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         break;
     case SOUND_FILE_SID:
         memcpy(alarm_stream.alarm_id, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
+        break;
+    case SOUND_FILE_OFID:
+        memcpy(alarm_stream.alarm_id, alarm->alarm_off_voice_alarm_id, sizeof(alarm->alarm_off_voice_alarm_id));
         break;
     default:
         break;
@@ -386,7 +389,6 @@ OSStatus alarm_sound_scan(void)
 scan_again:
     if (flag)
     {
-
         alarm_log("check default sound");
         err = SOUND_CHECK_DEFAULT_FILE();
         if (err != kNoErr)
@@ -401,25 +403,25 @@ scan_again:
     }
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
+        alarm_log("alarm:%d", i);
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 1) ||
-            ((alarm_list.alarm_lib + i)->alarm_pattern == 3) ||
-            ((alarm_list.alarm_lib + i)->alarm_pattern == 4))
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
         {
-            alarm_log("SID:%d", i);
+            alarm_log("SID:%ld", (alarm_list.alarm_lib + i)->alarm_sound_id);
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
             require_noerr(err, exit);
         }
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 2) ||
-            ((alarm_list.alarm_lib + i)->alarm_pattern == 3) ||
-            ((alarm_list.alarm_lib + i)->alarm_pattern == 4))
+            ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
         {
-            alarm_log("VID:%d", i);
+            alarm_log("VID:%s", (alarm_list.alarm_lib + i)->voice_alarm_id);
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
             require_noerr(err, exit);
         }
-        if ((alarm_list.alarm_lib + i)->alarm_pattern == 4)
+
+        if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 30)
         {
-            alarm_log("OID:%d", i);
+            alarm_log("OFID:%s", (alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id);
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
             require_noerr(err, exit);
         }
@@ -525,12 +527,16 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     mico_utc_time_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
     bool first_to_snooze = true, first_to_alarming = true;
     mscp_result_t result;
-    uint8_t volume_value = 0;
+    static uint8_t volume_value = 0;
     uint8_t volume_change_counter = 0;
     iso8601_time_t iso8601_time;
     uint8_t i = 0;
     uint8_t volume_stepup_count = 0;
     _tcp_cmd_sem_t tcp_message;
+
+    for (i = 0; i < volume_value + 3; i++)
+        audio_service_volume_down(&result, 1);
+    volume_value = 0;
 
     if (alarm->volume_stepup_enabled == 0)
     {
@@ -580,7 +586,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
                 alarm_log("alarm_time up");
                 set_alarm_state(ALARM_SNOOZ_STOP);
-                Alarm_Play_Control(alarm, 0); //stop with delay
             }
             else
                 Alarm_Play_Control(alarm, 1); //play with delay
@@ -641,9 +646,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         mico_rtos_set_semaphore(&off_history.alarm_off_sem);
         set_alarm_history_data_state(WAIT_UPLOAD);
     }
-
-    for (i = 0; i < volume_value + 3; i++)
-        audio_service_volume_down(&result, 1);
 }
 /***CMD = 1 PALY   CMD = 0 STOP***/
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
@@ -651,14 +653,16 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     mscp_result_t result;
     mscp_status_t audio_status;
     static bool isVoice = false;
+    static bool voic_stoped = false;
 
     audio_service_get_audio_status(&result, &audio_status);
     if (CMD) //play
     {
+        voic_stoped = false;
         if (get_alarm_stream_state() != STREAM_PLAY)
         {
             alarm_log("audio_status %d", audio_status);
-            if ((alarm->alarm_pattern == 1) || (alarm->alarm_pattern == 4))
+            if (alarm->alarm_pattern == 1)
             {
                 init_alarm_stream(alarm, SOUND_FILE_SID);
                 set_alarm_stream_state(STREAM_PLAY);
@@ -698,9 +702,16 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             set_alarm_stream_state(STREAM_STOP);
         if (audio_status != MSCP_STATUS_IDLE)
             audio_service_stream_stop(&result, alarm_stream.stream_id);
-        if (alarm->alarm_pattern == 4) //alarm off oid
+        if ((strlen(alarm->alarm_off_voice_alarm_id) > 30) && //alarm off oid
+            !voic_stoped)
         {
-            init_alarm_stream(alarm, SOUND_FILE_VID);
+            voic_stoped = true;
+            do
+            {
+                mico_rtos_thread_msleep(200);
+                audio_service_get_audio_status(&result, &audio_status);
+            } while (audio_status != MSCP_STATUS_IDLE);
+            init_alarm_stream(alarm, SOUND_FILE_OFID);
             set_alarm_stream_state(STREAM_PLAY);
             mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }

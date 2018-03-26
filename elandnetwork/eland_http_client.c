@@ -590,7 +590,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     int ssl_errno = 0;
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
-    struct timeval t = {1, HTTP_YIELD_TMIE * 1000};
+    struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
 
     if (http_body)
         http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
