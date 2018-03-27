@@ -20,7 +20,7 @@
 
 /* Private define ------------------------------------------------------------*/
 #define MCU_VERSION_MAJOR 1
-#define MCU_VERSION_MINOR 5
+#define MCU_VERSION_MINOR 6
 
 /* Define mcu power pin */
 #define MCU_POWER_GPIO MICO_GPIO_1

@@ -112,8 +112,7 @@ exit:
 }
 static void eland_check_ssid(void)
 {
-    OSStatus err;
-    msg_wify_queue received;
+      msg_wify_queue received;
     mico_Context_t *context = NULL;
     /********清空消息隊列*************/
     context = mico_system_context_get();
@@ -151,9 +150,8 @@ static void eland_check_ssid(void)
             memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
         }
         context->micoSystemConfig.configured = allConfigured;
-        err = mico_system_context_update(context);
-        app_httpd_log("err = %d", err);
-    }
+         mico_system_context_update(context);
+          }
     else
     {
         SendElandStateQueue(WifyConnectedFailed);

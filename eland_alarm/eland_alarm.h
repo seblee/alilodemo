@@ -37,20 +37,14 @@ typedef struct
     mico_rtc_time_t moment_time; //
     int8_t color;
     int8_t snooze_count;
-    int8_t alarm_repeat;
-    uint8_t alarm_on_days_of_week;
+    int8_t snooze_interval_min;
+    uint8_t alarm_continue_min;
     _ELAND_MODE_t mode;
 } _alarm_mcu_data_t;
-typedef struct __SOUND_FILE_INFO_
-{
-    uint32_t file_len;
-    uint32_t file_address;
-} _sound_file_info_t;
+
 typedef struct
 {
-    uint32_t moment_second; //
-    int8_t color;
-    int8_t snooze_count;
+    uint32_t moment_second;
     uint8_t alarm_on_days_of_week;
 } _alarm_eland_data_t;
 

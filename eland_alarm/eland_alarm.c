@@ -222,34 +222,30 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     if (elsv_alarm_data->alarm_repeat == 0)
         get_alarm_utc_second(elsv_alarm_data);
 
-    alarm_eland_data->color = elsv_alarm_data->alarm_color;
-    alarm_mcu_data->color = elsv_alarm_data->alarm_color;
+     alarm_mcu_data->color = elsv_alarm_data->alarm_color;
 
     if (elsv_alarm_data->snooze_enabled)
     {
-        alarm_eland_data->snooze_count = elsv_alarm_data->snooze_count;
-        alarm_mcu_data->snooze_count = elsv_alarm_data->snooze_count;
+         alarm_mcu_data->snooze_count = elsv_alarm_data->snooze_count;
     }
     else
     {
-        alarm_eland_data->snooze_count = 0;
-        alarm_mcu_data->snooze_count = 0;
+         alarm_mcu_data->snooze_count = 0;
     }
+    alarm_mcu_data->snooze_interval_min = elsv_alarm_data->snooze_interval_min;
+    alarm_mcu_data->alarm_continue_min = elsv_alarm_data->alarm_continue_min;
 
     if (elsv_alarm_data->alarm_repeat == 1)
     {
         alarm_eland_data->alarm_on_days_of_week = 0x7f;
-        alarm_mcu_data->alarm_on_days_of_week = 0x7f;
     }
     else if (elsv_alarm_data->alarm_repeat == 2)
     {
         alarm_eland_data->alarm_on_days_of_week = 0x3e;
-        alarm_mcu_data->alarm_on_days_of_week = 0x3e;
     }
     else if (elsv_alarm_data->alarm_repeat == 3)
     {
         alarm_eland_data->alarm_on_days_of_week = 0x41;
-        alarm_mcu_data->alarm_on_days_of_week = 0x41;
     }
     else if (elsv_alarm_data->alarm_repeat == 4)
     {
@@ -259,7 +255,6 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
             if (elsv_alarm_data->alarm_on_days_of_week[i] == '1')
                 alarm_eland_data->alarm_on_days_of_week |= (1 << i);
         }
-        alarm_mcu_data->alarm_on_days_of_week = alarm_eland_data->alarm_on_days_of_week;
     }
     else if (elsv_alarm_data->alarm_repeat == 5)
     {
@@ -267,7 +262,6 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     else
     {
         alarm_eland_data->alarm_on_days_of_week = 0;
-        alarm_mcu_data->alarm_on_days_of_week = 0;
     }
 }
 OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
@@ -841,13 +835,13 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("alarm_on_days_of_week:%s", alarm_data->alarm_on_days_of_week);
     alarm_log("\r\alarm_data_for_eland");
     alarm_log("moment_second:%ld", alarm_data->alarm_data_for_eland.moment_second);
-    alarm_log("color:%d", alarm_data->alarm_data_for_eland.color);
-    alarm_log("snooze_count:%d", alarm_data->alarm_data_for_eland.snooze_count);
+    alarm_log("color:%d", alarm_data->alarm_color);
+    alarm_log("snooze_count:%d", alarm_data->snooze_count);
     alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("\r\n_alarm_mcu_data_t");
     alarm_log("color:%d", alarm_data->alarm_data_for_mcu.color);
     alarm_log("snooze_count:%d", alarm_data->alarm_data_for_mcu.snooze_count);
-    alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_mcu.alarm_on_days_of_week);
+    alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("moment_time:%02d-%02d-%02d %d %02d-%02d-%02d",
               alarm_data->alarm_data_for_mcu.moment_time.year,
               alarm_data->alarm_data_for_mcu.moment_time.month,
@@ -973,7 +967,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
     case 4:
         for (i = 0; i < 7; i++)
         {
-            if (alarm->alarm_data_for_mcu.alarm_on_days_of_week & (1 << ((week_day + i - 1) % 7)))
+            if (alarm->alarm_data_for_eland.alarm_on_days_of_week & (1 << ((week_day + i - 1) % 7)))
             {
                 alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * SECOND_ONE_DAY);
                 if (alarm->alarm_data_for_eland.moment_second < utc_time)
