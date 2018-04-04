@@ -76,3 +76,26 @@ Content-Length: 730
         "night_mode_end_time": "06:00:00"
     }
 }
+{
+    "ssid": "lsi-4F-mac",
+    "password": "hdhd",
+    "device": {
+        "eland_id": 12,
+        "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
+        "eland_name": "aoyagi",
+        "timezone_offset_sec": 32400,
+        "serial_number": "AM1A8000012",
+        "firmware_version": "01.07",
+        "mac_address": "B0:F8:93:15:25:B2",
+        "dhcp_enabled": 1,
+        "ip_address": "",
+        "subnet_mask": "",
+        "default_gateway": "",
+        "time_display_format": 1,
+        "brightness_normal": 80,
+        "brightness_night": 20,
+        "night_mode_enabled": 0,
+        "night_mode_begin_time": "22:00:00",
+        "night_mode_end_time": "06:00:00"
+    }
+}

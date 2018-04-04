@@ -16,6 +16,7 @@
 #include "mico.h"
 #include "eland_sound.h"
 #include "netclock_ota.h"
+#include "eland_alarm.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -195,7 +196,7 @@ OSStatus SOUND_CHECK_DEFAULT_FILE(void)
     err = mico_rtos_lock_mutex(&eland_sound_mutex);
     require_noerr(err, exit);
     flash_kh25_read((uint8_t *)(&alarm_file_temp), 0, sizeof(_sound_file_type_t));
-    if (strncmp(alarm_file_temp.flag, ALARM_FILE_FLAG_STRING, ALARM_FILE_FLAG_LEN)) //沒尋到標誌
+    if (strncmp(alarm_file_temp.alarm_ID, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK))) //沒尋到標誌
     {
         err = kGeneralErr;
         goto exit;
@@ -219,7 +220,7 @@ OSStatus SOUND_FILE_CLEAR(void)
     mico_rtos_lock_mutex(&eland_sound_mutex);
 
     flash_kh25_read((uint8_t *)(&alarm_file_temp), 0, sizeof(_sound_file_type_t));
-    if (strncmp(alarm_file_temp.flag, ALARM_FILE_FLAG_STRING, ALARM_FILE_FLAG_LEN) == 0)
+    if (strncmp(alarm_file_temp.alarm_ID, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK)) == 0)
     {
         sound_file_list.file_number = 1;
         sector_count += (alarm_file_temp.file_len + sizeof(_sound_file_type_t)) / KH25L8006_SECTOR_SIZE;
@@ -250,6 +251,8 @@ void file_download(void)
 {
     OSStatus err;
     _download_type_t download_type;
+    // download_type = DOWNLOAD_OID;
+    // mico_rtos_push_to_queue(&download_queue, &download_type, 10);
 wait_for_queue:
     err = mico_rtos_pop_from_queue(&download_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
@@ -259,6 +262,7 @@ wait_for_queue:
         alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
+        sound_log("###sound download start####");
         alarm_sound_oid();
         break;
     case DOWNLOAD_OTA:

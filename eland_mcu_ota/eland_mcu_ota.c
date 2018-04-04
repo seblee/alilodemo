@@ -113,8 +113,6 @@ static int ota_start_command(void)
     uint8_t times = 10;
     int recv_len;
     mico_uart_config_t uart_config;
-    int version_major_cache = 0;
-    int version_minor_cache = 0;
 
     memset(&uart_config, 0, sizeof(mico_uart_config_t));
     memset(&inDatabuf, 0, sizeof(inDatabuf));
@@ -149,11 +147,15 @@ static int ota_start_command(void)
                 (outDatabuf[1] == 0x07) &&
                 (outDatabuf[8] == 0xaa))
             {
-                sscanf((char const *)&outDatabuf[3], "%02d.%02d", &version_major_cache, &version_minor_cache);
-                if ((version_major_cache == MCU_VERSION_MAJOR) && (version_minor_cache == MCU_VERSION_MINOR))
+                if (!strncmp(MCU_REVISION, (char const *)&outDatabuf[3], 5))
                     return 2;
                 else
                     break;
+                // sscanf((char const *)&outDatabuf[3], "%02d.%02d", &version_major_cache, &version_minor_cache);
+                // if ((version_major_cache == MCU_VERSION_MAJOR) && (version_minor_cache == MCU_VERSION_MINOR))
+                //     return 2;
+                // else
+                //     break;
             }
             else
                 memset(&outDatabuf, 0, sizeof(outDatabuf));

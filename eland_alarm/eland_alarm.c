@@ -21,8 +21,12 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-#define alarm_log(format, ...) custom_log("alarm", format, ##__VA_ARGS__)
-
+//#define CONFIG_SOUND_DEBUG
+#ifdef CONFIG_SOUND_DEBUG
+#define alarm_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+#else
+#define alarm_log(...)
+#endif /* ! CONFIG_SOUND_DEBUG */
 /*********/
 #define ALARM_DATA_SIZE (uint16_t)(sizeof(__elsv_alarm_data_t) * 50 + 1)
 /* Private typedef -----------------------------------------------------------*/
@@ -222,15 +226,15 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     if (elsv_alarm_data->alarm_repeat == 0)
         get_alarm_utc_second(elsv_alarm_data);
 
-     alarm_mcu_data->color = elsv_alarm_data->alarm_color;
+    alarm_mcu_data->color = elsv_alarm_data->alarm_color;
 
     if (elsv_alarm_data->snooze_enabled)
     {
-         alarm_mcu_data->snooze_count = elsv_alarm_data->snooze_count;
+        alarm_mcu_data->snooze_count = elsv_alarm_data->snooze_count;
     }
     else
     {
-         alarm_mcu_data->snooze_count = 0;
+        alarm_mcu_data->snooze_count = 0;
     }
     alarm_mcu_data->snooze_interval_min = elsv_alarm_data->snooze_interval_min;
     alarm_mcu_data->alarm_continue_min = elsv_alarm_data->alarm_continue_min;
@@ -275,13 +279,13 @@ OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
     strcpy(alarm_data_cache.alarm_id, ALARM_ID_OF_SIMPLE_CLOCK);
     alarm_data_cache.alarm_color = 0;
     sprintf(alarm_data_cache.alarm_time, "%02d:%02d:%02d", alarm_mcu_data->moment_time.hr, alarm_mcu_data->moment_time.min, alarm_mcu_data->moment_time.sec);
-    alarm_data_cache.snooze_enabled = 0;
-    alarm_data_cache.snooze_count = 1;
-    alarm_data_cache.snooze_interval_min = 0;
+    alarm_data_cache.snooze_enabled = 1;
+    alarm_data_cache.snooze_count = 3;
+    alarm_data_cache.snooze_interval_min = 10;
     alarm_data_cache.alarm_pattern = 1;
     alarm_data_cache.alarm_sound_id = 1;
     alarm_data_cache.alarm_volume = 80;
-    alarm_data_cache.alarm_continue_min = 10;
+    alarm_data_cache.alarm_continue_min = 15;
     alarm_data_cache.alarm_repeat = 1;
     elsv_alarm_data_sort_out(&alarm_data_cache);
     err = alarm_list_clear(&alarm_list);
@@ -542,7 +546,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     }
 
     if (alarm->snooze_enabled)
-        snooze_count = alarm->snooze_count;
+        snooze_count = alarm->snooze_count + 1;
     else
         snooze_count = 1;
     alarm_moment += (uint32_t)alarm->alarm_continue_min * 60;
@@ -587,9 +591,10 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_ADD:
         case ALARM_MINUS:
         case ALARM_SORT:
-        case ALARM_STOP:
         case ALARM_JUMP:
-            Alarm_Play_Control(alarm, 0); //stop
+               alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
+        case ALARM_STOP:
+               Alarm_Play_Control(alarm, 0); //stop
             alarm_list.state.alarm_stoped = true;
             break;
         case ALARM_SNOOZ_STOP:
@@ -604,7 +609,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                         volume_value = 0;
                     }
                     alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
-                    alarm_moment -= (uint32_t)alarm->alarm_continue_min * 60;
                     mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)alarm_moment * 1000), &iso8601_time);
                     alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
                     /**add json for tcp**/
@@ -1070,7 +1074,6 @@ OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, c
     generate_data = json_object_to_json_string(TempJsonData);
     require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
     generate_data_len = strlen(generate_data);
-    json_buff = calloc(generate_data_len + 1, sizeof(uint8_t));
     memcpy(json_buff, generate_data, generate_data_len);
     alarm_log("history_json_buff:%s", json_buff);
 exit:

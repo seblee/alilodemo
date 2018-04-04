@@ -945,7 +945,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     case HT01:
         history_data_p = get_alarm_history_data();
         if (history_data_p)
-            alarm_off_history_json_data_build(history_data_p, telegram_data);
+            alarm_off_history_json_data_build(history_data_p, (char *)telegram_data);
         telegram->lenth = strlen(telegram_data);
         elan_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
         set_alarm_history_data_state(DONE_UPLOAD);

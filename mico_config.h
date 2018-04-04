@@ -35,7 +35,7 @@
 
 #define APP_INFO "Eland Demo"
 
-#define FIRMWARE_REVISION "eland_01.06"
+#define FIRMWARE_REVISION "01.10"
 #define MANUFACTURER "MXCHIP Inc."
 #define SERIAL_NUMBER "20140606"
 #define PROTOCOL "com.mxchip.basic"
@@ -54,7 +54,7 @@
 
 #define EasyLink_TimeOut 60000 /**< EasyLink timeout 60 seconds. */
 
-#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \
+#define EasyLink_ConnectWlan_Timeout 20000 /**< Connect to wlan after configured by easylink. \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \
                                                 Restart easylink after timeout: 20 seconds. */
 
 /************************************************************************

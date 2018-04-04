@@ -77,7 +77,7 @@ OSStatus netclock_desInit(void)
 
     eland_get_mac(netclock_des_g->mac_address);
 
-    Eland_log("local firmware version:%s", Eland_Firmware_Version);
+    Eland_log("local firmware version:%s", FIRMWARE_REVISION);
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     return kNoErr;
 exit:
@@ -172,7 +172,7 @@ start_Check:
     memcpy(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len);
     /***initialize by device flash***/
     netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
-    memcpy(netclock_des_g->firmware_version, Eland_Firmware_Version, strlen(Eland_Firmware_Version)); //设置设备软件版本号
+    memcpy(netclock_des_g->firmware_version, FIRMWARE_REVISION, strlen(FIRMWARE_REVISION)); //设置设备软件版本号
     //eland_get_mac(netclock_des_g->mac_address);
     netclock_des_g->dhcp_enabled = device_state->dhcp_enabled;
     memcpy(netclock_des_g->ip_address, device_state->ip_address, ip_address_Len);
@@ -181,7 +181,7 @@ start_Check:
     memcpy(netclock_des_g->dnsServer, device_state->dnsServer, ip_address_Len);
     /***initialization to default value***/
     netclock_des_g->time_display_format = 1;
-    netclock_des_g->brightness_normal = 80;
+    netclock_des_g->brightness_normal = 100;
     netclock_des_g->brightness_night = 20;
     netclock_des_g->night_mode_enabled = 0;
     strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
@@ -262,7 +262,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "eland_name", json_object_new_string(netclock_des_g->eland_name));
     json_object_object_add(DeviceJsonData, "timezone_offset_sec", json_object_new_int(netclock_des_g->timezone_offset_sec));
     json_object_object_add(DeviceJsonData, "serial_number", json_object_new_string(netclock_des_g->serial_number));
-    json_object_object_add(DeviceJsonData, "firmware_version", json_object_new_string(Eland_Firmware_Version));
+    json_object_object_add(DeviceJsonData, "firmware_version", json_object_new_string(FIRMWARE_REVISION));
     json_object_object_add(DeviceJsonData, "mac_address", json_object_new_string(netclock_des_g->mac_address));
     json_object_object_add(DeviceJsonData, "dhcp_enabled", json_object_new_int(netclock_des_g->dhcp_enabled));
     json_object_object_add(DeviceJsonData, "ip_address", json_object_new_string(netclock_des_g->ip_address));

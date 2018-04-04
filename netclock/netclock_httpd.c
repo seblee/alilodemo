@@ -112,7 +112,7 @@ exit:
 }
 static void eland_check_ssid(void)
 {
-      msg_wify_queue received;
+    msg_wify_queue received;
     mico_Context_t *context = NULL;
     /********清空消息隊列*************/
     context = mico_system_context_get();
@@ -150,8 +150,8 @@ static void eland_check_ssid(void)
             memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
         }
         context->micoSystemConfig.configured = allConfigured;
-         mico_system_context_update(context);
-          }
+        mico_system_context_update(context);
+    }
     else
     {
         SendElandStateQueue(WifyConnectedFailed);
@@ -160,6 +160,7 @@ static void eland_check_ssid(void)
         //Start_wifi_Station_SoftSP_Thread(Soft_AP);
     }
     app_httpd_log("system restart");
+    mico_rtos_thread_msleep(200);
     mico_system_power_perform(context, eState_Software_Reset);
     mico_rtos_thread_sleep(2);
     flagHttpdServerAP = 1;

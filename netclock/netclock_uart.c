@@ -615,12 +615,12 @@ static void ELAND_H06_Send(uint8_t *Cache)
 
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_FIRM_WARE_06;
-    *(Cache + 2) = strlen(Eland_Firmware_Version);
-    sprintf((char *)(Cache + 3), "%s", Eland_Firmware_Version);
-    *(Cache + 3 + strlen(Eland_Firmware_Version)) = Uart_Packet_Trail;
+    *(Cache + 2) = strlen(FIRMWARE_REVISION);
+    sprintf((char *)(Cache + 3), "%s", FIRMWARE_REVISION);
+    *(Cache + 3 + strlen(FIRMWARE_REVISION)) = Uart_Packet_Trail;
 start_send:
     sended_times--;
-    err = elandUsartSendData(Cache, 4 + strlen(Eland_Firmware_Version));
+    err = elandUsartSendData(Cache, 4 + strlen(FIRMWARE_REVISION));
     require_noerr(err, exit);
 
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
@@ -655,7 +655,7 @@ static void ELAND_H08_Send(uint8_t *Cache)
             rssi_level = LEVEL3;
         else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE2)
             rssi_level = LEVEL2;
-        else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE1)
+        else if (LinkStatus_Cache.rssi >= RSSI_STATE_STAGE0)
             rssi_level = LEVEL1;
         else
             rssi_level = LEVEL0;
