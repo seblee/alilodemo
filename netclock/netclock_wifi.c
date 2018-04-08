@@ -25,7 +25,12 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define WifiSet_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+//#define CONFIG_WIFI_DEBUG
+#ifdef CONFIG_WIFI_DEBUG
+#define WifiSet_log(M, ...) custom_log("wifi_set", M, ##__VA_ARGS__)
+#else
+#define WifiSet_log(...)
+#endif /* ! CONFIG_WIFI_DEBUG */
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -138,7 +143,7 @@ void Wifi_station_threed(mico_thread_arg_t arg)
         memcpy(wNetConfigAdv.local_ip_addr, netclock_des_g->ip_address, 16);
         memcpy(wNetConfigAdv.net_mask, netclock_des_g->subnet_mask, 16);
         memcpy(wNetConfigAdv.gateway_ip_addr, netclock_des_g->default_gateway, 16);
-        memcpy(wNetConfigAdv.dnsServer_ip_addr, netclock_des_g->dnsServer, 16);
+        memcpy(wNetConfigAdv.dnsServer_ip_addr, netclock_des_g->primary_dns, 16);
     }
     wNetConfigAdv.wifi_retry_interval = 100; /* Retry interval after a failure connection */
 

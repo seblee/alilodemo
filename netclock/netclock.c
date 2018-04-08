@@ -28,7 +28,7 @@
 #include "eland_sound.h"
 #include "eland_tcp.h"
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ELAND_DEBUG
+//#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -178,7 +178,7 @@ start_Check:
     memcpy(netclock_des_g->ip_address, device_state->ip_address, ip_address_Len);
     memcpy(netclock_des_g->subnet_mask, device_state->subnet_mask, ip_address_Len);
     memcpy(netclock_des_g->default_gateway, device_state->default_gateway, ip_address_Len);
-    memcpy(netclock_des_g->dnsServer, device_state->dnsServer, ip_address_Len);
+    memcpy(netclock_des_g->primary_dns, device_state->primary_dns, ip_address_Len);
     /***initialization to default value***/
     netclock_des_g->time_display_format = 1;
     netclock_des_g->brightness_normal = 100;
@@ -226,6 +226,7 @@ OSStatus Netclock_des_recovery(void)
     if (context->micoSystemConfig.configured != unConfigured)
         context->micoSystemConfig.configured = unConfigured;
     mico_system_context_update(context);
+    mico_rtos_thread_msleep(200);
     return kNoErr;
 }
 
@@ -428,6 +429,11 @@ OSStatus ProcessPostJson(char *InputJson)
         {
             memset(netclock_des_g->default_gateway, 0, ip_address_Len);
             sprintf(netclock_des_g->default_gateway, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "primary_dns"))
+        {
+            memset(netclock_des_g->primary_dns, 0, ip_address_Len);
+            sprintf(netclock_des_g->primary_dns, "%s", json_object_get_string(val));
         }
     }
     /**refresh flash inside**/
@@ -669,7 +675,7 @@ void eland_update_flash(void)
         if ((strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0) ||
             (strncmp(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len) != 0) ||
             (strncmp(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len) != 0) ||
-            (strncmp(device_state->dnsServer, netclock_des_g->dnsServer, ip_address_Len) != 0))
+            (strncmp(device_state->primary_dns, netclock_des_g->primary_dns, ip_address_Len) != 0))
         {
             needupdateflash = true;
             memcpy(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len);
@@ -681,7 +687,7 @@ void eland_update_flash(void)
             memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
             memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
             memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
-            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
+            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->primary_dns, 16);
         }
     }
     if (strncmp(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len) != 0)
@@ -694,7 +700,6 @@ void eland_update_flash(void)
         needupdateflash = true;
         memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
     }
-
     if (needupdateflash == true)
         mico_system_context_update(context);
 }

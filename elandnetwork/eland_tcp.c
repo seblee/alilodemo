@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-05 11:33:28
+ * @Last Modified time:2018-04-04 10:35:51
  * @brief   :
  ****************************************************************************
 **/
@@ -26,7 +26,7 @@
 /* Private define ------------------------------------------------------------*/
 #define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
-#define elan_tcp_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+#define elan_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
 #define elan_tcp_log(...)
 #endif /* ! CONFIG_TCP_DEBUG */
@@ -910,7 +910,6 @@ static TCP_Error_t eland_IF_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type,
                                      pClient->clientData.writeBuf,
                                      timer,
                                      &wrtied_len);
-
     return rc;
 }
 
@@ -1057,7 +1056,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
         rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
         break;
     case DV03: //07 eland info remove Notification
-        reset_eland_flash_para();
+        reset_eland_flash_para(ELAND_DELETE_0E);
         break;
     case AL00: //08 alarm info request
         break;
@@ -1065,9 +1064,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case AL02: //10 alarm info add Notification
     case AL03: //11 alarm info change Notification
     case AL04: //12 alarm info delete notification
-               // elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         rc = TCP_Operate_ALXX((char *)(buff + sizeof(_TELEGRAM_t)), tep_cmd);
-        //     elan_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
         SendElandStateQueue(TCP_AL00);
         break;
     case HD00: //13 holiday data request
@@ -1083,7 +1080,6 @@ static TCP_Error_t TCP_Operate(const char *buff)
         break;
     case FW00: //18 firmware update start request
         rc = TCP_Operate_FW00((char *)(buff + sizeof(_TELEGRAM_t)));
-        elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case FW01: //19 firmwart update start response
         break;

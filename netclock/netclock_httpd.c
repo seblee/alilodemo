@@ -79,6 +79,7 @@ static OSStatus build_ssids_json_string(char *data, __http_ssids_list_t *wifi_li
     json_object *JsonSsidval = NULL;
     const char *generate_data = NULL;
     uint32_t generate_data_len = 0;
+    uint8_t secure = 0;
 
     Json = json_object_new_object();
     require_action_string(Json, exit, err = kNoMemoryErr, "create Json object error!");
@@ -90,9 +91,16 @@ static OSStatus build_ssids_json_string(char *data, __http_ssids_list_t *wifi_li
     {
         JsonSsidval = json_object_new_object();
         require_action_string(JsonSsidval, exit, err = kNoMemoryErr, "create JsonSsidval object error!");
-
+        if ((wifi_list->ssids + i)->rssi > RSSI_STATE_STAGE4)
+            secure = 100;
+        else if ((wifi_list->ssids + i)->rssi < RSSI_STATE_STAGE0)
+            secure = 0;
+        else
+            secure = ((wifi_list->ssids + i)->rssi - RSSI_STATE_STAGE0) * 100 /
+                     (RSSI_STATE_STAGE4 - RSSI_STATE_STAGE0);
+        app_httpd_log("ap%d--rssi:%d,signal:%d", i, (wifi_list->ssids + i)->rssi, secure);
         json_object_object_add(JsonSsidval, "secure", json_object_new_int((wifi_list->ssids + i)->security));
-        json_object_object_add(JsonSsidval, "signal", json_object_new_int((wifi_list->ssids + i)->rssi));
+        json_object_object_add(JsonSsidval, "signal", json_object_new_int((uint32_t)secure));
         json_object_object_add(JsonSsidval, "ssid", json_object_new_string((wifi_list->ssids + i)->ssid));
 
         json_object_array_add(JsonList, JsonSsidval);
@@ -147,7 +155,7 @@ static void eland_check_ssid(void)
             memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
             memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
             memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
-            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->dnsServer, 16);
+            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->primary_dns, 16);
         }
         context->micoSystemConfig.configured = allConfigured;
         mico_system_context_update(context);

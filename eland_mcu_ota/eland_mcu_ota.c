@@ -18,7 +18,12 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
+//#define CONFIG_OTA_DEBUG
+#ifdef CONFIG_OTA_DEBUG
 #define mcu_ota_log(M, ...) custom_log("mcu_ota", M, ##__VA_ARGS__)
+#else
+#define mcu_ota_log(...)
+#endif /* ! CONFIG_OTA_DEBUG */
 
 #define OTA_SEND_BUFFER_LEN 150
 #define OTA_UART_BUFFER_LENGTH 256

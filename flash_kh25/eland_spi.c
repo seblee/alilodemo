@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-22 09:26:03
+ * @Last Modified time:2018-04-04 10:33:16
  * @brief   :
  ****************************************************************************
 **/
@@ -19,12 +19,12 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_SPI_DEBUG
+//#define CONFIG_SPI_DEBUG
 #ifdef CONFIG_SPI_DEBUG
 #define spi_log(M, ...) custom_log("SPI", M, ##__VA_ARGS__)
 #else
-#define client_log(...)
-#endif /* ! CONFIG_CLIENT_DEBUG */
+#define spi_log(...)
+#endif /* ! CONFIG_SPI_DEBUG */
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/

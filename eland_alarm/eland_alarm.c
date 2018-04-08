@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-15 10:11:44
+ * @Last Modified time:2018-04-08 17:02:17
  * @brief   :
  ****************************************************************************
 **/
@@ -21,12 +21,12 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_SOUND_DEBUG
-#ifdef CONFIG_SOUND_DEBUG
-#define alarm_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
+//#define CONFIG_ALARM_DEBUG
+#ifdef CONFIG_ALARM_DEBUG
+#define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
 #define alarm_log(...)
-#endif /* ! CONFIG_SOUND_DEBUG */
+#endif /* ! CONFIG_ALARM_DEBUG */
 /*********/
 #define ALARM_DATA_SIZE (uint16_t)(sizeof(__elsv_alarm_data_t) * 50 + 1)
 /* Private typedef -----------------------------------------------------------*/
@@ -227,17 +227,7 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
         get_alarm_utc_second(elsv_alarm_data);
 
     alarm_mcu_data->color = elsv_alarm_data->alarm_color;
-
-    if (elsv_alarm_data->snooze_enabled)
-    {
-        alarm_mcu_data->snooze_count = elsv_alarm_data->snooze_count;
-    }
-    else
-    {
-        alarm_mcu_data->snooze_count = 0;
-    }
-    alarm_mcu_data->snooze_interval_min = elsv_alarm_data->snooze_interval_min;
-    alarm_mcu_data->alarm_continue_min = elsv_alarm_data->alarm_continue_min;
+    alarm_mcu_data->snooze_enabled = elsv_alarm_data->snooze_enabled;
 
     if (elsv_alarm_data->alarm_repeat == 1)
     {
@@ -322,12 +312,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     {
         if ((list->alarm_lib + i)->alarm_repeat)
             get_alarm_utc_second(list->alarm_lib + i);
-
-        // if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
-        // {
-        //     alarm_list_minus(list, list->alarm_lib + i);
-        //     goto start_ergonic_list;
-        // }
     }
     /*****Sequence*****/
     for (i = 0; i < list->alarm_number - 1; i++)
@@ -450,7 +434,8 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         {
             if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
             {
-                memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
+                memmove(AlarmList->alarm_lib, AlarmList->alarm_lib + 1, i * sizeof(__elsv_alarm_data_t));
+                memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
                 goto exit;
             }
         }
@@ -458,7 +443,8 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         alarm_log("alarm_id is new");
         if (i == AlarmList->alarm_number)
         {
-            memcpy(((uint8_t *)(AlarmList->alarm_lib) + i * sizeof(__elsv_alarm_data_t)), inData, sizeof(__elsv_alarm_data_t));
+            memmove(AlarmList->alarm_lib, AlarmList->alarm_lib + 1, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
+            memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
             AlarmList->alarm_number++;
         }
     }
@@ -532,7 +518,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     uint8_t volume_stepup_count = 0;
     _tcp_cmd_sem_t tcp_message;
 
-    for (i = 0; i < volume_value + 3; i++)
+    for (i = 0; i < 32; i++)
         audio_service_volume_down(&result, 1);
     volume_value = 0;
 
@@ -592,9 +578,10 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_MINUS:
         case ALARM_SORT:
         case ALARM_JUMP:
-               alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
+            mico_time_get_iso8601_time(&iso8601_time);
+            alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
         case ALARM_STOP:
-               Alarm_Play_Control(alarm, 0); //stop
+            Alarm_Play_Control(alarm, 0); //stop
             alarm_list.state.alarm_stoped = true;
             break;
         case ALARM_SNOOZ_STOP:
@@ -961,13 +948,17 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         alarm_log("utc_time:%ld", alarm->alarm_data_for_eland.moment_second);
         break;
     case 3:
-        if (week_day < 2)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-        else if (week_day < 7)
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (7 - week_day) * SECOND_ONE_DAY;
-        else
-            alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-        break;
+        for (i = 0; i < 7; i++)
+        {
+            if ((((week_day + i - 1) % 7) == 0) || (((week_day + i - 1) % 7) == 6))
+            {
+                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + i * SECOND_ONE_DAY;
+                if (alarm->alarm_data_for_eland.moment_second < utc_time)
+                    continue;
+                else
+                    break;
+            }
+        }
     case 4:
         for (i = 0; i < 7; i++)
         {
@@ -1006,7 +997,11 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
     }
     /*******Calculate date for mcu*********/
     UCT_Convert_Date(&(alarm->alarm_data_for_eland.moment_second), &(alarm->alarm_data_for_mcu.moment_time));
-
+    if ((utc_time < alarm->alarm_data_for_eland.moment_second) &&
+        ((alarm->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY))
+        alarm->alarm_data_for_mcu.next_alarm = 1;
+    else
+        alarm->alarm_data_for_mcu.next_alarm = 0;
     alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
               alarm->alarm_data_for_mcu.moment_time.year + 2000,
               alarm->alarm_data_for_mcu.moment_time.month,

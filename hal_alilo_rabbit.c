@@ -1,3 +1,18 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-04-04 10:30:20
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-04-04 10:31:39
+ * @brief   :
+ ****************************************************************************
+**/
+
+/* Private include -----------------------------------------------------------*/
 #include "../alilodemo/hal_alilo_rabbit.h"
 #include "../alilodemo/inc/audio_service.h"
 #include "../alilodemo/inc/http_file_download.h"
@@ -6,8 +21,19 @@
 #include "mico.h"
 #include "platform.h"
 #include "netclock_httpd.h"
-#define hal_log(format, ...) custom_log("HAL", format, ##__VA_ARGS__)
 
+/* Private typedef -----------------------------------------------------------*/
+//#define CONFIG_HAL_ALILO_DEBUG
+#ifdef CONFIG_HAL_ALILO_DEBUG
+#define hal_log(format, ...) custom_log("HAL", format, ##__VA_ARGS__)
+#else
+#define hal_log(...)
+#endif /* ! CONFIG_HAL_ALILO_DEBUG */
+/* Private define ------------------------------------------------------------*/
+
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
 mico_semaphore_t recordKeyPress_Sem;
 mico_semaphore_t urlFileDownload_Sem;
 mico_semaphore_t urlPalyStreamStop_Sem;
@@ -18,13 +44,15 @@ uint8_t flag_mic_start = 0;
 uint8_t flagAudioPlay = 0;
 uint8_t flagHttpdServerAP = 0;
 
-extern void PlatformEasyLinkButtonClickedCallback(void);
-extern void PlatformEasyLinkButtonLongPressedCallback(void);
-
 static uint16_t fm_test_cnt = 0;
 static PLAYER_OPTION_S stream_play_opt;
 static uint8_t ai_stream_play_id = 0;
 static FILE_DOWNLOAD_CONTEXT g_file_download_context_user = NULL;
+/* Private function prototypes -----------------------------------------------*/
+extern void PlatformEasyLinkButtonClickedCallback(void);
+extern void PlatformEasyLinkButtonLongPressedCallback(void);
+
+/* Private functions ---------------------------------------------------------*/
 
 static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
 {

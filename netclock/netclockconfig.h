@@ -59,7 +59,7 @@ typedef struct _ELAND_DES_S //设备状态结构
     char ip_address[ip_address_Len];             //Eland IP地址
     char subnet_mask[ip_address_Len];            //Eland的IPv4子网掩码。
     char default_gateway[ip_address_Len];        //Eland的IPv4默认网关。
-    char dnsServer[ip_address_Len];              //DNS server ip address
+    char primary_dns[ip_address_Len];            //DNS server ip address
     int8_t time_display_format;                  //12小时显示还是24小时显示的代码  1:12時間表示(AM/PM表示) 2 : 24時間表示
     int8_t brightness_normal;                    //通常时的液晶显示亮度。背光亮度
     int8_t brightness_night;                     //夜间模式时的液晶显示亮度、背光亮度
@@ -96,7 +96,7 @@ typedef struct _ELAND_DEVICE //设备状态结构
     char ip_address[ip_address_Len];      //Eland IP地址
     char subnet_mask[ip_address_Len];     //Eland 的IPv4子网掩码。
     char default_gateway[ip_address_Len]; //Eland 的IPv4默认网关。
-    char dnsServer[ip_address_Len];       //DNS server ip address
+    char primary_dns[ip_address_Len];     //DNS server ip address
 } _ELAND_DEVICE_t;
 
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

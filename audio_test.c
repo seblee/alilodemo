@@ -34,7 +34,12 @@
 #include "eland_sound.h"
 #include "netclock.h"
 
-#define test_log(format, ...) custom_log("ASR", format, ##__VA_ARGS__)
+//#define CONFIG_AUDIO_DEBUG
+#ifdef CONFIG_AUDIO_DEBUG
+#define test_log(M, ...) custom_log("audio", M, ##__VA_ARGS__)
+#else
+#define test_log(...)
+#endif /* ! CONFIG_AUDIO_DEBUG */
 
 void player_test_thread(mico_thread_arg_t arg)
 {

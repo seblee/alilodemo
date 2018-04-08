@@ -65,6 +65,7 @@ typedef enum {
     ALARM_SEND_0B,       /* SEND NEXT ALARM STATE*/
     ELAND_DATA_0C,       /* SEND ELAND DATA TO MCU*/
     ELAND_RESET_0D,      /* RESET SYSTEM */
+    ELAND_DELETE_0E,     /* DEVICE DATA DELETE */
 } __msg_function_t;
 
 typedef enum {
@@ -114,11 +115,11 @@ typedef struct eland_data_2_mcu
 #define Uart_Packet_Trail (uint8_t)(0xaa)
 #define USART_RESEND_MAX_TIMES 3
 
-#define RSSI_STATE_STAGE0 (int)(-85)
-#define RSSI_STATE_STAGE1 (int)(-80)
-#define RSSI_STATE_STAGE2 (int)(-75)
-#define RSSI_STATE_STAGE3 (int)(-70)
-#define RSSI_STATE_STAGE4 (int)(-65)
+#define RSSI_STATE_STAGE0 (int16_t)(-85)
+#define RSSI_STATE_STAGE1 (int16_t)(-80)
+#define RSSI_STATE_STAGE2 (int16_t)(-75)
+#define RSSI_STATE_STAGE3 (int16_t)(-70)
+#define RSSI_STATE_STAGE4 (int16_t)(-65)
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
@@ -128,7 +129,7 @@ OSStatus start_uart_service(void);
 void uart_recv_thread_DDE(uint32_t arg);
 int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void SendElandStateQueue(Eland_Status_type_t value);
-void reset_eland_flash_para(void);
+void reset_eland_flash_para(__msg_function_t msg);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

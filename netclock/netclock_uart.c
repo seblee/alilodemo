@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-22 09:35:01
+ * @Last Modified time:2018-04-04 10:31:50
  * @brief   :
  ****************************************************************************
 **/
@@ -27,7 +27,12 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define Eland_uart_log(format, ...) custom_log("netclock_uart", format, ##__VA_ARGS__)
+//#define CONFIG_UART_DEBUG
+#ifdef CONFIG_UART_DEBUG
+#define Eland_uart_log(M, ...) custom_log("UART", M, ##__VA_ARGS__)
+#else
+#define Eland_uart_log(...)
+#endif /* ! CONFIG_UART_DEBUG */
 
 #define UART_BUFFER_LENGTH 1024
 #define UART_ONE_PACKAGE_LENGTH 512
@@ -57,6 +62,7 @@ static void ELAND_H0A_Send(uint8_t *Cache);
 static void ELAND_H0B_Send(uint8_t *Cache);
 static void ELAND_H0C_Send(uint8_t *Cache);
 static void ELAND_H0D_Send(uint8_t *Cache);
+static void ELAND_H0E_Send(uint8_t *Cache);
 static void MODH_Opration_02H(uint8_t *usart_rec);
 static void MODH_Opration_04H(uint8_t *usart_rec);
 static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec);
@@ -386,6 +392,9 @@ static void uart_thread_DDE(uint32_t arg)
             break;
         case ELAND_RESET_0D: /* RESET SYSTEM */
             ELAND_H0D_Send(inDataBuffer);
+            break;
+        case ELAND_DELETE_0E: /* RESET SYSTEM */
+            ELAND_H0E_Send(inDataBuffer);
             break;
         default:
             break;
@@ -810,6 +819,21 @@ static void ELAND_H0D_Send(uint8_t *Cache)
 exit:
     return;
 }
+static void ELAND_H0E_Send(uint8_t *Cache)
+{
+    OSStatus err = kGeneralErr;
+
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = ELAND_DELETE_0E;
+    *(Cache + 2) = 0;
+    *(Cache + 3 + (*(Cache + 2))) = Uart_Packet_Trail;
+
+    err = elandUsartSendData(Cache, 4 + (*(Cache + 2)));
+    require_noerr(err, exit);
+    mico_rtos_delete_thread(NULL);
+exit:
+    return;
+}
 static void MODH_Opration_02H(uint8_t *usart_rec)
 {
     static uint16_t Key_Count = 0, Key_Restain = 0;
@@ -833,7 +857,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     Key_Restain_count = Key_Restain;
 
     if (Key_Restain_Trg & KEY_Reset)
-        reset_eland_flash_para();
+        reset_eland_flash_para(ELAND_RESET_0D);
 
     /*alarm control*/
     alarm_status = get_alarm_state();
@@ -1075,7 +1099,7 @@ static void set_eland_state(Eland_Status_type_t state)
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
 }
 
-void reset_eland_flash_para(void)
+void reset_eland_flash_para(__msg_function_t msg)
 {
     OSStatus err = kNoErr;
     __msg_function_t eland_cmd;
@@ -1084,10 +1108,11 @@ void reset_eland_flash_para(void)
     {
         err = mico_rtos_pop_from_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
     } while (err == kNoErr);
-    eland_cmd = ELAND_RESET_0D;
+    eland_cmd = msg;
+    /**clear time**/
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     err = Netclock_des_recovery();
-
+    /**clear sound file in flash**/
     flash_kh25_write_page(BUF, KH25_CHECK_ADDRESS, sizeof(BUF));
     MicoSystemReboot();
 }
