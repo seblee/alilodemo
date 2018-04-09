@@ -32,13 +32,26 @@
 #define SIMULATE_DAYS_OF_YEAR 410
 #define SIMULATE_DAYS_OF_MONTH 32
 /* Private typedef -----------------------------------------------------------*/
+
+typedef enum {
+    ALARM_IDEL,
+    ALARM_ADD,
+    ALARM_MINUS,
+    ALARM_SORT,
+    ALARM_ING,
+    ALARM_SNOOZ_STOP,
+    ALARM_STOP,
+    ALARM_SKIP,
+} _alarm_list_state_t;
 typedef struct
 {
     mico_rtc_time_t moment_time;
     int8_t color;
     int8_t snooze_enabled;
     int8_t next_alarm;
+    int8_t alarm_skip;
     _ELAND_MODE_t mode;
+    _alarm_list_state_t alarm_state;
 } _alarm_mcu_data_t;
 
 typedef struct
@@ -66,6 +79,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     int8_t alarm_repeat;                                   //鬧鐘反復條件
     uint16_t alarm_on_dates[ALARM_ON_DATES_COUNT];         //鬧鐘日期排列
     char alarm_on_days_of_week[ALARM_ON_DAYS_OF_WEEK_LEN]; //鬧鐘播放的星期幾
+    int8_t alarm_skip;
     _alarm_eland_data_t alarm_data_for_eland;
     _alarm_mcu_data_t alarm_data_for_mcu;
 } __elsv_alarm_data_t;
@@ -76,17 +90,6 @@ typedef struct _ELSV_HOLIDAY //闹钟情報结构体
     uint16_t *list;
     mico_mutex_t holidaymutex;
 } _elsv_holiday_t;
-
-typedef enum {
-    ALARM_IDEL,
-    ALARM_ADD,
-    ALARM_MINUS,
-    ALARM_SORT,
-    ALARM_ING,
-    ALARM_SNOOZ_STOP,
-    ALARM_STOP,
-    ALARM_JUMP,
-} _alarm_list_state_t;
 
 typedef struct
 {
@@ -114,7 +117,8 @@ typedef enum {
     ALARM_OFF_SNOOZE = (uint8_t)1,
     ALARM_OFF_ALARMOFF = (uint8_t)2,
     ALARM_OFF_AUTOOFF = (uint8_t)3,
-    ALARM_SNOOZE = (uint8_t)4,
+    ALARM_OFF_SKIP = (uint8_t)4,
+    ALARM_SNOOZE = (uint8_t)5,
 } alarm_off_history_record_t;
 typedef enum {
     IDEL_UPLOAD = 0,
@@ -133,7 +137,6 @@ typedef struct _AlarmOffHistoryData //闹钟履历结构体
 typedef struct
 {
     mico_mutex_t off_Mutex;
-    mico_semaphore_t alarm_off_sem;
     AlarmOffHistoryData_t HistoryData;
     HistoryDatastate_t state;
 } _alarm_off_history_t;
@@ -141,7 +144,7 @@ typedef struct
 typedef struct
 {
     bool list_refreshed;
-    bool alarm_jump_flag;
+    bool alarm_skip_flag;
     uint8_t alarm_number;
     mico_mutex_t AlarmlibMutex;
     _alarm_state_t state;
@@ -168,7 +171,7 @@ extern _eland_alarm_list_t alarm_list;
 extern _elsv_holiday_t holiday_list;
 extern _alarm_stream_t alarm_stream;
 extern mico_semaphore_t alarm_update;
-extern mico_semaphore_t alarm_jump_sem;
+extern mico_semaphore_t alarm_skip_sem;
 extern mico_queue_t download_queue;
 
 extern _alarm_off_history_t off_history;
@@ -189,7 +192,7 @@ uint8_t get_waiting_alarm_serial(void);
 void set_waiting_alarm_serial(uint8_t now_serial);
 _alarm_list_state_t get_alarm_state(void);
 void set_alarm_state(_alarm_list_state_t state);
-uint8_t get_alarm_jump_flag(void);
+uint8_t get_alarm_skip_flag(void);
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
 

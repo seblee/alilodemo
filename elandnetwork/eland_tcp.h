@@ -351,10 +351,12 @@ typedef enum TIME_RECORD_T {
 } TIME_RECORD_T_t;
 
 typedef enum TCP_CMD_SEM {
-    TCP_Stop_Sem,
-    TCP_HT00_Sem,
-    TCP_HC00_Sem,
-    TCP_FW01_Sem,
+    TCP_Stop_Sem, //delete tcp thread
+    TCP_HT00_Sem, //alarm on notice
+    TCP_HT01_Sem, //alarm off notice
+    TCP_HT02_Sem, //ALARM skip notice
+    TCP_HC00_Sem, //helth check
+    TCP_FW01_Sem, //OTA start
 } _tcp_cmd_sem_t;
 /* Private define ------------------------------------------------------------*/
 #define TELEGRAMHEADER "EL"
@@ -374,6 +376,7 @@ OSStatus TCP_Service_Start(void);
 ClientState_t eland_get_client_state(_Client_t *pClient);
 void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data);
 mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
+OSStatus TCP_Push_MSG_queue(_tcp_cmd_sem_t message);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

@@ -629,6 +629,7 @@ little_cycle_loop:
         else
             tcp_HC_flag = false;
     }
+pop_queue:
     /*pop queue*/
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
     if (err == kNoErr)
@@ -636,6 +637,12 @@ little_cycle_loop:
         /*******upload alarm on notification********/
         if (tcp_message == TCP_HT00_Sem)
             rc = eland_IF_upload(&Eland_Client, HT00);
+        /*******upload alarm history********/
+        else if (tcp_message == TCP_HT01_Sem)
+            rc = eland_IF_upload(&Eland_Client, HT01);
+        /*******upload alarm skip notice********/
+        else if (tcp_message == TCP_HT01_Sem)
+            rc = eland_IF_upload(&Eland_Client, HT02);
         /*******delete tcp thread***********/
         else if (tcp_message == TCP_Stop_Sem)
         {
@@ -668,14 +675,9 @@ little_cycle_loop:
             mico_thread_sleep(1);
             elan_tcp_log("Connection Error rc = %d", rc);
         }
+        else
+            goto pop_queue;
     }
-
-    /*******upload alarm history********/
-    if (mico_rtos_get_semaphore(&off_history.alarm_off_sem, 0) == kNoErr)
-        rc = eland_IF_upload(&Eland_Client, HT01);
-    /*******upload alarm history********/
-    if (mico_rtos_get_semaphore(&off_history.alarm_off_sem, 0) == kNoErr)
-        rc = eland_IF_upload(&Eland_Client, HT01);
 
     goto little_cycle_loop;
 exit:
@@ -892,7 +894,6 @@ static TCP_Error_t eland_IF_upload(_Client_t *pClient, _TCP_CMD_t tcp_cmd)
                  CommandTable[tcp_cmd][1],
                  CommandTable[tcp_cmd][2],
                  CommandTable[tcp_cmd][3]);
-
     return rc;
 }
 
@@ -948,6 +949,12 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
         telegram->lenth = strlen(telegram_data);
         elan_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
         set_alarm_history_data_state(DONE_UPLOAD);
+        break;
+    case HT02:
+        /*build alarm json data*/
+        Alarm_build_JSON(telegram_data);
+        telegram->lenth = strlen(telegram_data);
+        elan_tcp_log("HT02 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case FW01:
         break;
@@ -1135,7 +1142,6 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
     TCP_Error_t rc = TCP_SUCCESS;
     __msg_function_t eland_cmd = ELAND_DATA_0C;
     bool des_data_chang_flag = false;
-    _tcp_cmd_sem_t tcp_message;
 
     json_object *ReceivedJsonCache = NULL, *device_JSON = NULL;
     ELAND_DES_S des_data_cache;
@@ -1244,10 +1250,7 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
     eland_update_flash();
     /**stop tcp communication**/
     if (des_data_chang_flag)
-    {
-        tcp_message = TCP_HC00_Sem;
-        mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
-    }
+        TCP_Push_MSG_queue(TCP_HC00_Sem);
 exit:
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1510,7 +1513,6 @@ static TCP_Error_t TCP_Operate_FW00(char *buf)
     char Cache_version[firmware_version_len];
     char Cache_url[URL_Len];
     char Cache_hash[hash_Len];
-    _tcp_cmd_sem_t tcp_message;
     if (*buf != '{')
     {
         elan_tcp_log("error:received err json format data");
@@ -1572,9 +1574,7 @@ static TCP_Error_t TCP_Operate_FW00(char *buf)
     memcpy(netclock_des_g->OTA_url, Cache_url, URL_Len);
     memcpy(netclock_des_g->OTA_hash, Cache_hash, hash_Len);
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
-    tcp_message = TCP_FW01_Sem;
-    mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
-
+    TCP_Push_MSG_queue(TCP_FW01_Sem);
 exit:
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1676,4 +1676,10 @@ static void eland_set_time(void)
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
     if ((offset_time > 86400) || (offset_time < -86400))
         mico_rtos_set_semaphore(&alarm_update);
+}
+OSStatus TCP_Push_MSG_queue(_tcp_cmd_sem_t message)
+{
+    _tcp_cmd_sem_t tcp_message;
+    tcp_message = message;
+    return mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
 }
