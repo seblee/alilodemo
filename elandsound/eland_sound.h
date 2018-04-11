@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-02-04 17:03:49
+ * @Last Modified time:2018-04-10 16:13:26
  * @brief   :
  ****************************************************************************
 **/
@@ -30,6 +30,7 @@
 #define SOUND_FILE_OFID (uint8_t)0X03
 #define SOUND_FILE_DEFAULT (uint8_t)0X04
 /* Private typedef -----------------------------------------------------------*/
+
 typedef struct __SOUND_FILE_TYPE_
 {
     char flag[ALARM_FILE_FLAG_LEN + 1];
@@ -93,6 +94,8 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
 OSStatus SOUND_CHECK_DEFAULT_FILE(void);
 OSStatus SOUND_FILE_CLEAR(void);
 void file_download(void);
+uint32_t get_flash_capacity(void);
+OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list);
 /*************************/
 
 #endif

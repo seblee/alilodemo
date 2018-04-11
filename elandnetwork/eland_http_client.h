@@ -44,14 +44,14 @@
 
 typedef enum {
     HTTP_POST = 1,
-    HTTP_GET = 2
+    HTTP_GET = 2,
 } ELAND_HTTP_METHOD;
 
 typedef enum {
     HTTP_REQUEST_ERROR = 1,    //请求错误
     HTTP_CONNECT_ERROR = 2,    //连接失败
     HTTP_RESPONSE_SUCCESS = 3, //成功
-    HTTP_RESPONSE_FAILURE = 4  //失败
+    HTTP_RESPONSE_FAILURE = 4, //失败
 } ELAND_HTTP_RESPONSE_E;
 
 typedef enum {

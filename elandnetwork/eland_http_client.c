@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-22 09:28:26
+ * @Last Modified time:2018-04-10 17:44:32
  * @brief   :
  ****************************************************************************
 **/
@@ -28,7 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_CLIENT_DEBUG
+#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
@@ -365,7 +365,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     // client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
-
+    client_log("ssl_send request");
     /* Send HTTP Request */
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
     if (ret > 0)
@@ -391,6 +391,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     if (FD_ISSET(http_fd, &readfds))
     {
         /*parse header*/
+        client_log("start read response");
         err = SocketReadHTTPSHeader(client_ssl, httpHeader);
         if (sound_download_status == SOUND_DOWNLOAD_START)
         {
@@ -510,6 +511,11 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             {
                 context->content = calloc(1501, sizeof(uint8_t));
                 sound_flash_pos = 0;
+                if (get_flash_capacity() < inHeader->contentLength)
+                {
+                    client_log("flash capacity is insufficient");
+                    //    eland_sound_file_arrange(&sound_file_list);
+                }
             }
             else
                 context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
@@ -519,8 +525,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
         if (is_sound_data)
         {
-
-            client_log("sound data");
+            //  client_log("sound data");
             if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
                 goto exit;
             HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
@@ -529,8 +534,9 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
             HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
             HTTP_W_R_struct.alarm_w_r_queue->is_read = false;
-            client_log("send_queue:inlen = %ld,sound_flash_pos = %ld", HTTP_W_R_struct.alarm_w_r_queue->len, HTTP_W_R_struct.alarm_w_r_queue->pos);
             err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+            if (sound_flash_pos == 0)
+                client_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
             require_noerr(err, exit);
             sound_flash_pos += inLen;
         }
@@ -685,13 +691,16 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     ssl_set_client_version(TLS_V1_2_MODE);
     client_log("start ssl_connect");
     client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    //   client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
+
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
+    client_log("ssl_send request");
     /* Send HTTP Request */
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
     if (ret > 0)
     {
-        client_log("ssl_send success [%d] [%d]", strlen((const char *)eland_http_requeset), ret);
-        client_log("%s", eland_http_requeset);
+        // client_log("ssl_send success [%d] [%d]", strlen((const char *)eland_http_requeset), ret);
+        // client_log("%s", eland_http_requeset);
     }
     else
     {
@@ -711,6 +720,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     if (FD_ISSET(http_fd, &readfds))
     {
         /*parse header*/
+        client_log("start read response");
         err = SocketReadHTTPSHeader(client_ssl, httpHeader);
         switch (err)
         {
@@ -742,6 +752,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
             if (httpHeader->statusCode == 200) //正常應答
             {
                 //PrintHTTPHeader(httpHeader);
+                client_log("statusCode == 200");
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
                 client_log("data lenth = %ld", (uint32_t)context.content_length);
                 require_noerr(err, exit);

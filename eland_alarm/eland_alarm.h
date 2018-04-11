@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-15 09:58:38
+ * @Last Modified time:2018-04-10 16:12:58
  * @brief   :
  ****************************************************************************
 **/
@@ -16,6 +16,7 @@
 /* Private include -----------------------------------------------------------*/
 #include "mico.h"
 #include "netclock_uart.h"
+#include "eland_sound.h"
 /* Private define ------------------------------------------------------------*/
 #define ALARM_ID_LEN 36        //闹钟唯一识别的ID。
 #define ALARM_TIME_LEN 8       //時刻是"HH:mm:ss"的形式。
@@ -69,7 +70,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     int8_t snooze_enabled;                                 //继续响铃 有效标志  0：无效   1：有效
     int8_t snooze_count;                                   //继续响铃的次数
     int8_t snooze_interval_min;                            //继续响铃的间隔。単位「分」
-    int8_t alarm_pattern;                                  //闹钟的播放样式。 1 : 只有闹钟音 2 : 只有语音 3 : digital音和语音（交互播放） 4 : 闹钟OFF后的语音
+    int8_t alarm_pattern;                                  //闹钟的播放样式。 1 : 只有闹钟音 2 : 只有语音 3 : digital音和语音（交互播放）
     int32_t alarm_sound_id;                                //鬧鈴音ID
     char voice_alarm_id[VOICE_ALARM_ID_LEN];               //语音闹钟的ID
     char alarm_off_voice_alarm_id[VOICE_ALARM_ID_LEN];     //Alarm off 後语音闹钟的ID

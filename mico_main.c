@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-22 11:28:39
+ * @Last Modified time:2018-04-10 16:55:38
  * @brief   :
  ****************************************************************************
 **/
@@ -72,7 +72,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    start_uart_service();
+    //  start_uart_service();
 
     /*start Soft_AP mode*/
     //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
@@ -90,7 +90,7 @@ int application_start(void)
     err = get_eland_mode();
     app_netclock_log("eland_mode:%d", err);
 
-    if (err > ELAND_CLOCK_ALARM)
+    // if (err > ELAND_CLOCK_ALARM)
     {
         err = TCP_Service_Start();
         require_noerr(err, exit);

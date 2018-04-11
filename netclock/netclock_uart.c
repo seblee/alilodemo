@@ -661,10 +661,10 @@ static void ELAND_H08_Send(uint8_t *Cache)
     *(Cache + 3) = rssi_level;
     *(Cache + 4) = (uint8_t)(mode_state_temp >> 8);
     *(Cache + 5) = (uint8_t)(mode_state_temp & 0xff);
-    *(Cache + 7) = Uart_Packet_Trail;
+    *(Cache + 6) = Uart_Packet_Trail;
 start_send:
     sended_times--;
-    err = elandUsartSendData(Cache, 8);
+    err = elandUsartSendData(Cache, 7);
     require_noerr(err, exit);
     err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
     require_noerr(err, exit);

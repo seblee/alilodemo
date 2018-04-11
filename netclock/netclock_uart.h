@@ -52,20 +52,21 @@ typedef enum {
 } KEY_State_TypeDef;
 
 typedef enum {
-    KEY_FUN_NONE = 0x00, /* 空命令*/
-    KEY_READ_02 = 0X02,  /* READ MCU KEY STATE*/
-    TIME_SET_03,         /* SEND ELAND TIME*/
-    TIME_READ_04,        /* READ MCU TIME*/
-    ELAND_STATES_05,     /* SEND ELAND STATES*/
-    SEND_FIRM_WARE_06,   /* SEND ELAND FIRMWARE VERSION*/
-    REND_FIRM_WARE_07,   /* READ MUC FIRMWARE VERSION*/
-    SEND_LINK_STATE_08,  /* SEND WIFI LINK STATE*/
-    MCU_FIRM_WARE_09,    /* START MCU FIRM WARE UPDATE*/
-    ALARM_READ_0A,       /* READ MCU ALARM*/
-    ALARM_SEND_0B,       /* SEND NEXT ALARM STATE*/
-    ELAND_DATA_0C,       /* SEND ELAND DATA TO MCU*/
-    ELAND_RESET_0D,      /* RESET SYSTEM */
-    ELAND_DELETE_0E,     /* DEVICE DATA DELETE */
+    KEY_FUN_NONE = 0x00,      /* 空命令*/
+    SEND_ELAND_ERR_01 = 0x01, /* SEND ELAND ERROR CODE*/
+    KEY_READ_02 = 0X02,       /* READ MCU KEY STATE*/
+    TIME_SET_03,              /* SEND ELAND TIME*/
+    TIME_READ_04,             /* READ MCU TIME*/
+    ELAND_STATES_05,          /* SEND ELAND STATES*/
+    SEND_FIRM_WARE_06,        /* SEND ELAND FIRMWARE VERSION*/
+    REND_FIRM_WARE_07,        /* READ MUC FIRMWARE VERSION*/
+    SEND_LINK_STATE_08,       /* SEND WIFI LINK STATE*/
+    MCU_FIRM_WARE_09,         /* START MCU FIRM WARE UPDATE*/
+    ALARM_READ_0A,            /* READ MCU ALARM*/
+    ALARM_SEND_0B,            /* SEND NEXT ALARM STATE*/
+    ELAND_DATA_0C,            /* SEND ELAND DATA TO MCU*/
+    ELAND_RESET_0D,           /* RESET SYSTEM */
+    ELAND_DELETE_0E,          /* DEVICE DATA DELETE */
 } __msg_function_t;
 
 typedef enum {

@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-04 10:35:51
+ * @Last Modified time:2018-04-10 16:58:13
  * @brief   :
  ****************************************************************************
 **/
@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_TCP_DEBUG
+//#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define elan_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else

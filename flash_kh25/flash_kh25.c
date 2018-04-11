@@ -197,15 +197,16 @@ void flash_kh25_sector_erase(uint32_t address)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 4);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_log("sector_erase");
     flash_kh25_write_disable();
     free(spireadbuffer);
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待300ms
+    flash_kh25_log("sector_erase end");
 }
 void flash_kh25_block_erase(uint32_t address)
 {
     uint8_t *spireadbuffer = NULL;
     spireadbuffer = malloc(4);
-    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待300ms
     flash_kh25_write_enable();
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -217,9 +218,10 @@ void flash_kh25_block_erase(uint32_t address)
     spiReadWirteOneData(&Spi_eland, spireadbuffer, 4);
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
-    flash_kh25_log("block_erase");
     flash_kh25_write_disable();
     free(spireadbuffer);
+    flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
+    flash_kh25_log("block_erase end");
 }
 void flash_kh25_chip_erase(void)
 {
@@ -237,9 +239,9 @@ void flash_kh25_chip_erase(void)
     v_CSIsEnableSimulate(&Spi_eland, 0);
 
     flash_kh25_write_disable();
+    free(spireadbuffer);
     flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
     flash_kh25_log("chip_erase end");
-    free(spireadbuffer);
 }
 /* flash 按頁寫入數據*/
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
