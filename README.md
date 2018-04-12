@@ -1,5 +1,7 @@
 # Netclock
-
+#v01.12
+2018年4月12日14:31:13
+## change lcd 5V（LCD_All_angle_view）
 # v01.11
 2018年4月12日13:44:18 
 ## fix alarm repeat 3 bug;
