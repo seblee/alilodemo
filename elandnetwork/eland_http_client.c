@@ -279,7 +279,8 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
         err = kGeneralErr;
         goto exit;
     }
-    mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
+    client_log("http_send_setting_mutex");
+    err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     /******set request mode******/
     if (method == HTTP_POST)
     {
@@ -310,16 +311,6 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
         sprintf(eland_http_requeset + strlen(eland_http_requeset), "Content-Length: 0\r\n\r\n"); //增加Content-Length
     }
 
-    if (client_ssl)
-    {
-        ssl_close(client_ssl);
-        client_ssl = NULL;
-    }
-    if (http_fd > 0)
-    {
-        SocketClose(&http_fd);
-        http_fd = -1;
-    }
     client_log("start dns analysis, domain:%s", eland_host);
     err = usergethostbyname(eland_host, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
@@ -493,6 +484,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
 {
     OSStatus err = kNoErr;
     http_context_t *context = inUserContext;
+    int32_t contentLen;
     static uint32_t sound_flash_pos = 0;
     static bool is_sound_data = false;
 
@@ -511,10 +503,11 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             {
                 context->content = calloc(1501, sizeof(uint8_t));
                 sound_flash_pos = 0;
-                if (get_flash_capacity() < inHeader->contentLength)
+                contentLen = (int32_t)inHeader->contentLength;
+                if (get_flash_capacity() < contentLen)
                 {
                     client_log("flash capacity is insufficient");
-                    //    eland_sound_file_arrange(&sound_file_list);
+                    eland_sound_file_arrange(&sound_file_list);
                 }
             }
             else
@@ -615,7 +608,8 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
         err = kGeneralErr;
         goto exit;
     }
-    mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
+    client_log("http_send_setting_mutex");
+    err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     /******set request mode******/
     if (method == HTTP_POST)
     {

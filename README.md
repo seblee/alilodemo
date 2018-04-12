@@ -1,5 +1,21 @@
 # Netclock
 
+# v01.11
+2018年4月12日13:44:18 
+## fix alarm repeat 3 bug;
+## alarm off with app record time & stop reason 2 
+## new alarm data play priority
+## change alarm_mcu_data struct
+## add primary_dns
+## change ssid scan value 0-100
+## add ELAND_H0E_Send to issue eland delet data operation;
+
+## change _alarm_mcu_data_t struct; 
+## add alarm skip tcp send; 
+## alarm skip operation;
+
+## flash capacity arrange
+
 # v01.10 
 2018年4月3日11:25:30
 ## fix alarm off history data empty bug

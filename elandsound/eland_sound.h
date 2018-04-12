@@ -94,7 +94,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
 OSStatus SOUND_CHECK_DEFAULT_FILE(void);
 OSStatus SOUND_FILE_CLEAR(void);
 void file_download(void);
-uint32_t get_flash_capacity(void);
+int32_t get_flash_capacity(void);
 OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list);
 /*************************/
 

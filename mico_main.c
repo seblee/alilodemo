@@ -72,7 +72,7 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
-    //  start_uart_service();
+    start_uart_service();
 
     /*start Soft_AP mode*/
     //  Start_wifi_Station_SoftSP_Thread(Soft_AP);
@@ -80,17 +80,22 @@ int application_start(void)
     /* Wait for wlan connection*/
     app_netclock_log("wait for wifi");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
-    app_netclock_log("wifi connected successful");
     SendElandStateQueue(WifyConnected);
+    app_netclock_log("wifi connected successful");
 
     /*start eland HTTP service */
     err = start_eland_service();
     require_noerr(err, exit);
+
+    /*check default sound */
+    err = check_default_sound();
+    require_noerr(err, exit);
+
     mico_rtos_thread_msleep(1500);
     err = get_eland_mode();
     app_netclock_log("eland_mode:%d", err);
 
-    // if (err > ELAND_CLOCK_ALARM)
+    if (err > ELAND_CLOCK_ALARM)
     {
         err = TCP_Service_Start();
         require_noerr(err, exit);

@@ -230,6 +230,7 @@ OSStatus SOUND_FILE_CLEAR(void)
         free(sound_file_list.lib);
         sound_file_list.sector_start = 0;
         sound_file_list.sector_end = 0;
+        sound_file_list.file_number = 0;
     }
 
     for (block_count = 0; block_count < KH25_BLOCKCOUNT - 1; block_count++)
@@ -241,6 +242,8 @@ OSStatus SOUND_FILE_CLEAR(void)
     {
         flash_kh25_sector_erase((uint32_t)sector_count * KH25L8006_BLOCK_SIZE);
     }
+
+    sound_log("sound_file numberr :%d", sound_file_list.file_number);
 
     mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
@@ -274,9 +277,9 @@ exit:
     goto wait_for_queue;
 }
 
-uint32_t get_flash_capacity(void)
+int32_t get_flash_capacity(void)
 {
-    uint32_t capacity = 0;
+    int32_t capacity;
     capacity = KH25_CHECK_ADDRESS - sound_file_list.sector_end;
     return capacity;
 }
@@ -387,7 +390,7 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
             if (((alarm_list->alarm_lib + i)->alarm_pattern == 1) &&
                 (sound_id == (alarm_list->alarm_lib + i)->alarm_sound_id))
             {
-                sound_log("FILE_VID %s is usable", sound_file->alarm_ID);
+                sound_log("FILE_SID %ld is usable", *((int32_t *)(sound_file->alarm_ID)));
                 return true;
             }
         }

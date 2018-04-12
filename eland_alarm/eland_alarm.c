@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ALARM_DEBUG
+#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -356,24 +356,9 @@ OSStatus alarm_sound_scan(void)
 {
     OSStatus err = kNoErr;
     uint8_t i;
-    static bool flag = true;
-    __elsv_alarm_data_t alarm_simple;
 
 scan_again:
-    if (flag)
-    {
-        alarm_log("check default sound");
-        err = SOUND_CHECK_DEFAULT_FILE();
-        if (err != kNoErr)
-        {
-            SOUND_FILE_CLEAR();
-            alarm_log("download default sound");
-            memset(&alarm_simple, 0, sizeof(__elsv_alarm_data_t));
-            err = alarm_sound_download(&alarm_simple, SOUND_FILE_DEFAULT);
-            require_noerr(err, exit);
-        }
-        flag = false;
-    }
+    alarm_log("alarm_number:%d", alarm_list.alarm_number);
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
         alarm_log("alarm:%d", i);
@@ -425,8 +410,7 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         {
             if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
             {
-                memmove(AlarmList->alarm_lib, AlarmList->alarm_lib + 1, i * sizeof(__elsv_alarm_data_t));
-                memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
+                memcpy((uint8_t *)(AlarmList->alarm_lib + i), inData, sizeof(__elsv_alarm_data_t));
                 goto exit;
             }
         }
@@ -434,7 +418,7 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         alarm_log("alarm_id is new");
         if (i == AlarmList->alarm_number)
         {
-            memmove(AlarmList->alarm_lib, AlarmList->alarm_lib + 1, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
+            memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
             memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
             AlarmList->alarm_number++;
         }
@@ -464,6 +448,7 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
                     (AlarmList->alarm_number - 1 - i) * sizeof(__elsv_alarm_data_t));
             AlarmList->alarm_number--;
             AlarmList->list_refreshed = true;
+            break;
         }
     }
     if (AlarmList->alarm_number == 0)
@@ -823,7 +808,7 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("\r\n_alarm_mcu_data_t");
     alarm_log("color:%d", alarm_data->alarm_data_for_mcu.color);
-    alarm_log("snooze_count:%d", alarm_data->alarm_data_for_mcu.snooze_count);
+    alarm_log("snooze_count:%d", alarm_data->alarm_data_for_mcu.snooze_enabled);
     alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("moment_time:%02d-%02d-%02d %d %02d-%02d-%02d",
               alarm_data->alarm_data_for_mcu.moment_time.year,
@@ -1324,5 +1309,27 @@ static OSStatus set_alarm_history_send_sem(void)
         set_alarm_history_data_state(WAIT_UPLOAD);
         TCP_Push_MSG_queue(TCP_HT01_Sem);
     }
+    return err;
+}
+OSStatus check_default_sound(void)
+{
+    OSStatus err = kNoErr;
+    __elsv_alarm_data_t alarm_simple;
+check_start:
+    alarm_log("check default sound");
+    err = SOUND_CHECK_DEFAULT_FILE();
+    if (err != kNoErr)
+    {
+        alarm_log("SOUND_FILE_CLEAR");
+        SOUND_FILE_CLEAR();
+        memset(&alarm_simple, 0, sizeof(__elsv_alarm_data_t));
+        alarm_log("download default file");
+        err = alarm_sound_download(&alarm_simple, SOUND_FILE_DEFAULT);
+        require_noerr(err, exit);
+        goto check_start;
+    }
+exit:
+    if (err == kNoErr)
+        alarm_log("check ok");
     return err;
 }

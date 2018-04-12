@@ -203,6 +203,8 @@ void set_alarm_history_data_state(HistoryDatastate_t value);
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
 OSStatus alarm_sound_scan(void);
 OSStatus alarm_sound_oid(void);
+OSStatus check_default_sound(void);
+
 OSStatus Alarm_build_JSON(char *json_str);
 
 void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time);
