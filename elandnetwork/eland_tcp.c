@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_TCP_DEBUG
+#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define elan_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
@@ -1225,6 +1225,14 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         else if (!strcmp(key, "brightness_night"))
         {
             des_data_cache.brightness_night = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "led_normal"))
+        {
+            des_data_cache.led_normal = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "led_night"))
+        {
+            des_data_cache.led_night = json_object_get_int(val);
         }
         else if (!strcmp(key, "night_mode_enabled"))
         {

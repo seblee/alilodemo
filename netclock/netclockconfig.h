@@ -63,6 +63,8 @@ typedef struct _ELAND_DES_S //设备状态结构
     int8_t time_display_format;                  //12小时显示还是24小时显示的代码  1:12時間表示(AM/PM表示) 2 : 24時間表示
     int8_t brightness_normal;                    //通常时的液晶显示亮度。背光亮度
     int8_t brightness_night;                     //夜间模式时的液晶显示亮度、背光亮度
+    int8_t led_normal;                           //通常时的液晶显示亮度。背光亮度
+    int8_t led_night;                            //通常时的液晶显示亮度。背光亮度
     int8_t night_mode_enabled;                   //指定時刻间、是否调节背光亮度
     char night_mode_begin_time[Time_Format_Len]; //设定背光的亮度调节的开始时刻
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻

@@ -99,6 +99,8 @@ static void recorde_IPStatus(wlanInterfaceTypedef type)
     sprintf(netclock_des_g->subnet_mask, IPStatus_Cache.mask);
     memset(netclock_des_g->default_gateway, 0, sizeof(netclock_des_g->default_gateway));
     sprintf(netclock_des_g->default_gateway, IPStatus_Cache.gate);
+    memset(netclock_des_g->primary_dns, 0, sizeof(netclock_des_g->primary_dns));
+    sprintf(netclock_des_g->primary_dns, IPStatus_Cache.dns);
 }
 OSStatus Start_wifi_Station_SoftSP_Thread(wlanInterfaceTypedef wifi_Mode)
 {

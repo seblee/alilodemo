@@ -1,22 +1,23 @@
 # Netclock
-#v01.12
+# v01.12
 2018年4月12日14:31:13
-## change lcd 5V（LCD_All_angle_view）
+* change lcd 5V（LCD_All_angle_view）
 # v01.11
 2018年4月12日13:44:18 
-## fix alarm repeat 3 bug;
-## alarm off with app record time & stop reason 2 
-## new alarm data play priority
-## change alarm_mcu_data struct
-## add primary_dns
-## change ssid scan value 0-100
-## add ELAND_H0E_Send to issue eland delet data operation;
+## 
+    1 fix alarm repeat 3 bug;
+    2 alarm off with app record time & stop reason 2
+    3 press ALARM_OFF in snoozing,stop alarm snooze
+    4 new alarm data play priority
+    5 change alarm_mcu_data struct
+    6 add primary_dns
+    7 change ssid scan value 0-100
+    8 add ELAND_H0E_Send to issue eland delet data operation;
+    9 change _alarm_mcu_data_t struct; 
+    10 add alarm skip tcp send; 
+    11 alarm skip operation;
 
-## change _alarm_mcu_data_t struct; 
-## add alarm skip tcp send; 
-## alarm skip operation;
-
-## flash capacity arrange
+    12 flash capacity arrange
 
 # v01.10 
 2018年4月3日11:25:30
