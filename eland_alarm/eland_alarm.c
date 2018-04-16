@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-08 17:02:17
+ * @Last Modified time:2018-04-16 16:01:13
  * @brief   :
  ****************************************************************************
 **/
@@ -410,18 +410,16 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         {
             if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
             {
-                memcpy((uint8_t *)(AlarmList->alarm_lib + i), inData, sizeof(__elsv_alarm_data_t));
+                memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, i * sizeof(__elsv_alarm_data_t));
+                memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
                 goto exit;
             }
         }
         /**a new alarm**/
         alarm_log("alarm_id is new");
-        if (i == AlarmList->alarm_number)
-        {
-            memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
-            memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
-            AlarmList->alarm_number++;
-        }
+        memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
+        memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
+        AlarmList->alarm_number++;
     }
 exit:
     alarm_log("alarm_add success!");
@@ -1055,7 +1053,7 @@ OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, c
     require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
     generate_data_len = strlen(generate_data);
     memcpy(json_buff, generate_data, generate_data_len);
-    alarm_log("history_json_buff:%s", json_buff);
+    // alarm_log("history_json_buff:%s", json_buff);
 exit:
     free_json_obj(&TempJsonData);
     free_json_obj(&AlarmOffHistoryData);
