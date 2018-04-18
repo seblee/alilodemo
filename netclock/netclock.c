@@ -27,6 +27,7 @@
 #include "flash_kh25.h"
 #include "eland_sound.h"
 #include "eland_tcp.h"
+
 /* Private define ------------------------------------------------------------*/
 //#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
@@ -172,8 +173,12 @@ start_Check:
     memcpy(netclock_des_g->eland_name, device_state->eland_name, eland_name_Len);
     /***initialize by device flash***/
     netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
+
+    if (device_state->area_code > 142)
+        netclock_des_g->area_code = 43;
+    else
+        netclock_des_g->area_code = device_state->area_code;
     memcpy(netclock_des_g->firmware_version, FIRMWARE_REVISION, strlen(FIRMWARE_REVISION)); //设置设备软件版本号
-    //eland_get_mac(netclock_des_g->mac_address);
     netclock_des_g->dhcp_enabled = device_state->dhcp_enabled;
     memcpy(netclock_des_g->ip_address, device_state->ip_address, ip_address_Len);
     memcpy(netclock_des_g->subnet_mask, device_state->subnet_mask, ip_address_Len);
@@ -189,6 +194,9 @@ start_Check:
     netclock_des_g->health_check_moment = (netclock_des_g->eland_id) % 100 % 60;
 
     Eland_log("eland_id %ld", device_state->eland_id);
+
+    // Eland_log("area_code %d", offsetof(_ELAND_DEVICE_t, area_code));
+    // Eland_log("sizeof %d", sizeof(_ELAND_DEVICE_t));
 
     return kNoErr;
 exit:
@@ -219,6 +227,7 @@ OSStatus Netclock_des_recovery(void)
     device_state->eland_id = device_temp.eland_id;
     sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
     device_state->timezone_offset_sec = DEFAULT_TIMEZONE;
+    device_state->area_code = DEFAULT_AREACODE;
     // memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
 
     context = mico_system_context_get();
@@ -278,6 +287,7 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
+    json_object_object_add(DeviceJsonData, "area_code", json_object_new_int(netclock_des_g->area_code));
 
     json_object_object_add(ElandJsonData, "device", DeviceJsonData);
 
@@ -703,6 +713,17 @@ void eland_update_flash(void)
         needupdateflash = true;
         memcpy(device_state->user_id, netclock_des_g->user_id, user_id_len);
     }
+    if (netclock_des_g->timezone_offset_sec != device_state->timezone_offset_sec)
+    {
+        device_state->timezone_offset_sec = netclock_des_g->timezone_offset_sec;
+        needupdateflash = true;
+    }
+    if (netclock_des_g->area_code != device_state->area_code)
+    {
+        device_state->area_code = netclock_des_g->area_code;
+        needupdateflash = true;
+    }
+
     if (needupdateflash == true)
         mico_system_context_update(context);
 }

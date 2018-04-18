@@ -91,6 +91,7 @@ typedef enum _eland_mode {
     ELAND_NC,
     ELAND_NA,
     ELAND_AP,
+    ELAND_OTA,
     ELAND_MODE_MAX,
 } _ELAND_MODE_t;
 
@@ -107,6 +108,8 @@ typedef struct eland_data_2_mcu
     int8_t night_mode_enabled;
     int8_t brightness_normal;
     int8_t brightness_night;
+    int8_t led_normal;
+    int8_t led_night;
     uint32_t night_mode_begin_time;
     uint32_t night_mode_end_time;
 } __ELAND_DATA_2_MCU_t;
@@ -124,6 +127,7 @@ typedef struct eland_data_2_mcu
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 /* Private function prototypes -----------------------------------------------*/
+void set_eland_mode(_ELAND_MODE_t mode);
 uint16_t get_eland_mode_state(void);
 _ELAND_MODE_t get_eland_mode(void);
 OSStatus start_uart_service(void);

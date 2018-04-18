@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_TCP_DEBUG
+#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define elan_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
@@ -600,7 +600,6 @@ cycle_loop:
             goto exit;
         }
     }
-
 little_cycle_loop:
     timer.tv_sec = 1;
     timer.tv_usec = 0;
@@ -641,7 +640,7 @@ pop_queue:
         else if (tcp_message == TCP_HT01_Sem)
             rc = eland_IF_upload(&Eland_Client, HT01);
         /*******upload alarm skip notice********/
-        else if (tcp_message == TCP_HT01_Sem)
+        else if (tcp_message == TCP_HT02_Sem)
             rc = eland_IF_upload(&Eland_Client, HT02);
         /*******delete tcp thread***********/
         else if (tcp_message == TCP_Stop_Sem)
@@ -666,6 +665,8 @@ pop_queue:
             if (TCP_SUCCESS == rc)
             {
                 download_type = DOWNLOAD_OTA;
+                set_eland_mode(ELAND_OTA);
+                eland_push_send_queue(SEND_LINK_STATE_08);
                 mico_rtos_push_to_queue(&download_queue, &download_type, 10);
             }
         }
@@ -1200,6 +1201,10 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         {
             des_data_cache.timezone_offset_sec = json_object_get_int(val);
         }
+        else if (!strcmp(key, "area_code"))
+        {
+            des_data_cache.area_code = json_object_get_int(val);
+        }
         else if (!strcmp(key, "serial_number"))
         {
             if (strcmp(des_data_cache.serial_number, json_object_get_string(val)))
@@ -1421,6 +1426,10 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             {
                 elan_tcp_log("alarm_on_days_of_week = %s", alarm_data->alarm_on_days_of_week);
             }
+        }
+        else if (!strcmp(key, "skip_flag"))
+        {
+            alarm_data->skip_flag = json_object_get_int(val);
         }
     }
     if (alarm_data->alarm_repeat == 5)

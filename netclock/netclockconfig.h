@@ -13,6 +13,7 @@
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
 #define Timezone_offset_elsv ((int32_t)32400)     //elsv time zone
 #define DEFAULT_TIMEZONE ((int32_t)32400)
+#define DEFAULT_AREACODE ((int16_t)43)
 
 #define DEVICE_MAC_LEN (17) //MAC地址长度
 
@@ -63,13 +64,18 @@ typedef struct _ELAND_DES_S //设备状态结构
     int8_t time_display_format;                  //12小时显示还是24小时显示的代码  1:12時間表示(AM/PM表示) 2 : 24時間表示
     int8_t brightness_normal;                    //通常时的液晶显示亮度。背光亮度
     int8_t brightness_night;                     //夜间模式时的液晶显示亮度、背光亮度
-    int8_t led_normal;                           //通常时的液晶显示亮度。背光亮度
-    int8_t led_night;                            //通常时的液晶显示亮度。背光亮度
+    int8_t led_normal;                           //通常时的led显示亮度。
+    int8_t led_night;                            //通常时的led显示亮度。
+    int8_t notification_volume_normal;           //通常时的通知音量。
+    int8_t notification_volume_night;            //夜间时的led显示亮度。
+
     int8_t night_mode_enabled;                   //指定時刻间、是否调节背光亮度
     char night_mode_begin_time[Time_Format_Len]; //设定背光的亮度调节的开始时刻
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
-    char Wifissid[ElandSsid_Len];                //wifi 賬號
-    char WifiKey[ElandKey_Len];                  //wifi 密碼
+    int16_t area_code;                           //天气预报的地域代码
+    /*****************/
+    char Wifissid[ElandSsid_Len]; //wifi 賬號
+    char WifiKey[ElandKey_Len];   //wifi 密碼
     uint8_t health_check_moment;
 
     char tcpIP_host[ip_address_Len];
@@ -84,21 +90,24 @@ typedef struct _ELAND_DES_S //设备状态结构
 
 typedef struct _ELAND_DEVICE //设备状态结构
 {
-    bool IsActivate;   //是否已激活设备
-    bool IsAlreadySet; //是否已經寫入設備碼 eg.
+    bool IsActivate;   //是否已激活设备 0
+    bool IsAlreadySet; //是否已經寫入設備碼  01
 
-    uint32_t eland_id;                     //Eland唯一识别的ID
-    char serial_number[serial_number_len]; //Eland的串口番号。
-    char eland_name[eland_name_Len];       //Eland名称，用户输入
-    int32_t timezone_offset_sec;           //Eland的时区的UTC的offset秒 日本标准时为UTC + 09 : 00  「32400」
+    uint32_t eland_id;                     //Eland唯一识别的ID 4
+    char serial_number[serial_number_len]; //Eland的串口番号。8
+    char eland_name[eland_name_Len + 1];   //Eland名称，用户输入 20
+    int32_t timezone_offset_sec;           //Eland的时区的UTC的offset秒  172
 
     /*APP/tcpIP通信時獲取*/
-    char user_id[user_id_len];            //用户唯一识别ID
-    int8_t dhcp_enabled;                  //Eland IP地址自动取号是否有效的标志 0 : 無効 1 : 有効
-    char ip_address[ip_address_Len];      //Eland IP地址
-    char subnet_mask[ip_address_Len];     //Eland 的IPv4子网掩码。
-    char default_gateway[ip_address_Len]; //Eland 的IPv4默认网关。
-    char primary_dns[ip_address_Len];     //DNS server ip address
+    char user_id[user_id_len];            //用户唯一识别ID 176
+    int8_t dhcp_enabled;                  //IP地址自动取号  213
+    char ip_address[ip_address_Len];      //IP地址 214
+    char subnet_mask[ip_address_Len];     //的IPv4子网掩码。 230
+    char default_gateway[ip_address_Len]; //的IPv4默认网关。 246
+    char primary_dns[ip_address_Len];     //DNS server ip address  262
+    int16_t area_code;                    //天气预报的地域代码 278
+
+    // int8_t reserve[1024];
 } _ELAND_DEVICE_t;
 
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

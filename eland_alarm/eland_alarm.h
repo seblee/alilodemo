@@ -50,7 +50,7 @@ typedef struct
     int8_t color;
     int8_t snooze_enabled;
     int8_t next_alarm;
-    int8_t alarm_skip;
+    int8_t skip_flag;
     _ELAND_MODE_t mode;
     _alarm_list_state_t alarm_state;
 } _alarm_mcu_data_t;
@@ -70,7 +70,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     int8_t snooze_enabled;                                 //继续响铃 有效标志  0：无效   1：有效
     int8_t snooze_count;                                   //继续响铃的次数
     int8_t snooze_interval_min;                            //继续响铃的间隔。単位「分」
-    int8_t alarm_pattern;                                  //闹钟的播放样式。 1 : 只有闹钟音 2 : 只有语音 3 : digital音和语音（交互播放）
+    int8_t alarm_pattern;                                  //闹钟的播放样式。 1 : 只有闹钟音 2 : 只有语音 3 : digital音和语音（交互播放）4:default alarm
     int32_t alarm_sound_id;                                //鬧鈴音ID
     char voice_alarm_id[VOICE_ALARM_ID_LEN];               //语音闹钟的ID
     char alarm_off_voice_alarm_id[VOICE_ALARM_ID_LEN];     //Alarm off 後语音闹钟的ID
@@ -80,7 +80,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     int8_t alarm_repeat;                                   //鬧鐘反復條件
     uint16_t alarm_on_dates[ALARM_ON_DATES_COUNT];         //鬧鐘日期排列
     char alarm_on_days_of_week[ALARM_ON_DAYS_OF_WEEK_LEN]; //鬧鐘播放的星期幾
-    int8_t alarm_skip;
+    int8_t skip_flag;
     _alarm_eland_data_t alarm_data_for_eland;
     _alarm_mcu_data_t alarm_data_for_mcu;
 } __elsv_alarm_data_t;
@@ -194,6 +194,7 @@ void set_waiting_alarm_serial(uint8_t now_serial);
 _alarm_list_state_t get_alarm_state(void);
 void set_alarm_state(_alarm_list_state_t state);
 uint8_t get_alarm_skip_flag(void);
+uint8_t get_alarm_number(void);
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
 

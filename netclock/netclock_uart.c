@@ -72,7 +72,6 @@ static void uart_thread_DDE(uint32_t arg);
 static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
 static void Opration_Packet(uint8_t *data);
 
-static void set_eland_mode(_ELAND_MODE_t mode);
 static void set_eland_state(Eland_Status_type_t state);
 /* Private functions ---------------------------------------------------------*/
 
@@ -715,9 +714,14 @@ static void ELAND_H0B_Send(uint8_t *Cache)
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
     _alarm_mcu_data_t *alarm_data_mcu = NULL;
     uint8_t serial_cache;
-    serial_cache = get_display_alarm_serial();
-    alarm_data_mcu = get_alarm_mcu_data(serial_cache);
-    alarm_data_mcu->alarm_state = get_alarm_state();
+    if (get_alarm_number() == 0)
+        alarm_data_mcu = NULL;
+    else
+    {
+        serial_cache = get_display_alarm_serial();
+        alarm_data_mcu = get_alarm_mcu_data(serial_cache);
+        alarm_data_mcu->alarm_state = get_alarm_state();
+    }
 
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = ALARM_SEND_0B;
@@ -759,6 +763,8 @@ static void ELAND_H0C_Send(uint8_t *Cache)
     cache_to_mcu.night_mode_enabled = netclock_des_g->night_mode_enabled;
     cache_to_mcu.brightness_normal = netclock_des_g->brightness_normal;
     cache_to_mcu.brightness_night = netclock_des_g->brightness_night;
+    cache_to_mcu.led_normal = netclock_des_g->led_normal;
+    cache_to_mcu.led_night = netclock_des_g->led_night;
     sscanf((const char *)(&(netclock_des_g->night_mode_begin_time)), "%02d:%02d:%02d", &ho, &mi, &se);
     cache_to_mcu.night_mode_begin_time = (uint32_t)ho * 3600 + (uint32_t)mi * 60 + (uint32_t)se;
     sscanf((const char *)(&(netclock_des_g->night_mode_end_time)), "%02d:%02d:%02d", &ho, &mi, &se);
@@ -863,13 +869,17 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     {
         if (Key_Count_Trg & KEY_Alarm)
             set_alarm_state(ALARM_STOP);
+        if (Key_Count_Trg & KEY_Snooze) //alarm jump
+        {
+            download_type = DOWNLOAD_OID;
+            mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+        }
     }
     else
     {
         if (Key_Restain_Trg & KEY_Alarm) //alarm jump
         {
-            set_alarm_state(ALARM_SKIP);
-            mico_rtos_set_semaphore(&alarm_skip_sem);
+            TCP_Push_MSG_queue(TCP_HT02_Sem);
         }
         if (Key_Count_Trg & KEY_Snooze) //alarm jump
         {
@@ -1001,6 +1011,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 MicoSystemReboot();
             }
             break;
+        case ELAND_OTA:
+
+            break;
         case ELAND_CLOCK_MON:
         case ELAND_CLOCK_ALARM:
             alarm_list_clear(&alarm_list);
@@ -1057,7 +1070,7 @@ _ELAND_MODE_t get_eland_mode(void)
 {
     return eland_mode_state.eland_mode;
 }
-static void set_eland_mode(_ELAND_MODE_t mode)
+void set_eland_mode(_ELAND_MODE_t mode)
 {
     if (eland_mode_state.state_mutex == NULL)
         return;
