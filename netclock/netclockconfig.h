@@ -68,7 +68,6 @@ typedef struct _ELAND_DES_S //设备状态结构
     int8_t led_night;                            //通常时的led显示亮度。
     int8_t notification_volume_normal;           //通常时的通知音量。
     int8_t notification_volume_night;            //夜间时的led显示亮度。
-
     int8_t night_mode_enabled;                   //指定時刻间、是否调节背光亮度
     char night_mode_begin_time[Time_Format_Len]; //设定背光的亮度调节的开始时刻
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
@@ -76,7 +75,6 @@ typedef struct _ELAND_DES_S //设备状态结构
     /*****************/
     char Wifissid[ElandSsid_Len]; //wifi 賬號
     char WifiKey[ElandKey_Len];   //wifi 密碼
-    uint8_t health_check_moment;
 
     char tcpIP_host[ip_address_Len];
     uint16_t tcpIP_port;
@@ -107,7 +105,7 @@ typedef struct _ELAND_DEVICE //设备状态结构
     char primary_dns[ip_address_Len];     //DNS server ip address  262
     int16_t area_code;                    //天气预报的地域代码 278
 
-    // int8_t reserve[1024];
+    int8_t reserve[1024];
 } _ELAND_DEVICE_t;
 
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

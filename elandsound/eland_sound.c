@@ -253,10 +253,9 @@ void file_download(void)
 {
     OSStatus err;
     _download_type_t download_type;
-    // download_type = DOWNLOAD_OID;
-    // mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+    //  eland_push_http_queue(DOWNLOAD_OID);
 wait_for_queue:
-    err = mico_rtos_pop_from_queue(&download_queue, &download_type, MICO_WAIT_FOREVER);
+    err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
     switch (download_type)
     {
@@ -264,7 +263,6 @@ wait_for_queue:
         alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
-        sound_log("###sound download start####");
         alarm_sound_oid();
         break;
     case DOWNLOAD_OTA:

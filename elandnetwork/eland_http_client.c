@@ -686,7 +686,6 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     client_log("start ssl_connect");
     client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     //   client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
-
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
     client_log("ssl_send request");
     /* Send HTTP Request */
@@ -820,6 +819,7 @@ static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader, uint32_t inPo
                    (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
     }
 audio_transfer:
+    require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
     err = audio_service_stream_play(&result, &fm_stream);
     if (err != kNoErr)
     {

@@ -29,7 +29,7 @@
 #include "eland_tcp.h"
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ELAND_DEBUG
+#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -186,14 +186,15 @@ start_Check:
     memcpy(netclock_des_g->primary_dns, device_state->primary_dns, ip_address_Len);
     /***initialization to default value***/
     netclock_des_g->time_display_format = 1;
-    netclock_des_g->brightness_normal = 100;
+    netclock_des_g->brightness_normal = 80;
     netclock_des_g->brightness_night = 20;
+    netclock_des_g->led_normal = 80;
+    netclock_des_g->led_night = 20;
+    netclock_des_g->notification_volume_normal = 40;
+    netclock_des_g->notification_volume_night = 10;
     netclock_des_g->night_mode_enabled = 0;
     strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
     strncpy(netclock_des_g->night_mode_end_time, "06:00:00", Time_Format_Len);
-    netclock_des_g->health_check_moment = (netclock_des_g->eland_id) % 100 % 60;
-
-    Eland_log("eland_id %ld", device_state->eland_id);
 
     // Eland_log("area_code %d", offsetof(_ELAND_DEVICE_t, area_code));
     // Eland_log("sizeof %d", sizeof(_ELAND_DEVICE_t));
@@ -284,6 +285,8 @@ OSStatus InitUpLoadData(char *OutputJsonstring)
     json_object_object_add(DeviceJsonData, "brightness_night", json_object_new_int(netclock_des_g->brightness_night));
     json_object_object_add(DeviceJsonData, "led_normal", json_object_new_int(netclock_des_g->led_normal));
     json_object_object_add(DeviceJsonData, "led_night", json_object_new_int(netclock_des_g->led_night));
+    json_object_object_add(DeviceJsonData, "notification_volume_normal", json_object_new_int(netclock_des_g->notification_volume_normal));
+    json_object_object_add(DeviceJsonData, "notification_volume_night", json_object_new_int(netclock_des_g->notification_volume_night));
     json_object_object_add(DeviceJsonData, "night_mode_enabled", json_object_new_int(netclock_des_g->night_mode_enabled));
     json_object_object_add(DeviceJsonData, "night_mode_begin_time", json_object_new_string(netclock_des_g->night_mode_begin_time));
     json_object_object_add(DeviceJsonData, "night_mode_end_time", json_object_new_string(netclock_des_g->night_mode_end_time));
@@ -726,4 +729,42 @@ void eland_update_flash(void)
 
     if (needupdateflash == true)
         mico_system_context_update(context);
+}
+
+int8_t get_notification_volume(void)
+{
+    int ho, mi, se;
+    uint32_t begin_second, end_second, now_second;
+    mico_utc_time_t utc_time;
+
+    sscanf((const char *)(&(netclock_des_g->night_mode_begin_time)), "%02d:%02d:%02d", &ho, &mi, &se);
+    begin_second = (uint32_t)ho * SECOND_ONE_HOUR + (uint32_t)mi * SECOND_ONE_MINUTE + (uint32_t)se;
+    sscanf((const char *)(&(netclock_des_g->night_mode_end_time)), "%02d:%02d:%02d", &ho, &mi, &se);
+    end_second = (uint32_t)ho * SECOND_ONE_HOUR + (uint32_t)mi * SECOND_ONE_MINUTE + (uint32_t)se;
+
+    mico_time_get_utc_time(&utc_time);
+    now_second = utc_time % SECOND_ONE_DAY;
+    if (netclock_des_g->night_mode_enabled)
+    {
+        if (end_second < begin_second)
+        {
+            if (now_second < end_second)
+                return netclock_des_g->notification_volume_night;
+            else if (now_second < begin_second)
+                return netclock_des_g->notification_volume_normal;
+            else
+                return netclock_des_g->notification_volume_night;
+        }
+        else
+        {
+            if (now_second < begin_second)
+                return netclock_des_g->notification_volume_normal;
+            else if (now_second < end_second)
+                return netclock_des_g->notification_volume_night;
+            else
+                return netclock_des_g->notification_volume_normal;
+        }
+    }
+    else
+        return netclock_des_g->notification_volume_normal;
 }

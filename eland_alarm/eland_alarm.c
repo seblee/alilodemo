@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ALARM_DEBUG
+#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -36,7 +36,7 @@
 /* Private variables ---------------------------------------------------------*/
 mico_semaphore_t alarm_update = NULL;
 mico_semaphore_t alarm_skip_sem = NULL;
-mico_queue_t download_queue = NULL;
+mico_queue_t http_queue = NULL;
 
 _eland_alarm_list_t alarm_list;
 _elsv_holiday_t holiday_list;
@@ -49,8 +49,6 @@ static uint32_t GET_current_second(void);
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list);
 void Alarm_Manager(uint32_t arg);
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD);
-static void set_alarm_stream_state(_stream_state_t state);
-static _stream_state_t get_alarm_stream_state(void);
 
 static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
@@ -85,7 +83,7 @@ OSStatus Start_Alarm_service(void)
     err = mico_rtos_init_semaphore(&alarm_update, 5);
     require_noerr(err, exit);
     //eland_state_queue
-    err = mico_rtos_init_queue(&download_queue, "download_queue", sizeof(_download_type_t), 5); //只容纳一个成员 传递的只是地址
+    err = mico_rtos_init_queue(&http_queue, "http_queue", sizeof(_download_type_t), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
 
     err = mico_rtos_init_semaphore(&alarm_skip_sem, 1);
@@ -159,7 +157,7 @@ void set_alarm_state(_alarm_list_state_t state)
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
     if ((state == ALARM_ING) || (state == ALARM_SNOOZ_STOP))
-        eland_push_send_queue(ALARM_SEND_0B);
+        eland_push_uart_send_queue(ALARM_SEND_0B);
 }
 static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
@@ -193,13 +191,13 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
 
-static void set_alarm_stream_state(_stream_state_t state)
+void set_alarm_stream_state(_stream_state_t state)
 {
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     alarm_stream.state = state;
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
-static _stream_state_t get_alarm_stream_state(void)
+_stream_state_t get_alarm_stream_state(void)
 {
     return alarm_stream.state;
 }
@@ -360,9 +358,11 @@ exit:
 OSStatus alarm_sound_scan(void)
 {
     OSStatus err = kNoErr;
+    uint8_t scan_count = 0;
     uint8_t i;
 
 scan_again:
+    scan_count++;
     alarm_log("alarm_number:%d", alarm_list.alarm_number);
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
@@ -390,7 +390,7 @@ scan_again:
         }
     }
 exit:
-    if (err != kNoErr)
+    if ((err != kNoErr) && (scan_count < 5))
     {
         mico_rtos_thread_sleep(5);
         goto scan_again;
@@ -869,7 +869,7 @@ void set_display_alarm_serial(uint8_t serial)
     alarm_list.alarm_display_serial = serial;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
-    eland_push_send_queue(ALARM_SEND_0B);
+    eland_push_uart_send_queue(ALARM_SEND_0B);
 }
 _alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial)
 {
@@ -1028,7 +1028,7 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
         alarm_serial = get_waiting_alarm_serial();
         memcpy(off_history.HistoryData.alarm_id,
                (alarm_list.alarm_lib + alarm_serial)->alarm_id, ALARM_ID_LEN);
-        memcpy(&off_history.HistoryData.alarm_off_datetime, iso8601_time, 19);
+        memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
         off_history.state = READY_UPLOAD;
         break;
@@ -1224,7 +1224,6 @@ void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time)
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest)
 {
     OSStatus err = kGeneralErr;
-    _download_type_t download_type;
     // err = mico_rtos_get_semaphore(&alarm_skip_sem, 0);
     // if (err == kNoErr)
     // {
@@ -1247,7 +1246,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
     //         else
     //             TCP_Push_MSG_queue(TCP_HT02_Sem);
     //     }
-    //     eland_push_send_queue(ALARM_SEND_0B);
+    //     eland_push_uart_send_queue(ALARM_SEND_0B);
     // }
     err = mico_rtos_get_semaphore(&alarm_update, 500);
     if (list->list_refreshed ||
@@ -1262,8 +1261,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
 
         if (*alarm_nearest)
         {
-            download_type = DOWNLOAD_SCAN;
-            mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+            eland_push_http_queue(DOWNLOAD_SCAN);
             set_display_alarm_serial(get_waiting_alarm_serial());
             alarm_log("get alarm_nearest alarm_id:%s", (*alarm_nearest)->alarm_id);
         }
@@ -1288,10 +1286,16 @@ OSStatus alarm_sound_oid(void)
     char uri_str[100] = {0};
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
+    uint8_t oid_volume = 0;
 
     set_alarm_stream_state(STREAM_PLAY);
     for (i = 0; i < 33; i++)
+        audio_service_volume_down(&result, 1);
+    oid_volume = get_notification_volume();
+    for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
+    {
         audio_service_volume_up(&result, 1);
+    }
 
     /******************/
     sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
@@ -1300,6 +1304,7 @@ OSStatus alarm_sound_oid(void)
     require_noerr(err, exit);
     /******************/
 check_audio:
+    require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
     audio_service_get_audio_status(&result, &audio_status);
     if (audio_status == MSCP_STATUS_STREAM_PLAYING)
     {
@@ -1313,10 +1318,9 @@ exit:
         alarm_log("stop playing");
         audio_service_stream_stop(&result, alarm_stream.stream_id);
     }
+    set_alarm_stream_state(STREAM_IDEL);
     alarm_log("play stopped");
-    for (i = 0; i < 33; i++)
-        audio_service_volume_down(&result, 1);
-    set_alarm_stream_state(STREAM_STOP);
+
     return err;
 }
 
@@ -1351,4 +1355,10 @@ exit:
     if (err == kNoErr)
         alarm_log("check ok");
     return err;
+}
+
+void eland_push_http_queue(_download_type_t msg)
+{
+    _download_type_t http_msg = msg;
+    mico_rtos_push_to_queue(&http_queue, &http_msg, 10);
 }

@@ -480,9 +480,8 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _time_t timer;
     mico_rtc_time_t cur_time = {0};
     _tcp_cmd_sem_t tcp_message;
-    _download_type_t download_type;
 
-    HC00_moment_sec = netclock_des_g->health_check_moment;
+    HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
 GET_CONNECT_INFO:
     /*pop queue*/
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
@@ -664,10 +663,9 @@ pop_queue:
             rc = eland_IF_upload(&Eland_Client, FW01);
             if (TCP_SUCCESS == rc)
             {
-                download_type = DOWNLOAD_OTA;
                 set_eland_mode(ELAND_OTA);
-                eland_push_send_queue(SEND_LINK_STATE_08);
-                mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+                eland_push_uart_send_queue(SEND_LINK_STATE_08);
+                eland_push_http_queue(DOWNLOAD_OTA);
             }
         }
 
@@ -933,6 +931,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     switch (cmd_type)
     {
     case CN00:
+        /*build eland json data*/
         InitUpLoadData(telegram_data);
         telegram->lenth = strlen(telegram_data);
         elan_tcp_log("CN00 len:%ld,json:%s", telegram->lenth, telegram_data);
@@ -1238,6 +1237,14 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         else if (!strcmp(key, "led_night"))
         {
             des_data_cache.led_night = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "notification_volume_normal"))
+        {
+            des_data_cache.notification_volume_normal = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "notification_volume_night"))
+        {
+            des_data_cache.notification_volume_night = json_object_get_int(val);
         }
         else if (!strcmp(key, "night_mode_enabled"))
         {

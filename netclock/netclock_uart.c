@@ -136,7 +136,7 @@ OSStatus start_uart_service(void)
     err = mico_rtos_deinit_semaphore(&Is_usart_complete_sem);
     require_noerr(err, exit);
     /*read mcu rtc time*/
-    eland_push_send_queue(TIME_READ_04);
+    eland_push_uart_send_queue(TIME_READ_04);
     SendElandStateQueue(ElandBegin);
     Eland_uart_log("start usart timer");
     /*configuration usart timer*/
@@ -210,7 +210,7 @@ exit:
 //    err = mico_rtos_deinit_semaphore(&Is_usart_complete_sem);
 //    require_noerr(err, exit);
 //    /*read mcu rtc time*/
-//eland_push_send_queue(TIME_READ_04);
+//eland_push_uart_send_queue(TIME_READ_04);
 //    SendElandStateQueue(ElandBegin);
 //    Eland_uart_log("start usart timer");
 //    /*configuration usart timer*/
@@ -397,7 +397,7 @@ void SendElandStateQueue(Eland_Status_type_t value)
         mico_rtos_pop_from_queue(&eland_state_queue, &state, 0);
     state = value;
     mico_rtos_push_to_queue(&eland_state_queue, &state, 0);
-    eland_push_send_queue(ELAND_STATES_05);
+    eland_push_uart_send_queue(ELAND_STATES_05);
 }
 static void timer100_key_handle(void *arg)
 {
@@ -410,7 +410,7 @@ static void timer100_key_handle(void *arg)
     }
     else
         eland_cmd = KEY_READ_02;
-    eland_push_send_queue(eland_cmd);
+    eland_push_uart_send_queue(eland_cmd);
 }
 
 // static void Eland_Key_destroy_timer(void)
@@ -832,7 +832,6 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     uint8_t cache = 0;
     static uint16_t time_delay_counter;
     _alarm_list_state_t alarm_status;
-    _download_type_t download_type;
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
@@ -869,22 +868,26 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     {
         if (Key_Count_Trg & KEY_Alarm)
             set_alarm_state(ALARM_STOP);
-        if (Key_Count_Trg & KEY_Snooze) //alarm jump
+        if (Key_Count_Trg & KEY_Snooze) ////sound oid
         {
-            download_type = DOWNLOAD_OID;
-            mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+            if (get_alarm_stream_state() == STREAM_PLAY)
+                set_alarm_stream_state(STREAM_STOP);
+            else
+                eland_push_http_queue(DOWNLOAD_OID);
         }
     }
     else
     {
-        if (Key_Restain_Trg & KEY_Alarm) //alarm jump
+        if (Key_Restain_Trg & KEY_Alarm) //alarm skip
         {
             TCP_Push_MSG_queue(TCP_HT02_Sem);
         }
-        if (Key_Count_Trg & KEY_Snooze) //alarm jump
+        if (Key_Count_Trg & KEY_Snooze) //sound oid
         {
-            download_type = DOWNLOAD_OID;
-            mico_rtos_push_to_queue(&download_queue, &download_type, 10);
+            if (get_alarm_stream_state() == STREAM_PLAY)
+                set_alarm_stream_state(STREAM_STOP);
+            else
+                eland_push_http_queue(DOWNLOAD_OID);
         }
     }
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/
@@ -893,10 +896,10 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
         {
         case REFRESH_TIME:
-            eland_push_send_queue(TIME_READ_04);
+            eland_push_uart_send_queue(TIME_READ_04);
             break;
         case REFRESH_ALARM:
-            eland_push_send_queue(ALARM_READ_0A);
+            eland_push_uart_send_queue(ALARM_READ_0A);
             break;
         default:
             break;
@@ -908,7 +911,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             if (Key_Count & KEY_AlarmMode)
             {
                 set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_send_queue(ALARM_READ_0A);
+                eland_push_uart_send_queue(ALARM_READ_0A);
             }
             break;
         case ELAND_CLOCK_ALARM:
@@ -931,7 +934,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             else if (Key_Count & KEY_AlarmMode)
             {
                 set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_send_queue(ALARM_READ_0A);
+                eland_push_uart_send_queue(ALARM_READ_0A);
             }
             break;
         case ELAND_AP:
@@ -945,7 +948,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             else if (Key_Count & KEY_AlarmMode)
             {
                 set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_send_queue(ALARM_READ_0A);
+                eland_push_uart_send_queue(ALARM_READ_0A);
             }
             break;
 
@@ -1097,14 +1100,14 @@ void reset_eland_flash_para(__msg_function_t msg)
         err = mico_rtos_pop_from_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
     } while (err == kNoErr);
     /**clear time**/
-    eland_push_send_queue(msg);
+    eland_push_uart_send_queue(msg);
     err = Netclock_des_recovery();
     /**clear sound file in flash**/
     flash_kh25_write_page(BUF, KH25_CHECK_ADDRESS, sizeof(BUF));
     MicoSystemReboot();
 }
 
-void eland_push_send_queue(__msg_function_t cmd)
+void eland_push_uart_send_queue(__msg_function_t cmd)
 {
     __msg_function_t eland_cmd = cmd;
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);

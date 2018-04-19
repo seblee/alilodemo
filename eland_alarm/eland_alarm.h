@@ -102,6 +102,7 @@ typedef enum {
     STREAM_IDEL,
     STREAM_PLAY,
     STREAM_STOP,
+    STREAM_DONE,
 } _stream_state_t;
 
 typedef struct
@@ -173,7 +174,7 @@ extern _elsv_holiday_t holiday_list;
 extern _alarm_stream_t alarm_stream;
 extern mico_semaphore_t alarm_update;
 extern mico_semaphore_t alarm_skip_sem;
-extern mico_queue_t download_queue;
+extern mico_queue_t http_queue;
 
 extern _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
@@ -207,8 +208,10 @@ OSStatus alarm_sound_oid(void);
 OSStatus check_default_sound(void);
 
 OSStatus Alarm_build_JSON(char *json_str);
-
+void eland_push_http_queue(_download_type_t msg);
 void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time);
+void set_alarm_stream_state(_stream_state_t state);
+_stream_state_t get_alarm_stream_state(void);
 /* Private functions ---------------------------------------------------------*/
 
 #endif
