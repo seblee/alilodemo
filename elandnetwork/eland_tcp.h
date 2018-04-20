@@ -169,7 +169,9 @@ typedef enum _TCP_CMD {
     HT02,       //18 alarm jump over notification
     FW00,       //19 firmware update start request
     FW01,       //20 firmwart update start response
-    TCPCMD_MAX, //21
+    SD00,       //21 Alarm clock schedule request
+    SD01,       //22 Alarm clock schedule response
+    TCPCMD_MAX, //23
     TCPCMD_NONE,
 } _TCP_CMD_t;
 

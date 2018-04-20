@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ALARM_DEBUG
+//#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -99,7 +99,6 @@ exit:
 }
 void Alarm_Manager(uint32_t arg)
 {
-    __elsv_alarm_data_t *alarm_nearest = NULL;
     _alarm_list_state_t alarm_state;
     mico_utc_time_t utc_time = 0;
     uint8_t i;
@@ -109,11 +108,16 @@ void Alarm_Manager(uint32_t arg)
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
 
     alarm_log("start Alarm_Manager ");
-    alarm_nearest = Alarm_ergonic_list(&alarm_list);
-    if (alarm_nearest)
+    if (alarm_list.alarm_nearest)
+    {
+        free(alarm_list.alarm_nearest);
+        alarm_list.alarm_nearest = NULL;
+    }
+    alarm_list.alarm_nearest = Alarm_ergonic_list(&alarm_list);
+    if (alarm_list.alarm_nearest)
     {
         set_display_alarm_serial(get_waiting_alarm_serial());
-        alarm_log("get alarm_nearest alarm_id:%s", alarm_nearest->alarm_id);
+        alarm_log("nearest alarm_id:%s", alarm_list.alarm_nearest->alarm_id);
     }
     else
     {
@@ -122,17 +126,17 @@ void Alarm_Manager(uint32_t arg)
     }
     while (1)
     {
-        combing_alarm(&alarm_list, &alarm_nearest);
+        combing_alarm(&alarm_list, &(alarm_list.alarm_nearest));
         alarm_state = get_alarm_state();
         if ((alarm_state == ALARM_IDEL) || (alarm_state == ALARM_SKIP))
         {
-            if (alarm_nearest)
+            if (alarm_list.alarm_nearest)
             {
                 utc_time = GET_current_second();
-                if (utc_time >= alarm_nearest->alarm_data_for_eland.moment_second)
+                if (utc_time >= alarm_list.alarm_nearest->alarm_data_for_eland.moment_second)
                 {
                     alarm_log("##### start alarm ######");
-                    alarm_operation(alarm_nearest);
+                    alarm_operation(alarm_list.alarm_nearest);
                     /**operation output alarm**/
                 }
             }
@@ -291,6 +295,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 {
     uint8_t i, j;
     __elsv_alarm_data_t *elsv_alarm_data = NULL;
+    __elsv_alarm_data_t *near_alarm_data = NULL;
     mico_utc_time_t utc_time = 0;
     __elsv_alarm_data_t elsv_alarm_data_temp;
     list->list_refreshed = false;
@@ -337,7 +342,10 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
         }
     }
     if (elsv_alarm_data == NULL)
-        return NULL;
+    {
+        elsv_alarm_data = NULL;
+        goto exit;
+    }
 
     for (i = 0; i < list->alarm_number; i++)
     {
@@ -352,7 +360,12 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     }
 
 exit:
-    return elsv_alarm_data;
+    if (elsv_alarm_data)
+    {
+        near_alarm_data = calloc(sizeof(__elsv_alarm_data_t), sizeof(uint8_t));
+        memcpy(near_alarm_data, elsv_alarm_data, sizeof(__elsv_alarm_data_t));
+    }
+    return near_alarm_data;
 }
 
 OSStatus alarm_sound_scan(void)
@@ -364,6 +377,7 @@ OSStatus alarm_sound_scan(void)
 scan_again:
     scan_count++;
     alarm_log("alarm_number:%d", alarm_list.alarm_number);
+
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
         alarm_log("alarm:%d", i);
@@ -1257,6 +1271,11 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         alarm_log("list_refreshed");
         if (list->list_refreshed || list->state.alarm_stoped)
             list->alarm_skip_flag = false;
+        if (*alarm_nearest)
+        {
+            free(*alarm_nearest);
+            *alarm_nearest = NULL;
+        }
         *alarm_nearest = Alarm_ergonic_list(list);
 
         if (*alarm_nearest)
@@ -1292,13 +1311,15 @@ OSStatus alarm_sound_oid(void)
     for (i = 0; i < 33; i++)
         audio_service_volume_down(&result, 1);
     oid_volume = get_notification_volume();
+    //for (i = 0; i < 33 /* (oid_volume * 32 / 100 + 1)*/; i++)
     for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
     {
         audio_service_volume_up(&result, 1);
     }
 
     /******************/
-    sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
+    // sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
+    sprintf(uri_str, ELAND_SOUND_OFID_URI, netclock_des_g->eland_id, "00000000-0000-0000-0000-000000000000");
     alarm_log("uri_str:%s", uri_str);
     err = eland_http_file_download(ELAND_DOWN_LOAD_METHOD, uri_str, ELAND_HTTP_DOMAIN_NAME, NULL, DOWNLOAD_OID);
     require_noerr(err, exit);

@@ -69,6 +69,6 @@ void flash_kh25_block_erase(uint32_t address);
 void flash_kh25_chip_erase(void);
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
 
-#define FLASH_KH25_CHECK_STRING "flash_kh25_check_str0ng"
+#define FLASH_KH25_CHECK_STRING "flash_kh25_check_str1ng"
 
 #endif

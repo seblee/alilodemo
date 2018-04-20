@@ -20,6 +20,7 @@
 #define ELAND_AP_SSID ("LinkTime_LT10")     //配置模式ssid
 #define ELAND_AP_KEY ("")                   //配置模式key
 #define ELAND_AP_LOCAL_IP ("192.168.0.1")   //本體IP
+#define ELAND_AP_DNS_SERVER ("192.168.0.1") //本體 DNS
 #define ELAND_AP_NET_MASK ("255.255.255.0") //本體IP
 
 #define user_id_len 37          //Eland name

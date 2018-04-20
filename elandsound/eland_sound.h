@@ -29,6 +29,9 @@
 #define SOUND_FILE_SID (uint8_t)0X02
 #define SOUND_FILE_OFID (uint8_t)0X03
 #define SOUND_FILE_DEFAULT (uint8_t)0X04
+#define SOUND_FILE_WEATHER_0 (uint8_t)0X05
+#define SOUND_FILE_WEATHER_E (uint8_t)0X06
+#define SOUND_FILE_WEATHER_F (uint8_t)0X07
 /* Private typedef -----------------------------------------------------------*/
 
 typedef struct __SOUND_FILE_TYPE_

@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_FLASH_DEBUG
+#define CONFIG_FLASH_DEBUG
 #ifdef CONFIG_FLASH_DEBUG
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 #else
@@ -334,7 +334,6 @@ OSStatus flash_kh25_init(void)
         // flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
         SOUND_FILE_CLEAR();
         flash_kh25_sector_erase(KH25_CHECK_ADDRESS);
-        flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待300ms
         sprintf((char *)(elandSPIBuffer), "%s", FLASH_KH25_CHECK_STRING);
         flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
         memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);

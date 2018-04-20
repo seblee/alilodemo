@@ -143,21 +143,34 @@ typedef struct
     HistoryDatastate_t state;
 } _alarm_off_history_t;
 
+typedef struct ALARM_SCHEDULES //闹钟显示列表
+{
+    mico_rtc_time_t moment_time;
+    int8_t color;
+    int8_t snooze_enabled;
+    int8_t next_alarm;
+} _alarm_schedules_t;
+
 typedef struct
 {
     bool list_refreshed;
     bool alarm_skip_flag;
-    uint8_t alarm_number;
-    mico_mutex_t AlarmlibMutex;
     _alarm_state_t state;
     /*******************/
     uint8_t alarm_display_serial;
     uint8_t alarm_waiting_serial;
     mico_mutex_t AlarmSerialMutex;
     /**********************/
+    uint8_t alarm_na_serial;
+    _alarm_schedules_t schedules[50];
+    mico_mutex_t AlarmlibMutex;
+    uint8_t schedules_num;
     /************************/
+    mico_mutex_t AlarmlibMutex;
     __elsv_alarm_data_t *alarm_lib;
+    uint8_t alarm_number;
     __elsv_alarm_data_t *alarm_nearest;
+    /************************/
 } _eland_alarm_list_t;
 
 typedef enum {

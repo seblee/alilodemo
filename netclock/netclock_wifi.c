@@ -173,7 +173,7 @@ static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     wNetConfig.wifi_retry_interval = 100;
     strcpy((char *)wNetConfig.local_ip_addr, ELAND_AP_LOCAL_IP);
     strcpy((char *)wNetConfig.net_mask, ELAND_AP_NET_MASK);
-    strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_LOCAL_IP);
+    strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_DNS_SERVER);
     WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
     micoWlanStart(&wNetConfig);
     mico_rtos_get_semaphore(&wifi_SoftAP_Sem, 5000);
