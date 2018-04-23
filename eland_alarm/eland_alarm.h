@@ -32,6 +32,8 @@
 
 #define SIMULATE_DAYS_OF_YEAR 410
 #define SIMULATE_DAYS_OF_MONTH 32
+
+#define SCHEDULE_MAX 50
 /* Private typedef -----------------------------------------------------------*/
 
 typedef enum {
@@ -47,7 +49,7 @@ typedef enum {
 typedef struct
 {
     mico_rtc_time_t moment_time;
-    int8_t color;
+    int8_t alarm_color;
     int8_t snooze_enabled;
     int8_t next_alarm;
     int8_t skip_flag;
@@ -145,10 +147,9 @@ typedef struct
 
 typedef struct ALARM_SCHEDULES //闹钟显示列表
 {
-    mico_rtc_time_t moment_time;
-    int8_t color;
+    uint32_t utc_second;
+    int8_t alarm_color;
     int8_t snooze_enabled;
-    int8_t next_alarm;
 } _alarm_schedules_t;
 
 typedef struct
@@ -157,16 +158,14 @@ typedef struct
     bool alarm_skip_flag;
     _alarm_state_t state;
     /*******************/
-    uint8_t alarm_display_serial;
-    uint8_t alarm_waiting_serial;
+    uint8_t na_display_serial;
+    uint8_t alarm_na_serial;
     mico_mutex_t AlarmSerialMutex;
     /**********************/
-    uint8_t alarm_na_serial;
-    _alarm_schedules_t schedules[50];
     mico_mutex_t AlarmlibMutex;
+    _alarm_schedules_t schedules[SCHEDULE_MAX];
     uint8_t schedules_num;
-    /************************/
-    mico_mutex_t AlarmlibMutex;
+    /***********/
     __elsv_alarm_data_t *alarm_lib;
     uint8_t alarm_number;
     __elsv_alarm_data_t *alarm_nearest;
@@ -198,13 +197,14 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
 OSStatus Start_Alarm_service(void);
 OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data);
 void alarm_print(__elsv_alarm_data_t *alarm_data);
-_alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial);
-uint8_t get_display_alarm_serial(void);
-void set_display_alarm_serial(uint8_t serial);
+_alarm_mcu_data_t *get_alarm_mcu_data(void);
+_alarm_schedules_t *get_schedule_data(void);
+__elsv_alarm_data_t *get_nearest_alarm();
+uint8_t get_display_na_serial(void);
+uint8_t get_schedules_number(void);
+void set_display_na_serial(uint8_t serial);
 uint8_t get_next_alarm_serial(uint8_t now_serial);
 uint8_t get_previous_alarm_serial(uint8_t now_serial);
-uint8_t get_waiting_alarm_serial(void);
-void set_waiting_alarm_serial(uint8_t now_serial);
 _alarm_list_state_t get_alarm_state(void);
 void set_alarm_state(_alarm_list_state_t state);
 uint8_t get_alarm_skip_flag(void);

@@ -73,3 +73,7 @@ Content-Length: 730
         "night_mode_end_time": "06:00:00"
     }
 }
+Content-Type: application/octet-stream
+hash: 74aa541b70ae0cee87bceb9a6b1c4120
+Host: 192.168.0.1
+Content-Length: 584140

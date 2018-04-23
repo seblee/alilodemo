@@ -108,22 +108,8 @@ void Alarm_Manager(uint32_t arg)
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
 
     alarm_log("start Alarm_Manager ");
-    if (alarm_list.alarm_nearest)
-    {
-        free(alarm_list.alarm_nearest);
-        alarm_list.alarm_nearest = NULL;
-    }
-    alarm_list.alarm_nearest = Alarm_ergonic_list(&alarm_list);
-    if (alarm_list.alarm_nearest)
-    {
-        set_display_alarm_serial(get_waiting_alarm_serial());
-        alarm_log("nearest alarm_id:%s", alarm_list.alarm_nearest->alarm_id);
-    }
-    else
-    {
-        set_display_alarm_serial(0);
-        alarm_log("NO alarm_nearest ");
-    }
+    list->list_refreshed = true;
+
     while (1)
     {
         combing_alarm(&alarm_list, &(alarm_list.alarm_nearest));
@@ -224,7 +210,7 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
         return;
     alarm_eland_data = &(elsv_alarm_data->alarm_data_for_eland);
     alarm_mcu_data = &(elsv_alarm_data->alarm_data_for_mcu);
-    sscanf((const char *)(&(elsv_alarm_data->alarm_time)), "%02d:%02d:%02d", &ho, &mi, &se);
+    sscanf((const char *)(elsv_alarm_data->alarm_time), "%02d:%02d:%02d", &ho, &mi, &se);
 
     alarm_mcu_data->moment_time.hr = ho;
     alarm_mcu_data->moment_time.min = mi;
@@ -232,7 +218,7 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     if (elsv_alarm_data->alarm_repeat == 0)
         get_alarm_utc_second(elsv_alarm_data);
 
-    alarm_mcu_data->color = elsv_alarm_data->alarm_color;
+    alarm_mcu_data->alarm_color = elsv_alarm_data->alarm_color;
     alarm_mcu_data->snooze_enabled = elsv_alarm_data->snooze_enabled;
     alarm_mcu_data->skip_flag = elsv_alarm_data->skip_flag;
 
@@ -329,7 +315,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 
     utc_time = GET_current_second();
     alarm_log("utc_time:%ld", utc_time);
-    set_waiting_alarm_serial(0);
     for (i = 0; i < list->alarm_number; i++)
     {
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second < utc_time)
@@ -337,7 +322,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
         else
         {
             elsv_alarm_data = list->alarm_lib + i;
-            set_waiting_alarm_serial(i);
             break;
         }
     }
@@ -355,7 +339,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
             elsv_alarm_data->alarm_data_for_eland.moment_second)
         {
             elsv_alarm_data = list->alarm_lib + i;
-            set_waiting_alarm_serial(i);
         }
     }
 
@@ -416,8 +399,6 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
 {
     OSStatus err = kNoErr;
     uint8_t i;
-    err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
-    require_noerr(err, exit);
     if (AlarmList->alarm_number == 0)
     {
         memcpy(AlarmList->alarm_lib, inData, sizeof(__elsv_alarm_data_t));
@@ -444,16 +425,12 @@ exit:
     alarm_log("alarm_add success!");
     AlarmList->list_refreshed = true;
     set_alarm_state(ALARM_ADD);
-    err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     return err;
 }
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
     OSStatus err = kNoErr;
     uint8_t i;
-    alarm_log("lock AlarmlibMutex");
-    err = mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
-    require_noerr(err, exit);
 
     for (i = 0; i < AlarmList->alarm_number; i++)
     {
@@ -471,10 +448,6 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
     if (AlarmList->alarm_number == 0)
         memset((uint8_t *)(AlarmList->alarm_lib), 0, ALARM_DATA_SIZE);
 
-    err = mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
-    require_noerr(err, exit);
-    alarm_log("unlock AlarmlibMutex");
-exit:
     set_alarm_state(ALARM_MINUS);
     return err;
 }
@@ -595,7 +568,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                             audio_service_volume_down(&result, 1);
                         volume_value = 0;
                     }
-                    alarm_moment += (uint32_t)alarm->snooze_interval_min * 60;
+                    alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
                     mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)alarm_moment * 1000), &iso8601_time);
                     alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
                     /**add json for tcp**/
@@ -609,7 +582,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     alarm_log("alarm_time on again %d", snooze_count);
                     set_alarm_state(ALARM_ING);
                     snooze_count--;
-                    alarm_moment += (uint32_t)alarm->alarm_continue_min * 60;
+                    alarm_moment = utc_time + (uint32_t)alarm->alarm_continue_min * 60;
                 }
             }
             else
@@ -734,6 +707,10 @@ start_play_voice:
         goto exit;
         break;
     }
+    if (stream->stream_count)
+        stream->stream_count--;
+    else
+        goto exit;
 
     flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
     flash_read_stream.pdata = flashdata;
@@ -748,7 +725,6 @@ start_play_voice:
     alarm_w_r_queue.len = SOUND_STREAM_DEFAULT_LENGTH;
     alarm_log("len = %ld,pos = %ld",
               alarm_w_r_queue.total_len, alarm_w_r_queue.pos);
-    stream->stream_count--;
 falsh_read_start:
     alarm_w_r_queue.pos = data_pos;
     err = sound_file_read_write(&sound_file_list, &alarm_w_r_queue);
@@ -788,8 +764,7 @@ audio_transfer:
             data_pos = 0;
         alarm_log("state is_SUCCESS !");
     }
-    if (stream->stream_count)
-        goto start_play_voice;
+    goto start_play_voice;
 exit:
     if (get_alarm_stream_state() == STREAM_STOP)
     {
@@ -841,63 +816,68 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
               alarm_data->alarm_data_for_mcu.moment_time.sec);
 }
 
+__elsv_alarm_data_t *get_nearest_alarm()
+{
+    return alarm_list.alarm_nearest;
+}
+
 uint8_t get_next_alarm_serial(uint8_t now_serial)
 {
     now_serial++;
-    if (now_serial >= alarm_list.alarm_number)
+    if (now_serial >= get_schedules_number())
         now_serial = 0;
     return now_serial;
 }
 uint8_t get_previous_alarm_serial(uint8_t now_serial)
 {
-    if (alarm_list.alarm_number)
+    uint8_t schedules_number;
+    schedules_number = get_schedules_number();
+    if (schedules_number)
     {
-        if ((now_serial >= alarm_list.alarm_number) || (now_serial == 0))
-            now_serial = alarm_list.alarm_number - 1;
+        if ((now_serial >= schedules_number) || (now_serial == 0))
+            now_serial = schedules_number - 1;
         else
             now_serial--;
     }
     return now_serial;
 }
-uint8_t get_waiting_alarm_serial(void)
-{
-    return alarm_list.alarm_waiting_serial;
-}
-void set_waiting_alarm_serial(uint8_t now_serial)
-{
-    if (alarm_list.AlarmSerialMutex != NULL)
-        mico_rtos_lock_mutex(&alarm_list.AlarmSerialMutex);
-    alarm_list.alarm_waiting_serial = now_serial;
-    if (alarm_list.AlarmSerialMutex != NULL)
-        mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
-}
 
-uint8_t get_display_alarm_serial(void)
+uint8_t get_display_na_serial(void)
 {
-    return alarm_list.alarm_display_serial;
+    return alarm_list.na_display_serial;
 }
-void set_display_alarm_serial(uint8_t serial)
+void set_display_na_serial(uint8_t serial)
 {
+    if (serial >= get_schedules_number())
+        serial = 0;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_lock_mutex(&alarm_list.AlarmSerialMutex);
-    alarm_list.alarm_display_serial = serial;
+    alarm_list.na_display_serial = serial;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
     eland_push_uart_send_queue(ALARM_SEND_0B);
 }
-_alarm_mcu_data_t *get_alarm_mcu_data(uint8_t serial)
+_alarm_mcu_data_t *get_alarm_mcu_data(void)
 {
     _alarm_mcu_data_t *temp = NULL;
-    if (serial >= alarm_list.alarm_number)
-        return temp;
-    else
-        temp = &(alarm_list.alarm_lib + serial)->alarm_data_for_mcu;
+    if (alarm_list.alarm_nearest)
+        temp = &(alarm_list.alarm_nearest)->alarm_data_for_mcu;
     return temp;
+}
+_alarm_schedules_t *get_schedule_data(void)
+{
+    uint8_t serial;
+    serial = get_display_na_serial();
+    return &alarm_list.schedules[serial];
 }
 
 uint8_t get_alarm_number(void)
 {
     return alarm_list.alarm_number;
+}
+uint8_t get_schedules_number(void)
+{
+    return alarm_list.schedules_num;
 }
 
 static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
@@ -1016,7 +996,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
 {
-    uint8_t alarm_serial;
+    __elsv_alarm_data_t *nearestAlarm;
     if (get_alarm_history_data_state() == WAIT_UPLOAD)
         return;
     mico_rtos_lock_mutex(&off_history.off_Mutex);
@@ -1024,9 +1004,9 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
     {
     case ALARM_ON:
         memset(&off_history.HistoryData, 0, sizeof(AlarmOffHistoryData_t));
-        alarm_serial = get_waiting_alarm_serial();
-        memcpy(off_history.HistoryData.alarm_id,
-               (alarm_list.alarm_lib + alarm_serial)->alarm_id, ALARM_ID_LEN);
+        nearestAlarm = get_nearest_alarm();
+        require_quiet(nearestAlarm, exit);
+        memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
         off_history.state = IDEL_UPLOAD;
         break;
@@ -1039,9 +1019,9 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
         break;
     case ALARM_OFF_SKIP:
         memset(&off_history.HistoryData, 0, sizeof(AlarmOffHistoryData_t));
-        alarm_serial = get_waiting_alarm_serial();
-        memcpy(off_history.HistoryData.alarm_id,
-               (alarm_list.alarm_lib + alarm_serial)->alarm_id, ALARM_ID_LEN);
+        nearestAlarm = get_nearest_alarm();
+        require_quiet(nearestAlarm, exit);
+        memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
         off_history.state = READY_UPLOAD;
@@ -1053,6 +1033,7 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
     default:
         break;
     }
+exit:
     mico_rtos_unlock_mutex(&off_history.off_Mutex);
 }
 
@@ -1136,7 +1117,6 @@ OSStatus Alarm_build_JSON(char *json_str)
     json_object *Json = NULL;
     json_object *AlarmJson = NULL;
     json_object *AlarmOnDaysJson = NULL;
-    uint8_t alarm_now_serial;
     __elsv_alarm_data_t *alarm_now;
     const char *generate_data = NULL;
     uint32_t generate_data_len = 0;
@@ -1144,8 +1124,8 @@ OSStatus Alarm_build_JSON(char *json_str)
     char stringbuf[20];
 
     Json = json_object_new_object();
-    alarm_now_serial = get_waiting_alarm_serial();
-    alarm_now = (alarm_list.alarm_lib + alarm_now_serial);
+    alarm_now = get_nearest_alarm();
+    require_quiet(alarm_now, exit);
     require_action_string(Json, exit, err = kNoMemoryErr, "create Json object error!");
     AlarmJson = json_object_new_object();
     require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmJson object error!");
@@ -1281,14 +1261,11 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         if (*alarm_nearest)
         {
             eland_push_http_queue(DOWNLOAD_SCAN);
-            set_display_alarm_serial(get_waiting_alarm_serial());
             alarm_log("get alarm_nearest alarm_id:%s", (*alarm_nearest)->alarm_id);
         }
         else
-        {
             alarm_log("NO alarm_nearest ");
-            set_display_alarm_serial(0);
-        }
+        set_display_na_serial(SCHEDULE_MAX);
     }
 }
 uint8_t get_alarm_skip_flag(void)

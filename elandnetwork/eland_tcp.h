@@ -377,6 +377,7 @@ TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork);
 OSStatus TCP_Service_Start(void);
 ClientState_t eland_get_client_state(_Client_t *pClient);
 void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data);
+void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule);
 mico_utc_time_ms_t GetSecondTime(DATE_TIME_t *date_time);
 OSStatus TCP_Push_MSG_queue(_tcp_cmd_sem_t message);
 /* Private functions ---------------------------------------------------------*/

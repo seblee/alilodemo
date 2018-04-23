@@ -579,17 +579,17 @@ cycle_loop:
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
-    /**Alarm clock schedule**/
-    rc = TCP_request_response(&Eland_Client, SD00, SD01);
+    /**alarm info **/
+    rc = TCP_update_alarm(&Eland_Client);
+    if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
-    /**alarm info **/
-    rc = TCP_update_alarm(&Eland_Client);
-    if (TCP_SUCCESS != rc)
+    /**Alarm clock schedule**/
+    rc = TCP_request_response(&Eland_Client, SD00, SD01);
     {
         mico_thread_sleep(1);
         elan_tcp_log("Connection Error rc = %d", rc);
@@ -1321,6 +1321,8 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+
     if (telegram_cmd == AL01)
     {
         alarm_array = json_object_object_get(ReceivedJsonCache, "alarms");
@@ -1361,6 +1363,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         elan_tcp_log("alarm_number:%d", alarm_list.alarm_number);
     }
 exit:
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
     return rc;
 }
@@ -1631,7 +1634,8 @@ exit:
 }
 static TCP_Error_t TCP_Operate_SD01(char *buf)
 {
-    json_object *ReceivedJsonCache = NULL, *schedule_array = NULL, *schedule = NULL;
+    json_object *ReceivedJsonCache = NULL, *schedule_array = NULL, *schedule_json = NULL;
+    uint8_t list_len, i;
     TCP_Error_t rc = TCP_SUCCESS;
 
     if (*buf != '{')
@@ -1648,44 +1652,27 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
         goto exit;
     }
 
-    // schedule_array = json_object_object_get(ReceivedJsonCache, "alarms");
-    // if ((alarm_array == NULL) || ((json_object_get_object(alarm_array)->head) == NULL))
-    // {
-    //     elan_tcp_log("get alarm_array error");
-    //     rc = JSON_PARSE_ERROR;
-    //     goto exit;
-    // }
-    // list_len = json_object_array_length(alarm_array);
-    // elan_tcp_log("alarm_array list_len:%d", list_len);
-    // for (i = 0; i < list_len; i++)
-    // {
-    //     alarm = json_object_array_get_idx(alarm_array, i);
-    //     TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
-    //     elan_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
-    //     elsv_alarm_data_sort_out(&alarm_data_cache);
-    //     alarm_list_add(&alarm_list, &alarm_data_cache);
-    // }
+    schedule_array = json_object_object_get(ReceivedJsonCache, "schedules");
 
-    // else if ((telegram_cmd == AL02) ||
-    //          (telegram_cmd == AL03) ||
-    //          (telegram_cmd == AL04))
-    // {
-    //     alarm = json_object_object_get(ReceivedJsonCache, "alarm");
-    //     if ((alarm == NULL) || ((json_object_get_object(alarm)->head) == NULL))
-    //     {
-    //         elan_tcp_log("get alarm error");
-    //         rc = JSON_PARSE_ERROR;
-    //         goto exit;
-    //     }
-    //     TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
-    //     elsv_alarm_data_sort_out(&alarm_data_cache);
-    //     if (telegram_cmd == AL04)
-    //         alarm_list_minus(&alarm_list, &alarm_data_cache);
-    //     else
-    //         alarm_list_add(&alarm_list, &alarm_data_cache);
-    //     elan_tcp_log("alarm_number:%d", alarm_list.alarm_number);
-    // }
+    if ((schedule_array == NULL) || ((json_object_get_object(schedule_array)->head) == NULL))
+    {
+        elan_tcp_log("get schedule_array error");
+        rc = JSON_PARSE_ERROR;
+        goto exit;
+    }
+    list_len = json_object_array_length(schedule_array);
+    elan_tcp_log("schedule_array list_len:%d", list_len);
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    memset(&alarm_list.schedules, 0, sizeof(alarm_list.schedules));
+    alarm_list.schedules_num = list_len;
+    for (i = 0; i < list_len; i++)
+    {
+        schedule_json = json_object_array_get_idx(schedule_array, i);
+        TCP_Operate_Schedule_json(schedule_json, alarm_list.schedules + i);
+    }
+
 exit:
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
     return rc;
 }
@@ -1792,4 +1779,52 @@ OSStatus TCP_Push_MSG_queue(_tcp_cmd_sem_t message)
     _tcp_cmd_sem_t tcp_message;
     tcp_message = message;
     return mico_rtos_push_to_queue(&TCP_queue, &tcp_message, 10);
+}
+void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
+{
+    uint8_t i;
+    char alarm_id[ALARM_ID_LEN + 1];
+    char date_buffer[ALARM_OFF_DATES_LEN + 1];
+    char time_buffer[ALARM_TIME_LEN + 1];
+    int year, month, day;
+    int ho, mi, se;
+    DATE_TIME_t date_time;
+    json_object_object_foreach(json, key, val)
+    {
+        if (!strcmp(key, "alarm_id"))
+        {
+            memset(alarm_id, 0, sizeof(alarm_id));
+            sprintf(alarm_id, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "date"))
+        {
+            memset(date_buffer, 0, ALARM_OFF_DATES_LEN + 1);
+            sprintf(date_buffer, "%s", json_object_get_string(val));
+            sscanf((const char *)date_buffer, "%04d-%02d-%02d", &year, &month, &day);
+            date_time.iYear = year;
+            date_time.iMon = month;
+            date_time.iDay = day;
+        }
+        else if (!strcmp(key, "time"))
+        {
+            memset(time_buffer, 0, ALARM_TIME_LEN + 1);
+            sprintf(time_buffer, "%s", json_object_get_string(val));
+            sscanf((const char *)time_buffer, "%02d:%02d:%02d", &ho, &mi, &se);
+            date_time.iHour = (int16_t)ho;
+            date_time.iMin = (int16_t)mi;
+            date_time.iSec = (int16_t)se;
+            date_time.iMsec = 0;
+        }
+    }
+    schedule->utc_second = GetSecondTime(&date_time);
+    for (i = 0; i < alarm_list.alarm_number; i++)
+    {
+        if (memcmp(alarm_id, (alarm_list.alarm_lib + i)->alarm_id, ALARM_ID_LEN) == 0)
+        {
+            schedule->alarm_color = (alarm_list.alarm_lib + i)->alarm_color;
+            schedule->snooze_enabled = (alarm_list.alarm_lib + i)->snooze_enabled;
+            break;
+        }
+    }
+    elan_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
 }

@@ -713,15 +713,36 @@ static void ELAND_H0B_Send(uint8_t *Cache)
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
     _alarm_mcu_data_t *alarm_data_mcu = NULL;
-    uint8_t serial_cache;
-    if (get_alarm_number() == 0)
-        alarm_data_mcu = NULL;
+    _alarm_mcu_data_t to_mcu_data;
+    _alarm_schedules_t *schedule = NULL;
+    if (ELAND_NA == get_eland_mode())
+    {
+        if (get_schedules_number() == 0)
+            alarm_data_mcu = NULL;
+        else
+        {
+            alarm_data_mcu = get_alarm_mcu_data();
+            require_quiet(alarm_data_mcu, data_parse_over);
+            memcpy(&to_mcu_data, alarm_data_mcu, sizeof(_alarm_mcu_data_t));
+            schedule = get_schedule_data();
+            require_action(schedule, data_parse_over, alarm_data_mcu = NULL);
+            UCT_Convert_Date(&(schedule->utc_second), &(to_mcu_data.moment_time));
+            to_mcu_data.alarm_color = schedule->alarm_color;
+            to_mcu_data.snooze_enabled = schedule->snooze_enabled;
+            alarm_data_mcu = &to_mcu_data;
+        }
+    }
     else
     {
-        serial_cache = get_display_alarm_serial();
-        alarm_data_mcu = get_alarm_mcu_data(serial_cache);
-        alarm_data_mcu->alarm_state = get_alarm_state();
+        alarm_data_mcu = get_alarm_mcu_data();
+        if (alarm_data_mcu)
+        {
+            memcpy(&to_mcu_data, alarm_data_mcu, sizeof(_alarm_mcu_data_t));
+            alarm_data_mcu = &to_mcu_data;
+        }
     }
+
+data_parse_over:
 
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = ALARM_SEND_0B;
@@ -730,6 +751,7 @@ static void ELAND_H0B_Send(uint8_t *Cache)
     else
     {
         alarm_data_mcu->mode = get_eland_mode();
+        alarm_data_mcu->alarm_state = get_alarm_state();
         *(Cache + 2) = sizeof(_alarm_mcu_data_t);
         memcpy(Cache + 3, (uint8_t *)alarm_data_mcu, sizeof(_alarm_mcu_data_t));
     }
@@ -966,12 +988,12 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             {
                 set_eland_mode(ELAND_NA);
                 time_delay_counter = 0;
-                cache = get_waiting_alarm_serial();
+                cache = 0;
                 if (Key_Count_Trg & KEY_Add)
                     cache = get_next_alarm_serial(cache);
                 else
                     cache = get_previous_alarm_serial(cache);
-                set_display_alarm_serial(cache);
+                set_display_na_serial(cache);
             }
             else if (Key_Restain_Trg & KEY_Set) //NA
             {
@@ -984,12 +1006,12 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
             {
                 time_delay_counter = 0;
-                cache = get_display_alarm_serial();
+                cache = get_display_na_serial();
                 if (Key_Count_Trg & KEY_Add)
                     cache = get_next_alarm_serial(cache);
                 else
                     cache = get_previous_alarm_serial(cache);
-                set_display_alarm_serial(cache);
+                set_display_na_serial(cache);
             }
             if ((Key_Count_Trg & KEY_Snooze) ||
                 (Key_Count_Trg & KEY_Alarm) ||
@@ -997,8 +1019,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             {
                 /******back to nc********/
                 set_eland_mode(ELAND_NC);
-                cache = get_waiting_alarm_serial();
-                set_display_alarm_serial(cache);
+                set_display_na_serial(SCHEDULE_MAX);
                 time_delay_counter = 0;
             }
             break;
