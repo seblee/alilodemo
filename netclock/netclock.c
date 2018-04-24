@@ -427,6 +427,14 @@ OSStatus ProcessPostJson(char *InputJson)
             memset(netclock_des_g->eland_name, 0, sizeof(netclock_des_g->eland_name));
             sprintf(netclock_des_g->eland_name, "%s", json_object_get_string(val));
         }
+        else if (!strcmp(key, "area_code"))
+        {
+            netclock_des_g->area_code = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "timezone_offset_sec"))
+        {
+            netclock_des_g->timezone_offset_sec = json_object_get_int(val);
+        }
         else if (!strcmp(key, "dhcp_enabled"))
         {
             netclock_des_g->dhcp_enabled = json_object_get_int(val);
@@ -555,6 +563,34 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
     else if (sound_type == SOUND_FILE_DEFAULT)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK));
+    else if (sound_type == SOUND_FILE_WEATHER_0)
+    {
+        if (strstr(alarm->voice_alarm_id, "00000000"))
+            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+        else if (strstr(alarm->alarm_off_voice_alarm_id, "00000000"))
+            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+        else
+            goto exit;
+        Eland_log("00000000:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+    }
+    else if (sound_type == SOUND_FILE_WEATHER_E)
+    {
+        if (strstr(alarm->alarm_off_voice_alarm_id, "eeeeeeee"))
+            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+        else
+            goto exit;
+        Eland_log("eeeeeeee:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+    }
+    else if (sound_type == SOUND_FILE_WEATHER_F)
+    {
+        if (strstr(alarm->voice_alarm_id, "ffffffff"))
+            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+        else if (strstr(alarm->alarm_off_voice_alarm_id, "ffffffff"))
+            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+        else
+            goto exit;
+        Eland_log("ffffffff:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+    }
     else
         goto exit;
     HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
@@ -562,7 +598,6 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
     HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
     HTTP_W_R_struct.alarm_w_r_queue->len = 8;
-
     err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
     if (err == kNoErr) //文件已下載
     {
@@ -579,6 +614,14 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         sprintf(uri_str, ELAND_SOUND_OFID_URI, netclock_des_g->eland_id, alarm->alarm_off_voice_alarm_id);
     else if (sound_type == SOUND_FILE_DEFAULT)
         sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
+    else if (sound_type == SOUND_FILE_WEATHER_0)
+        sprintf(uri_str, ELAND_WEATHER_0_URI, netclock_des_g->eland_id);
+    else if (sound_type == SOUND_FILE_WEATHER_E)
+        sprintf(uri_str, ELAND_WEATHER_E_URI, netclock_des_g->eland_id);
+    else if (sound_type == SOUND_FILE_WEATHER_F)
+        sprintf(uri_str, ELAND_WEATHER_F_URI, netclock_des_g->eland_id);
+    else
+        goto exit;
     Eland_log("=====> alarm_sound_download send ======>");
 
     err = eland_http_request(ELAND_DOWN_LOAD_METHOD, //請求方式
@@ -592,6 +635,10 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     if (user_http_res.status_code == 200)
     {
         Eland_log("<===== alarm_sound_download end <======");
+    }
+    else if (user_http_res.status_code == 204)
+    {
+        Eland_log("<===== alarm_sound_download end 204<======");
     }
     else
     {

@@ -155,7 +155,7 @@ typedef struct ALARM_SCHEDULES //闹钟显示列表
 typedef struct
 {
     bool list_refreshed;
-    bool alarm_skip_flag;
+    bool weather_need_refreshed;
     _alarm_state_t state;
     /*******************/
     uint8_t na_display_serial;
@@ -177,6 +177,7 @@ typedef enum {
     DOWNLOAD_SCAN,
     DOWNLOAD_OID,
     DOWNLOAD_OTA,
+    DOWNLOAD_WEATHER,
 } _download_type_t;
 /* Private macro -------------------------------------------------------------*/
 
@@ -207,7 +208,6 @@ uint8_t get_next_alarm_serial(uint8_t now_serial);
 uint8_t get_previous_alarm_serial(uint8_t now_serial);
 _alarm_list_state_t get_alarm_state(void);
 void set_alarm_state(_alarm_list_state_t state);
-uint8_t get_alarm_skip_flag(void);
 uint8_t get_alarm_number(void);
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
@@ -218,6 +218,7 @@ void set_alarm_history_data_state(HistoryDatastate_t value);
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
 OSStatus alarm_sound_scan(void);
 OSStatus alarm_sound_oid(void);
+OSStatus weather_sound_scan(void);
 OSStatus check_default_sound(void);
 
 OSStatus Alarm_build_JSON(char *json_str);

@@ -52,21 +52,28 @@ typedef enum {
 } KEY_State_TypeDef;
 
 typedef enum {
-    KEY_FUN_NONE = 0x00,      /* 空命令*/
-    SEND_ELAND_ERR_01 = 0x01, /* SEND ELAND ERROR CODE*/
-    KEY_READ_02 = 0X02,       /* READ MCU KEY STATE*/
-    TIME_SET_03,              /* SEND ELAND TIME*/
-    TIME_READ_04,             /* READ MCU TIME*/
-    ELAND_STATES_05,          /* SEND ELAND STATES*/
-    SEND_FIRM_WARE_06,        /* SEND ELAND FIRMWARE VERSION*/
-    REND_FIRM_WARE_07,        /* READ MUC FIRMWARE VERSION*/
-    SEND_LINK_STATE_08,       /* SEND WIFI LINK STATE*/
-    MCU_FIRM_WARE_09,         /* START MCU FIRM WARE UPDATE*/
-    ALARM_READ_0A,            /* READ MCU ALARM*/
-    ALARM_SEND_0B,            /* SEND NEXT ALARM STATE*/
-    ELAND_DATA_0C,            /* SEND ELAND DATA TO MCU*/
-    ELAND_RESET_0D,           /* RESET SYSTEM */
-    ELAND_DELETE_0E,          /* DEVICE DATA DELETE */
+    EL_ERROR_NONE = 0x00, /*error none */
+    EL_HTTP_TIMEOUT,      /*http time out*/
+    EL_HTTP_204,          /*http 204*/
+    EL_HTTP_400,          /*http 400*/
+} __eland_error_t;
+
+typedef enum {
+    KEY_FUN_NONE = 0x00, /* 空命令*/
+    SEND_ELAND_ERR_01,   /* SEND ELAND ERROR CODE*/
+    KEY_READ_02,         /* READ MCU KEY STATE*/
+    TIME_SET_03,         /* SEND ELAND TIME*/
+    TIME_READ_04,        /* READ MCU TIME*/
+    ELAND_STATES_05,     /* SEND ELAND STATES*/
+    SEND_FIRM_WARE_06,   /* SEND ELAND FIRMWARE VERSION*/
+    REND_FIRM_WARE_07,   /* READ MUC FIRMWARE VERSION*/
+    SEND_LINK_STATE_08,  /* SEND WIFI LINK STATE*/
+    MCU_FIRM_WARE_09,    /* START MCU FIRM WARE UPDATE*/
+    ALARM_READ_0A,       /* READ MCU ALARM*/
+    ALARM_SEND_0B,       /* SEND NEXT ALARM STATE*/
+    ELAND_DATA_0C,       /* SEND ELAND DATA TO MCU*/
+    ELAND_RESET_0D,      /* RESET SYSTEM */
+    ELAND_DELETE_0E,     /* DEVICE DATA DELETE */
 } __msg_function_t;
 
 typedef enum {
@@ -136,6 +143,7 @@ int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void SendElandStateQueue(Eland_Status_type_t value);
 void reset_eland_flash_para(__msg_function_t msg);
 void eland_push_uart_send_queue(__msg_function_t cmd);
+__eland_error_t eland_error(bool write_error, __eland_error_t error);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

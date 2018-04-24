@@ -20,7 +20,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_SOUND_DEBUG
+#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -118,7 +118,11 @@ exit:
             sound_log("sound:%d,ofid :%s", i, (sound_list->lib + i)->alarm_ID);
             break;
         case SOUND_FILE_DEFAULT:
-            sound_log("sound:%d,default :%s", i, (sound_list->lib + i)->alarm_ID);
+            sound_log("sound:%d,default:%s", i, (sound_list->lib + i)->alarm_ID);
+        case SOUND_FILE_WEATHER_0:
+        case SOUND_FILE_WEATHER_E:
+        case SOUND_FILE_WEATHER_F:
+            sound_log("sound:%d,weather:%s", i, (sound_list->lib + i)->alarm_ID);
             break;
         default:
             sound_log("sound:%d,type :%d", i, (sound_list->lib + i)->sound_type);
@@ -139,20 +143,18 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
     require_noerr(err, exit);
     if (alarm_w_r_temp->is_read == true) //讀數據
     {
-        sound_log("read file number_file:%d", sound_list->file_number);
+        // sound_log("read file number_file:%d", sound_list->file_number);
         if (alarm_w_r_temp->pos == 0) //文件數據流首次讀取
         {
+            sound_log("file read");
             for (i = 0; i < sound_list->file_number; i++)
             {
-                if ((sound_list->lib + i)->sound_type == alarm_w_r_temp->sound_type)
+                if (memcmp((sound_list->lib + i)->alarm_ID, alarm_w_r_temp->alarm_ID, ALARM_ID_LEN) == 0)
                 {
-                    if (memcmp((sound_list->lib + i)->alarm_ID, alarm_w_r_temp->alarm_ID, ALARM_ID_LEN) == 0)
-                    {
-                        alarm_w_r_temp->total_len = (sound_list->lib + i)->file_len;
-                        alarm_w_r_temp->file_address = (sound_list->lib + i)->file_address;
-                        sound_log("total_len = %ld,sound_flash_pos = %ld", alarm_w_r_temp->total_len, alarm_w_r_temp->pos);
-                        goto start_read_sound;
-                    }
+                    alarm_w_r_temp->total_len = (sound_list->lib + i)->file_len;
+                    alarm_w_r_temp->file_address = (sound_list->lib + i)->file_address;
+                    sound_log("total_len = %ld,sound_flash_pos = %ld", alarm_w_r_temp->total_len, alarm_w_r_temp->pos);
+                    goto start_read_sound;
                 }
             }
             err = kGeneralErr;
@@ -163,13 +165,13 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
         if (alarm_w_r_temp->len > (alarm_w_r_temp->total_len - alarm_w_r_temp->pos))
             alarm_w_r_temp->len = alarm_w_r_temp->total_len - alarm_w_r_temp->pos;
         flash_kh25_read((uint8_t *)alarm_w_r_temp->sound_data, alarm_w_r_temp->file_address + alarm_w_r_temp->pos, alarm_w_r_temp->len);
-        sound_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_temp->len, alarm_w_r_temp->pos);
+        //  sound_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_temp->len, alarm_w_r_temp->pos);
     }
     else //寫數據
     {
-        sound_log("file write");
         if (alarm_w_r_temp->pos == 0) //文件數據流首次寫入
         {
+            sound_log("file write");
             sprintf((char *)(alarm_file_cache.flag), "%s", ALARM_FILE_FLAG_STRING);
             memset((char *)(alarm_file_cache.alarm_ID), 0, ALARM_ID_LEN);
             memcpy((char *)(alarm_file_cache.alarm_ID), alarm_w_r_temp->alarm_ID, ALARM_ID_LEN);
@@ -202,7 +204,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
             flash_kh25_write_page((uint8_t *)(&alarm_file_cache), sound_list->sector_end, sizeof(_sound_file_type_t)); //寫入文件信息
             sound_list->sector_end = KH25L8006_SECTOR_SIZE * sector_count;
         }
-        sound_log("write sound file data address :%ld", (alarm_w_r_temp->file_address + alarm_w_r_temp->pos));
+        //  sound_log("write sound file data address :%ld", (alarm_w_r_temp->file_address + alarm_w_r_temp->pos));
         flash_kh25_write_page((uint8_t *)alarm_w_r_temp->sound_data,
                               (alarm_w_r_temp->file_address + alarm_w_r_temp->pos),
                               alarm_w_r_temp->len);
@@ -284,10 +286,12 @@ void file_download(void)
 wait_for_queue:
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
+    eland_error(true, EL_ERROR_NONE);
     switch (download_type)
     {
     case DOWNLOAD_SCAN:
-        alarm_sound_scan();
+        weather_sound_scan();
+        // alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
         alarm_sound_oid();

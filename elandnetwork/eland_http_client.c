@@ -708,6 +708,8 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     {
         client_log("-----------------select error, ret = %d", ret);
         err = kGeneralErr;
+        if (ret == 0)
+            eland_error(true, EL_HTTP_TIMEOUT);
         goto exit;
     }
     if (FD_ISSET(http_fd, &readfds))
@@ -727,6 +729,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
             if (httpHeader->statusCode == 400) //認證錯誤
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
+                eland_error(true, EL_HTTP_400);
                 break;
             }
 
@@ -738,6 +741,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
             if (httpHeader->statusCode == 204) //文件為空 不需要播放
             {
                 client_log("[SUCCESS]eland http responsed, code:%d", httpHeader->statusCode);
+                eland_error(true, EL_HTTP_204);
                 break;
             }
 

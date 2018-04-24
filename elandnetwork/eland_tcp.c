@@ -1826,5 +1826,5 @@ void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
             break;
         }
     }
-    elan_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
+    // elan_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
 }

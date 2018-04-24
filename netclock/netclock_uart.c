@@ -52,6 +52,7 @@ mico_timer_t timer100_key;
 __ELAND_MODE_STATE_t eland_mode_state = {ELAND_MODE_NONE, ElandNone, NULL};
 /* Private function prototypes -----------------------------------------------*/
 //static void uart_service(uint32_t arg);
+static void Eland_H01_Send(uint8_t *Cache);
 static void Eland_H02_Send(uint8_t *Cache);
 static void Eland_H03_Send(uint8_t *Cache);
 static void Eland_H04_Send(uint8_t *Cache);
@@ -294,32 +295,29 @@ static void Opration_Packet(uint8_t *data)
 {
     switch (*(data + 1))
     {
+    case SEND_ELAND_ERR_01:
+        MODH_Opration_xxH(*(data + 1), data);
+        break;
     case KEY_READ_02:
         MODH_Opration_02H(data);
         break;
     case TIME_SET_03:
-        MODH_Opration_xxH(TIME_SET_03, data);
+        MODH_Opration_xxH(*(data + 1), data);
         break;
     case TIME_READ_04:
         MODH_Opration_04H(data);
         break;
     case ELAND_STATES_05:
-        MODH_Opration_xxH(ELAND_STATES_05, data);
-        break;
     case SEND_FIRM_WARE_06:
-        MODH_Opration_xxH(SEND_FIRM_WARE_06, data);
-        break;
     case SEND_LINK_STATE_08:
-        MODH_Opration_xxH(SEND_LINK_STATE_08, data);
+        MODH_Opration_xxH(*(data + 1), data);
         break;
     case ALARM_READ_0A:
         MODH_Opration_0AH(data);
         break;
     case ALARM_SEND_0B:
-        MODH_Opration_xxH(ALARM_SEND_0B, data);
-        break;
     case ELAND_DATA_0C:
-        MODH_Opration_xxH(ELAND_DATA_0C, data);
+        MODH_Opration_xxH(*(data + 1), data);
         break;
     default:
         break;
@@ -346,6 +344,9 @@ static void uart_thread_DDE(uint32_t arg)
             continue;
         switch (eland_cmd)
         {
+        case SEND_ELAND_ERR_01: /* read key value*/
+            Eland_H01_Send(inDataBuffer);
+            break;
         case KEY_READ_02: /* read key value*/
             Eland_H02_Send(inDataBuffer);
             break;
@@ -436,6 +437,37 @@ exit:
     return err;
 }
 
+//time set 03
+static void Eland_H01_Send(uint8_t *Cache)
+{
+    OSStatus err = kGeneralErr;
+    __msg_function_t received_cmd = KEY_FUN_NONE;
+    uint8_t sended_times = USART_RESEND_MAX_TIMES;
+    __eland_error_t el_error;
+    el_error = eland_error(false, EL_ERROR_NONE);
+    *Cache = Uart_Packet_Header;
+    *(Cache + 1) = SEND_ELAND_ERR_01;
+    *(Cache + 2) = 1;
+    *(Cache + 3) = el_error;
+    *(Cache + 4) = Uart_Packet_Trail;
+start_send:
+    sended_times--;
+    err = elandUsartSendData(Cache, 5);
+    require_noerr(err, exit);
+
+    err = mico_rtos_pop_from_queue(&eland_uart_receive_queue, &received_cmd, 20);
+    require_noerr(err, exit);
+    if (received_cmd == (__msg_function_t)SEND_ELAND_ERR_01)
+        err = kNoErr;
+    else //10ms resend mechanism
+    {
+        mico_rtos_thread_msleep(5);
+        if (sended_times > 0)
+            goto start_send;
+    }
+exit:
+    return;
+}
 //read key 02
 static void Eland_H02_Send(uint8_t *Cache)
 {
@@ -485,7 +517,7 @@ static void Eland_H02_Send(uint8_t *Cache)
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         // if (sended_times > 0)
         //     goto start_send;
     }
@@ -528,7 +560,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -558,7 +590,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -591,7 +623,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -621,7 +653,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -672,7 +704,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -700,7 +732,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -767,7 +799,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -808,7 +840,7 @@ start_send:
         err = kNoErr;
     else //10ms resend mechanism
     {
-        mico_rtos_thread_msleep(10);
+        mico_rtos_thread_msleep(5);
         if (sended_times > 0)
             goto start_send;
     }
@@ -1132,4 +1164,15 @@ void eland_push_uart_send_queue(__msg_function_t cmd)
 {
     __msg_function_t eland_cmd = cmd;
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+}
+
+__eland_error_t eland_error(bool write_error, __eland_error_t error)
+{
+    static __eland_error_t error_ram = EL_ERROR_NONE;
+    if (write_error)
+    {
+        error_ram = error;
+        eland_push_uart_send_queue(SEND_ELAND_ERR_01);
+    }
+    return error_ram;
 }

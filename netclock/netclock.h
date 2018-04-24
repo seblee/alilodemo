@@ -28,6 +28,9 @@
 #define ELAND_SOUND_VID_URI ("/api/sound/download?eid=%ld&vid=%s")
 #define ELAND_SOUND_OFID_URI ("/api/sound/download?eid=%ld&vid=%s")
 #define ELAND_SOUND_OID_URI ("/api/sound/download?eid=%ld&oid=%ld")
+#define ELAND_WEATHER_0_URI ("/api/sound/download?eid=%ld&vid=00000000-0000-0000-0000-000000000000")
+#define ELAND_WEATHER_E_URI ("/api/sound/download?eid=%ld&vid=eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+#define ELAND_WEATHER_F_URI ("/api/sound/download?eid=%ld&vid=ffffffff-ffff-ffff-ffff-ffffffffffff")
 #define ELAND_SOUND_DEFAULT_URI ("/api/sound/default")
 
 //eland 通信情報取得

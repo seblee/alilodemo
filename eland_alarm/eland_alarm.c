@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ALARM_DEBUG
+#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -108,7 +108,7 @@ void Alarm_Manager(uint32_t arg)
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
 
     alarm_log("start Alarm_Manager ");
-    list->list_refreshed = true;
+    alarm_list.list_refreshed = true;
 
     while (1)
     {
@@ -119,6 +119,13 @@ void Alarm_Manager(uint32_t arg)
             if (alarm_list.alarm_nearest)
             {
                 utc_time = GET_current_second();
+                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 300) &&
+                    alarm_list.weather_need_refreshed)
+                {
+                    alarm_list.weather_need_refreshed = false;
+                    eland_push_http_queue(DOWNLOAD_WEATHER);
+                }
+
                 if (utc_time >= alarm_list.alarm_nearest->alarm_data_for_eland.moment_second)
                 {
                     alarm_log("##### start alarm ######");
@@ -170,7 +177,7 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         memcpy(alarm_stream.alarm_id, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
         break;
     case SOUND_FILE_OFID:
-        memcpy(alarm_stream.alarm_id, alarm->alarm_off_voice_alarm_id, sizeof(alarm->alarm_off_voice_alarm_id));
+        memcpy(alarm_stream.alarm_id, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
         break;
     case SOUND_FILE_DEFAULT:
         memcpy(alarm_stream.alarm_id, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK));
@@ -375,6 +382,11 @@ scan_again:
             ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
         {
             alarm_log("VID:%s", (alarm_list.alarm_lib + i)->voice_alarm_id);
+            if (strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "ffffffff") ||
+                strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "eeeeeeee") ||
+                strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "00000000"))
+                continue;
+
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
             require_noerr(err, exit);
         }
@@ -382,10 +394,67 @@ scan_again:
         if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 30)
         {
             alarm_log("OFID:%s", (alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id);
+            if (strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "ffffffff") ||
+                strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "eeeeeeee") ||
+                strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "00000000"))
+                continue;
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
             require_noerr(err, exit);
         }
     }
+exit:
+    if ((err != kNoErr) && (scan_count < 5))
+    {
+        mico_rtos_thread_sleep(5);
+        goto scan_again;
+    }
+    return err;
+}
+
+OSStatus weather_sound_scan(void)
+{
+    OSStatus err = kNoErr;
+    uint8_t scan_count = 0, sound_type;
+    __elsv_alarm_data_t *nearest = NULL;
+    nearest = get_nearest_alarm();
+    require_quiet(nearest, exit);
+scan_again:
+    scan_count++;
+    alarm_log("nearest_id:%s", nearest->alarm_id);
+
+    if (strlen(nearest->alarm_off_voice_alarm_id) > 30)
+    {
+        alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
+        if (strstr(nearest->alarm_off_voice_alarm_id, "ffffffff"))
+            sound_type = SOUND_FILE_WEATHER_F;
+        else if (strstr(nearest->alarm_off_voice_alarm_id, "eeeeeeee"))
+            sound_type = SOUND_FILE_WEATHER_E;
+        else if (strstr(nearest->alarm_off_voice_alarm_id, "00000000"))
+            sound_type = SOUND_FILE_WEATHER_0;
+        else
+            goto exit;
+        sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
+        alarm_log("voice_id:%s", nearest->alarm_off_voice_alarm_id);
+        err = alarm_sound_download(nearest, sound_type);
+        require_noerr(err, exit);
+    }
+
+    if ((nearest->alarm_pattern == 2) ||
+        (nearest->alarm_pattern == 3))
+    {
+        alarm_log("VID:%s", nearest->voice_alarm_id);
+        if (strstr(nearest->voice_alarm_id, "ffffffff"))
+            sound_type = SOUND_FILE_WEATHER_F;
+        else if (strstr(nearest->voice_alarm_id, "00000000"))
+            sound_type = SOUND_FILE_WEATHER_0;
+        else
+            goto exit;
+        sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
+        alarm_log("voice_id:%s", nearest->voice_alarm_id);
+        err = alarm_sound_download(nearest, sound_type);
+        require_noerr(err, exit);
+    }
+
 exit:
     if ((err != kNoErr) && (scan_count < 5))
     {
@@ -662,12 +731,12 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             !voic_stoped)
         {
             voic_stoped = true;
+            init_alarm_stream(alarm, SOUND_FILE_OFID);
             do
             {
                 mico_rtos_thread_msleep(200);
                 audio_service_get_audio_status(&result, &audio_status);
             } while (audio_status != MSCP_STATUS_IDLE);
-            init_alarm_stream(alarm, SOUND_FILE_OFID);
             set_alarm_stream_state(STREAM_PLAY);
             mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }
@@ -723,8 +792,7 @@ start_play_voice:
     alarm_w_r_queue.is_read = true;
     alarm_w_r_queue.sound_data = flashdata;
     alarm_w_r_queue.len = SOUND_STREAM_DEFAULT_LENGTH;
-    alarm_log("len = %ld,pos = %ld",
-              alarm_w_r_queue.total_len, alarm_w_r_queue.pos);
+    alarm_log("id:%s", alarm_w_r_queue.alarm_ID);
 falsh_read_start:
     alarm_w_r_queue.pos = data_pos;
     err = sound_file_read_write(&sound_file_list, &alarm_w_r_queue);
@@ -766,6 +834,8 @@ audio_transfer:
     }
     goto start_play_voice;
 exit:
+    if (err != kNoErr)
+        alarm_log("err =%d", err);
     if (get_alarm_stream_state() == STREAM_STOP)
     {
         audio_service_get_audio_status(&result, &audio_status);
@@ -803,7 +873,7 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("snooze_count:%d", alarm_data->snooze_count);
     alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("\r\n_alarm_mcu_data_t");
-    alarm_log("color:%d", alarm_data->alarm_data_for_mcu.color);
+    alarm_log("color:%d", alarm_data->alarm_data_for_mcu.alarm_color);
     alarm_log("snooze_count:%d", alarm_data->alarm_data_for_mcu.snooze_enabled);
     alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("moment_time:%02d-%02d-%02d %d %02d-%02d-%02d",
@@ -1218,30 +1288,7 @@ void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time)
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest)
 {
     OSStatus err = kGeneralErr;
-    // err = mico_rtos_get_semaphore(&alarm_skip_sem, 0);
-    // if (err == kNoErr)
-    // {
-    //     if (list->alarm_skip_flag)
-    //     {
-    //         set_alarm_state(ALARM_IDEL);
-    //         list->alarm_skip_flag = false;
-    //     }
-    //     else
-    //     {
-    //         set_alarm_state(ALARM_SKIP);
-    //         list->alarm_skip_flag = true;
-    //     }
-    //     if (*alarm_nearest)
-    //     {
-    //         (*alarm_nearest)->alarm_data_for_mcu.skip_flag = get_alarm_skip_flag();
-    //         (*alarm_nearest)->skip_flag = get_alarm_skip_flag();
-    //         if ((*alarm_nearest)->skip_flag == 1)
-    //             TCP_Push_MSG_queue(TCP_HT02_Sem);
-    //         else
-    //             TCP_Push_MSG_queue(TCP_HT02_Sem);
-    //     }
-    //     eland_push_uart_send_queue(ALARM_SEND_0B);
-    // }
+
     err = mico_rtos_get_semaphore(&alarm_update, 500);
     if (list->list_refreshed ||
         list->state.alarm_stoped ||
@@ -1249,8 +1296,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
     {
         /**refresh point**/
         alarm_log("list_refreshed");
-        if (list->list_refreshed || list->state.alarm_stoped)
-            list->alarm_skip_flag = false;
+
         if (*alarm_nearest)
         {
             free(*alarm_nearest);
@@ -1260,6 +1306,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
 
         if (*alarm_nearest)
         {
+            list->weather_need_refreshed = true;
             eland_push_http_queue(DOWNLOAD_SCAN);
             alarm_log("get alarm_nearest alarm_id:%s", (*alarm_nearest)->alarm_id);
         }
@@ -1268,13 +1315,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         set_display_na_serial(SCHEDULE_MAX);
     }
 }
-uint8_t get_alarm_skip_flag(void)
-{
-    if (alarm_list.alarm_skip_flag)
-        return (uint8_t)0x01;
-    else
-        return (uint8_t)0x00;
-}
+
 OSStatus alarm_sound_oid(void)
 {
     OSStatus err;
