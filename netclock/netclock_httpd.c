@@ -279,6 +279,7 @@ static int web_send_Post_Request(httpd_request_t *req)
 exit:
     free(buf);
     app_httpd_log("system restart");
+    mico_rtos_thread_msleep(200);
     mico_system_power_perform(mico_system_context_get(), eState_Software_Reset);
     return err;
 }

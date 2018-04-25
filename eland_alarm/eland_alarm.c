@@ -119,10 +119,11 @@ void Alarm_Manager(uint32_t arg)
             if (alarm_list.alarm_nearest)
             {
                 utc_time = GET_current_second();
-                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 300) &&
+                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < 300) &&
                     alarm_list.weather_need_refreshed)
                 {
                     alarm_list.weather_need_refreshed = false;
+                    alarm_log("##### DOWNLOAD_WEATHER ######");
                     eland_push_http_queue(DOWNLOAD_WEATHER);
                 }
 
@@ -385,21 +386,27 @@ scan_again:
             if (strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "ffffffff") ||
                 strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "eeeeeeee") ||
                 strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "00000000"))
-                continue;
-
-            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
-            require_noerr(err, exit);
+            {
+            }
+            else
+            {
+                err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
+                require_noerr(err, exit);
+            }
         }
-
-        if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 30)
+        if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 10)
         {
             alarm_log("OFID:%s", (alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id);
             if (strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "ffffffff") ||
                 strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "eeeeeeee") ||
                 strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "00000000"))
-                continue;
-            err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
-            require_noerr(err, exit);
+            {
+            }
+            else
+            {
+                err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
+                require_noerr(err, exit);
+            }
         }
     }
 exit:
@@ -422,7 +429,7 @@ scan_again:
     scan_count++;
     alarm_log("nearest_id:%s", nearest->alarm_id);
 
-    if (strlen(nearest->alarm_off_voice_alarm_id) > 30)
+    if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
     {
         alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
         if (strstr(nearest->alarm_off_voice_alarm_id, "ffffffff"))
@@ -727,7 +734,7 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             set_alarm_stream_state(STREAM_STOP);
         if (audio_status != MSCP_STATUS_IDLE)
             audio_service_stream_stop(&result, alarm_stream.stream_id);
-        if ((strlen(alarm->alarm_off_voice_alarm_id) > 30) && //alarm off oid
+        if ((strlen(alarm->alarm_off_voice_alarm_id) > 10) && //alarm off oid
             !voic_stoped)
         {
             voic_stoped = true;

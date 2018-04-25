@@ -1,78 +1,35 @@
-//ota_md5 4294b96a29da439fc295601ac8ffe8b7
-//ota_url http://xiaowine.cee0.com/ota.bin
-//ota_op start
-//2017年12月18日17: 11: 34
-{
-    "device": {
-        "eland_id": 12,
-        "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
-        "eland_name": "AM1A8000012",
-        "timezone_offset_sec": 28800,
-        "serial_number": "AM1A8000012",
-        "firmware_version": "01.05",
-        "mac_address": "B0:F8:93:15:25:B2",
-        "dhcp_enabled": 1,
-        "ip_address": "192.168.1.112",
-        "subnet_mask": "255.255.255.0",
-        "default_gateway": "192.168.1.1",
-        "time_display_format": 1,
-        "brightness_normal": 32,
-        "brightness_night": 12,
-        "night_mode_enabled": 1,
-        "night_mode_begin_time": "23:00:00",
-        "night_mode_end_time": "07:20:00"
-    }
-}
-Host: 192.168.0.1
 Content-Type: application/json; charset=utf-8
-Content-Length: 730
 {
     "ssid": "TP-LINK_4850",
-    "password": "cq68794850",
-    "eland_id": 15,
+    "password": "cq6879850",
+    "eland_id": 312,
     "device": {
-        "eland_id": 15,
+        "eland_id": 312,
         "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
         "eland_name": "15",
         "timezone_offset_sec": 0,
         "serial_number": "AM1A8000012",
-        "firmware_version": "01.04",
-        "mac_address": "B0:F8:93:15:25:B2",
+        "firmware_version": "01.13",
+        "mac_address": "B0:F8:93:1B:99:57",
         "dhcp_enabled": 1,
-        "ip_address": "",
-        "subnet_mask": "",
-        "default_gateway": "",
+        "ip_address": "192.168.1.142",
+        "subnet_mask": "255.255.255.0",
+        "default_gateway": "192.168.1.1",
+        "primary_dns": "192.168.1.1",
         "time_display_format": 1,
         "brightness_normal": 80,
         "brightness_night": 20,
+        "led_normal": 80,
+        "led_night": 20,
+        "notification_volume_normal": 40,
+        "notification_volume_night": 10,
         "night_mode_enabled": 0,
         "night_mode_begin_time": "22:00:00",
-        "night_mode_end_time": "06:00:00"
+        "night_mode_end_time": "06:00:00",
+        "area_code": 43
     }
 }
-{
-    "ssid": "lsi-4F-mac",
-    "password": "hdhd",
-    "device": {
-        "eland_id": 12,
-        "user_id": "b378d87b-90c6-45fb-bc73-ae8d4a614914",
-        "eland_name": "aoyagi",
-        "timezone_offset_sec": 32400,
-        "serial_number": "AM1A8000012",
-        "firmware_version": "01.07",
-        "mac_address": "B0:F8:93:15:25:B2",
-        "dhcp_enabled": 1,
-        "ip_address": "",
-        "subnet_mask": "",
-        "default_gateway": "",
-        "time_display_format": 1,
-        "brightness_normal": 80,
-        "brightness_night": 20,
-        "night_mode_enabled": 0,
-        "night_mode_begin_time": "22:00:00",
-        "night_mode_end_time": "06:00:00"
-    }
-}
+
 Content-Type: application/octet-stream
 hash: 74aa541b70ae0cee87bceb9a6b1c4120
 Host: 192.168.0.1

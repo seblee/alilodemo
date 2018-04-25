@@ -290,14 +290,16 @@ wait_for_queue:
     switch (download_type)
     {
     case DOWNLOAD_SCAN:
-        weather_sound_scan();
-        // alarm_sound_scan();
+        alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
         alarm_sound_oid();
         break;
     case DOWNLOAD_OTA:
         eland_ota();
+        break;
+    case DOWNLOAD_WEATHER:
+        weather_sound_scan();
         break;
     default:
         break;
@@ -396,7 +398,7 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
 {
     uint8_t i;
     int32_t sound_id;
-
+    __elsv_alarm_data_t *nearest = NULL;
     switch (sound_file->sound_type)
     {
     case SOUND_FILE_VID:
@@ -444,6 +446,23 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
         {
             sound_log("FILE_DEFAULT %s is usable", sound_file->alarm_ID);
             return true;
+        }
+    case SOUND_FILE_WEATHER_0:
+    case SOUND_FILE_WEATHER_E:
+    case SOUND_FILE_WEATHER_F:
+        nearest = get_nearest_alarm();
+        if (nearest)
+        {
+            if (strncmp(sound_file->alarm_ID, nearest->voice_alarm_id, ALARM_ID_LEN) == 0)
+            {
+                sound_log("FILE_OFID %s is usable", sound_file->alarm_ID);
+                return true;
+            }
+            if (strncmp(sound_file->alarm_ID, nearest->alarm_off_voice_alarm_id, ALARM_ID_LEN) == 0)
+            {
+                sound_log("FILE_OFID %s is usable", sound_file->alarm_ID);
+                return true;
+            }
         }
         break;
     default:

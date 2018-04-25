@@ -174,7 +174,7 @@ start_Check:
     /***initialize by device flash***/
     netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
 
-    if (device_state->area_code > 142)
+    if ((device_state->area_code > 142) || (device_state->area_code == 0))
         netclock_des_g->area_code = 43;
     else
         netclock_des_g->area_code = device_state->area_code;
@@ -398,7 +398,8 @@ OSStatus ProcessPostJson(char *InputJson)
         }
         else if (!strcmp(key1, "eland_id"))
         {
-            device_state->eland_id = json_object_get_int(val1);
+            netclock_des_g->eland_id = json_object_get_int(val1);
+            Eland_log("eland_id:%ld", netclock_des_g->eland_id);
         }
     }
     Eland_log("process device");
@@ -714,6 +715,11 @@ void eland_update_flash(void)
     if (strncmp(serial_number_temp, device_state->serial_number, serial_number_len) != 0)
     {
         memcpy(device_state->serial_number, serial_number_temp, serial_number_len);
+        needupdateflash = true;
+    }
+    if (device_state->eland_id != netclock_des_g->eland_id)
+    {
+        device_state->eland_id = netclock_des_g->eland_id;
         needupdateflash = true;
     }
 
