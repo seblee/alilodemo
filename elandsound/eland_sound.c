@@ -135,7 +135,7 @@ exit:
 OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_type_t *alarm_w_r_temp)
 {
     uint16_t i;
-    OSStatus err = kGeneralErr;
+    OSStatus err = kNoErr;
     uint32_t sector_count = 0;
     _sound_file_type_t alarm_file_cache;
 
@@ -165,7 +165,6 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
         if (alarm_w_r_temp->len > (alarm_w_r_temp->total_len - alarm_w_r_temp->pos))
             alarm_w_r_temp->len = alarm_w_r_temp->total_len - alarm_w_r_temp->pos;
         flash_kh25_read((uint8_t *)alarm_w_r_temp->sound_data, alarm_w_r_temp->file_address + alarm_w_r_temp->pos, alarm_w_r_temp->len);
-        //  sound_log("inlen = %ld,sound_flash_pos = %ld", alarm_w_r_temp->len, alarm_w_r_temp->pos);
     }
     else //寫數據
     {
@@ -210,6 +209,9 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
                               alarm_w_r_temp->len);
     }
 exit:
+    if (err != kNoErr)
+        sound_log("err = %d", err);
+
     mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
 }

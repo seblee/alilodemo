@@ -224,12 +224,12 @@ OSStatus Netclock_des_recovery(void)
     memcpy(&device_temp, device_state, sizeof(_ELAND_DEVICE_t));
     /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
-    device_state->IsAlreadySet = true;
+    /***copy para***/
     device_state->eland_id = device_temp.eland_id;
-    sprintf(device_state->serial_number, "AM1A8%06ld", device_state->eland_id);
+    memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
     device_state->timezone_offset_sec = DEFAULT_TIMEZONE;
     device_state->area_code = DEFAULT_AREACODE;
-    // memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
+    device_state->dhcp_enabled = 1;
 
     context = mico_system_context_get();
     /***clear wifi para***/
@@ -708,13 +708,10 @@ void eland_update_flash(void)
     bool needupdateflash = false;
     mico_Context_t *context = NULL;
     context = mico_system_context_get();
-    char serial_number_temp[serial_number_len];
 
-    memset(serial_number_temp, 0, serial_number_len);
-    sprintf(serial_number_temp, "AM1A8%06ld", device_state->eland_id);
-    if (strncmp(serial_number_temp, device_state->serial_number, serial_number_len) != 0)
+    if (strncmp(netclock_des_g->serial_number, device_state->serial_number, serial_number_len) != 0)
     {
-        memcpy(device_state->serial_number, serial_number_temp, serial_number_len);
+        memcpy(device_state->serial_number, netclock_des_g->serial_number, serial_number_len);
         needupdateflash = true;
     }
     if (device_state->eland_id != netclock_des_g->eland_id)

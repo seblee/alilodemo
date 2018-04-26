@@ -161,6 +161,7 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
+    alarm_stream.stream_id = audio_service_system_generate_stream_id();
     alarm_stream.sound_type = sound_type;
 
     if ((alarm->alarm_pattern == 3) ||
@@ -377,7 +378,7 @@ scan_again:
         {
             alarm_log("SID:%ld", (alarm_list.alarm_lib + i)->alarm_sound_id);
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
-            require_noerr(err, exit);
+            //require_noerr(err, exit);
         }
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 2) ||
             ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
@@ -391,7 +392,7 @@ scan_again:
             else
             {
                 err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
-                require_noerr(err, exit);
+                //require_noerr(err, exit);
             }
         }
         if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 10)
@@ -405,7 +406,7 @@ scan_again:
             else
             {
                 err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
-                require_noerr(err, exit);
+                //require_noerr(err, exit);
             }
         }
     }
@@ -429,6 +430,22 @@ scan_again:
     scan_count++;
     alarm_log("nearest_id:%s", nearest->alarm_id);
 
+    if ((nearest->alarm_pattern == 2) ||
+        (nearest->alarm_pattern == 3))
+    {
+        alarm_log("VID:%s", nearest->voice_alarm_id);
+        if (strstr(nearest->voice_alarm_id, "ffffffff"))
+            sound_type = SOUND_FILE_WEATHER_F;
+        else if (strstr(nearest->voice_alarm_id, "00000000"))
+            sound_type = SOUND_FILE_WEATHER_0;
+        else
+            goto exit;
+        sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
+        alarm_log("voice_id:%s", nearest->voice_alarm_id);
+        err = alarm_sound_download(nearest, sound_type);
+        require_noerr(err, exit);
+    }
+
     if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
     {
         alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
@@ -442,22 +459,6 @@ scan_again:
             goto exit;
         sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
         alarm_log("voice_id:%s", nearest->alarm_off_voice_alarm_id);
-        err = alarm_sound_download(nearest, sound_type);
-        require_noerr(err, exit);
-    }
-
-    if ((nearest->alarm_pattern == 2) ||
-        (nearest->alarm_pattern == 3))
-    {
-        alarm_log("VID:%s", nearest->voice_alarm_id);
-        if (strstr(nearest->voice_alarm_id, "ffffffff"))
-            sound_type = SOUND_FILE_WEATHER_F;
-        else if (strstr(nearest->voice_alarm_id, "00000000"))
-            sound_type = SOUND_FILE_WEATHER_0;
-        else
-            goto exit;
-        sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
-        alarm_log("voice_id:%s", nearest->voice_alarm_id);
         err = alarm_sound_download(nearest, sound_type);
         require_noerr(err, exit);
     }
@@ -741,10 +742,11 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             init_alarm_stream(alarm, SOUND_FILE_OFID);
             do
             {
-                mico_rtos_thread_msleep(200);
                 audio_service_get_audio_status(&result, &audio_status);
+                mico_rtos_thread_msleep(200);
             } while (audio_status != MSCP_STATUS_IDLE);
             set_alarm_stream_state(STREAM_PLAY);
+            mico_rtos_thread_msleep(200);
             mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }
     }
@@ -759,9 +761,9 @@ static void play_voice(mico_thread_arg_t arg)
     mscp_result_t result = MSCP_RST_ERROR;
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
-    _sound_read_write_type_t alarm_w_r_queue;
     _stream_state_t stream_state;
 
+    mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
     alarm_log("player_flash_thread");
     flashdata = malloc(SOUND_STREAM_DEFAULT_LENGTH + 1);
 start_play_voice:
@@ -772,6 +774,7 @@ start_play_voice:
         goto exit;
         break;
     case STREAM_PLAY:
+    case STREAM_IDEL:
         audio_service_get_audio_status(&result, &audio_status);
         if (audio_status == MSCP_STATUS_STREAM_PLAYING)
         {
@@ -793,22 +796,22 @@ start_play_voice:
     flash_read_stream.stream_id = stream->stream_id;
     data_pos = 0;
 
-    memset(&alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(alarm_w_r_queue.alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
-    alarm_w_r_queue.sound_type = stream->sound_type;
-    alarm_w_r_queue.is_read = true;
-    alarm_w_r_queue.sound_data = flashdata;
-    alarm_w_r_queue.len = SOUND_STREAM_DEFAULT_LENGTH;
-    alarm_log("id:%s", alarm_w_r_queue.alarm_ID);
+    memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+    memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
+    HTTP_W_R_struct.alarm_w_r_queue->sound_type = stream->sound_type;
+    HTTP_W_R_struct.alarm_w_r_queue->is_read = true;
+    HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
+    HTTP_W_R_struct.alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
+    alarm_log("id:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
 falsh_read_start:
-    alarm_w_r_queue.pos = data_pos;
-    err = sound_file_read_write(&sound_file_list, &alarm_w_r_queue);
+    HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
+    err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
     require_noerr(err, exit);
     if (data_pos == 0)
     {
-        flash_read_stream.total_len = alarm_w_r_queue.total_len;
+        flash_read_stream.total_len = HTTP_W_R_struct.alarm_w_r_queue->total_len;
     }
-    flash_read_stream.stream_len = alarm_w_r_queue.len;
+    flash_read_stream.stream_len = HTTP_W_R_struct.alarm_w_r_queue->len;
 
 audio_transfer:
     if (get_alarm_stream_state() == STREAM_PLAY)
@@ -849,6 +852,7 @@ exit:
         if (audio_status != MSCP_STATUS_IDLE)
             audio_service_stream_stop(&result, alarm_stream.stream_id);
     }
+    mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     free(flashdata);
     set_alarm_stream_state(STREAM_IDEL);
     mico_rtos_delete_thread(NULL);

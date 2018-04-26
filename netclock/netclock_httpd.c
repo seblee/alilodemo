@@ -47,7 +47,7 @@ mico_semaphore_t wifi_netclock = NULL, wifi_SoftAP_Sem = NULL;
 mico_semaphore_t http_ssid_event_Sem = NULL;
 __http_ssids_list_t wifi_scan_list;
 /* Private function prototypes -----------------------------------------------*/
-
+static OSStatus eland_Setting_Json(char *InputJson);
 /* Private functions ---------------------------------------------------------*/
 static void wifi_manager_scan_complete_cb(ScanResult_adv *pApList, void *arg)
 {
@@ -129,13 +129,13 @@ static void eland_check_ssid(void)
         app_httpd_log("clear wifistate_queue");
         mico_rtos_pop_from_queue(&wifistate_queue, &received, 0);
     }
+
     app_httpd_log("wifistate_queue is empty");
     /********驗證wifi  ssid password*************/
     Start_wifi_Station_SoftSP_Thread(Station);
     mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
     if (received.value == Wify_Station_Connect_Successed)
     {
-        SendElandStateQueue(ELAPPConnected);
         app_httpd_log("Wifi parameter is correct");
         device_state->IsActivate = true;
         app_httpd_log("save wifi para,update flash"); //save
@@ -208,9 +208,9 @@ static int web_send_Post_Request(httpd_request_t *req)
     char *buf = NULL;
 
     buf = malloc(buf_size + 1);
-
     memset(buf, 0, buf_size + 1);
     app_httpd_log("post");
+    SendElandStateQueue(ELAPPConnected);
     /* read and parse header */
     ret = httpd_get_data(req, buf, buf_size);
     if (strncasecmp(HTTP_CONTENT_JSON_STR, req->content_type, strlen(HTTP_CONTENT_JSON_STR)) == 0) //json data
@@ -260,7 +260,6 @@ static int web_send_Post_Request(httpd_request_t *req)
 
         err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
         require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-        SendElandStateQueue(ELAPPConnected);
 
         eland_ota_operation();
     }
@@ -273,7 +272,6 @@ static int web_send_Post_Request(httpd_request_t *req)
 
         err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
         require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-        SendElandStateQueue(ELAPPConnected);
     }
     app_httpd_log("POST OVER");
 exit:
@@ -290,6 +288,7 @@ static int web_send_Get_ssids_Request(httpd_request_t *req)
     char *upload_data = NULL;
     uint32_t upload_data_len = 1024;
     app_httpd_log("Get_ssids_Request");
+    SendElandStateQueue(ELAPPConnected);
     upload_data = malloc(upload_data_len);
     memset(upload_data, 0, upload_data_len);
     memset(&wifi_scan_list, 0, sizeof(__http_ssids_list_t));
@@ -305,7 +304,6 @@ static int web_send_Get_ssids_Request(httpd_request_t *req)
 
     err = httpd_send_body(req->sock, (const unsigned char *)upload_data, strlen(upload_data));
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
-    SendElandStateQueue(ELAPPConnected);
 exit:
     if (wifi_scan_list.num > 0)
         free(wifi_scan_list.ssids);
@@ -314,10 +312,57 @@ exit:
 
     return err;
 }
+/*****************web_send_Post_setting_Request******************************************/
+static int web_send_Post_setting_Request(httpd_request_t *req)
+{
+    OSStatus err = kNoErr;
+    int ret;
+    int buf_size = 1024;
+    char *buf = NULL;
+
+    buf = malloc(buf_size + 1);
+
+    memset(buf, 0, buf_size + 1);
+    app_httpd_log("post");
+    SendElandStateQueue(ELAPPConnected);
+    /* read and parse header */
+    ret = httpd_get_data(req, buf, buf_size);
+    if (strncasecmp(HTTP_CONTENT_JSON_STR, req->content_type, strlen(HTTP_CONTENT_JSON_STR)) == 0) //json data
+    {
+        app_httpd_log("JSON*************");
+        if (req->remaining_bytes == 0)
+        {
+            app_httpd_log("size = %d,buf = %s", req->body_nbytes, buf);
+            /**add json process**/
+        }
+        err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
+
+        err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+
+        err = eland_Setting_Json(buf);
+        mico_thread_sleep(1); //等待傳輸完成
+    }
+    else
+    {
+        app_httpd_log("Content-Type: %s", req->content_type);
+        app_httpd_log("data: %s", buf);
+        err = httpd_send_all_header(req, HTTP_RES_200, strlen(HTTPD_JSON_SUCCESS), HTTP_CONTENT_JSON_STR);
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
+
+        err = httpd_send_body(req->sock, (const unsigned char *)HTTPD_JSON_SUCCESS, strlen(HTTPD_JSON_SUCCESS));
+        require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting body."));
+    }
+    app_httpd_log("POST OVER");
+exit:
+    free(buf);
+    return err;
+}
 struct httpd_wsgi_call g_app_handlers[] = {
     {"/", HTTPD_HDR_DEFORT, 0, web_send_Get_Request, web_send_Post_Request, NULL, NULL},
     {"/ssids", HTTPD_HDR_DEFORT, 0, web_send_Get_ssids_Request, NULL, NULL, NULL},
-    {"/setting.htm", HTTPD_HDR_DEFORT, 0, NULL, NULL, NULL, NULL},
+    {"/setting", HTTPD_HDR_DEFORT, 0, web_send_Get_Request, web_send_Post_setting_Request, NULL, NULL},
 };
 
 static int g_app_handlers_no = sizeof(g_app_handlers) / sizeof(struct httpd_wsgi_call);
@@ -393,4 +438,97 @@ int Eland_httpd_stop()
 
 exit:
     return err;
+}
+
+//解析接收到的数据包
+static OSStatus eland_Setting_Json(char *InputJson)
+{
+    json_object *ReceivedJsonCache = NULL;
+    mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
+    if (*InputJson != '{')
+    {
+        app_httpd_log("error:received err json format data");
+        goto exit;
+    }
+    ReceivedJsonCache = json_tokener_parse((const char *)(InputJson));
+    if (ReceivedJsonCache == NULL)
+    {
+        app_httpd_log("json_tokener_parse error");
+        goto exit;
+    }
+    json_object_object_foreach(ReceivedJsonCache, key, val)
+    {
+        if (!strcmp(key, "eland_id"))
+        {
+            device_state->eland_id = json_object_get_int(val);
+            netclock_des_g->eland_id = device_state->eland_id;
+            app_httpd_log("eland_id:%ld", device_state->eland_id);
+        }
+        else if (!strcmp(key, "serial_number"))
+        {
+            memset(device_state->serial_number, 0, sizeof(device_state->serial_number));
+            sprintf(device_state->serial_number, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->serial_number, device_state->serial_number, sizeof(device_state->serial_number));
+        }
+        else if (!strcmp(key, "eland_name"))
+        {
+            memset(device_state->eland_name, 0, sizeof(device_state->eland_name));
+            sprintf(device_state->eland_name, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->eland_name, device_state->eland_name, sizeof(device_state->eland_name));
+        }
+        else if (!strcmp(key, "timezone_offset_sec"))
+        {
+            device_state->timezone_offset_sec = json_object_get_int(val);
+            netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
+        }
+        else if (!strcmp(key, "user_id"))
+        {
+            memset(device_state->user_id, 0, sizeof(device_state->user_id));
+            sprintf(device_state->user_id, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->user_id, device_state->user_id, sizeof(device_state->user_id));
+        }
+        else if (!strcmp(key, "dhcp_enabled"))
+        {
+            device_state->dhcp_enabled = json_object_get_int(val);
+            netclock_des_g->dhcp_enabled = device_state->dhcp_enabled;
+        }
+        else if (!strcmp(key, "ip_address"))
+        {
+            memset(device_state->ip_address, 0, ip_address_Len);
+            sprintf(device_state->ip_address, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->ip_address, device_state->ip_address, sizeof(device_state->ip_address));
+        }
+        else if (!strcmp(key, "subnet_mask"))
+        {
+            memset(device_state->subnet_mask, 0, ip_address_Len);
+            sprintf(device_state->subnet_mask, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->subnet_mask, device_state->subnet_mask, sizeof(device_state->subnet_mask));
+        }
+        else if (!strcmp(key, "default_gateway"))
+        {
+            memset(device_state->default_gateway, 0, ip_address_Len);
+            sprintf(device_state->default_gateway, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->default_gateway, device_state->default_gateway, sizeof(device_state->default_gateway));
+        }
+        else if (!strcmp(key, "primary_dns"))
+        {
+            memset(device_state->primary_dns, 0, ip_address_Len);
+            sprintf(device_state->primary_dns, "%s", json_object_get_string(val));
+            memcpy(netclock_des_g->primary_dns, device_state->primary_dns, sizeof(device_state->primary_dns));
+        }
+        else if (!strcmp(key, "area_code"))
+        {
+            device_state->area_code = json_object_get_int(val);
+            netclock_des_g->area_code = device_state->area_code;
+        }
+    }
+    mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
+    device_state->IsAlreadySet = true;
+    /**refresh flash inside**/
+    mico_system_context_update(mico_system_context_get());
+    free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以
+    return kNoErr;
+exit:
+    free_json_obj(&ReceivedJsonCache);
+    return kGeneralErr;
 }
