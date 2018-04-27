@@ -368,7 +368,7 @@ static void uart_thread_DDE(uint32_t arg)
         case ALARM_READ_0A: /* READ MCU ALARM*/
             ELAND_H0A_Send(inDataBuffer);
             break;
-        case ALARM_SEND_0B: /* READ MCU ALARM*/
+        case ALARM_SEND_0B: /* SEND ELAND ALARM*/
             ELAND_H0B_Send(inDataBuffer);
             break;
         case ELAND_DATA_0C: /* SEND ELAND DATA TO MCU */
@@ -1013,6 +1013,21 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     }
     else //eland net clock mode
     {
+        switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
+        {
+        case REFRESH_TIME:
+            eland_push_uart_send_queue(TIME_READ_04);
+            break;
+        case REFRESH_ALARM:
+            eland_push_uart_send_queue(ALARM_SEND_0B);
+            break;
+        case REFRESH_ELAND_DATA:
+            eland_push_uart_send_queue(ELAND_DATA_0C);
+            break;
+        default:
+            break;
+        }
+
         switch (get_eland_mode())
         {
         case ELAND_NC:

@@ -524,6 +524,7 @@ static OSStatus eland_Setting_Json(char *InputJson)
     }
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
     device_state->IsAlreadySet = true;
+    device_state->IsActivate = false;
     /**refresh flash inside**/
     mico_system_context_update(mico_system_context_get());
     free_json_obj(&ReceivedJsonCache); //只要free最顶层的那个就可以

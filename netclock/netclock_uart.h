@@ -56,6 +56,9 @@ typedef enum {
     EL_HTTP_TIMEOUT,      /*http time out*/
     EL_HTTP_204,          /*http 204*/
     EL_HTTP_400,          /*http 400*/
+    EL_HTTP_OTHER,        /*http other error*/
+    EL_FLASH_READ,        /*flash read error*/
+    EL_AUDIO_PLAY         /*audio play error*/
 } __eland_error_t;
 
 typedef enum {
@@ -80,6 +83,7 @@ typedef enum {
     REFRESH_NONE = 0,
     REFRESH_TIME,
     REFRESH_ALARM,
+    REFRESH_ELAND_DATA,
     REFRESH_MAX,
 } MCU_Refresh_type_t;
 typedef enum {

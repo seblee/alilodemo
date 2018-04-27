@@ -288,7 +288,6 @@ void file_download(void)
 wait_for_queue:
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
-    eland_error(true, EL_ERROR_NONE);
     switch (download_type)
     {
     case DOWNLOAD_SCAN:

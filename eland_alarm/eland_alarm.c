@@ -54,6 +54,7 @@ static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
 static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
 static bool today_is_holiday(DATE_TIME_t *date, uint8_t offset);
+static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_alarm_data_t *alarm);
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest);
 static OSStatus set_alarm_history_send_sem(void);
 /* Private functions ---------------------------------------------------------*/
@@ -210,14 +211,11 @@ static mico_utc_time_t GET_current_second(void)
 /**elsv alarm data init**/
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
 {
-    _alarm_eland_data_t *alarm_eland_data = NULL;
     _alarm_mcu_data_t *alarm_mcu_data = NULL;
     int ho, mi, se;
-    uint8_t i;
     set_alarm_state(ALARM_SORT);
     if (elsv_alarm_data == NULL)
         return;
-    alarm_eland_data = &(elsv_alarm_data->alarm_data_for_eland);
     alarm_mcu_data = &(elsv_alarm_data->alarm_data_for_mcu);
     sscanf((const char *)(elsv_alarm_data->alarm_time), "%02d:%02d:%02d", &ho, &mi, &se);
 
@@ -230,35 +228,6 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     alarm_mcu_data->alarm_color = elsv_alarm_data->alarm_color;
     alarm_mcu_data->snooze_enabled = elsv_alarm_data->snooze_enabled;
     alarm_mcu_data->skip_flag = elsv_alarm_data->skip_flag;
-
-    if (elsv_alarm_data->alarm_repeat == 1)
-    {
-        alarm_eland_data->alarm_on_days_of_week = 0x7f;
-    }
-    else if (elsv_alarm_data->alarm_repeat == 2)
-    {
-        alarm_eland_data->alarm_on_days_of_week = 0x3e;
-    }
-    else if (elsv_alarm_data->alarm_repeat == 3)
-    {
-        alarm_eland_data->alarm_on_days_of_week = 0x41;
-    }
-    else if (elsv_alarm_data->alarm_repeat == 4)
-    {
-        alarm_eland_data->alarm_on_days_of_week = 0;
-        for (i = 0; i < 7; i++)
-        {
-            if (elsv_alarm_data->alarm_on_days_of_week[i] == '1')
-                alarm_eland_data->alarm_on_days_of_week |= (1 << i);
-        }
-    }
-    else if (elsv_alarm_data->alarm_repeat == 5)
-    {
-    }
-    else
-    {
-        alarm_eland_data->alarm_on_days_of_week = 0;
-    }
 }
 OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
 {
@@ -366,8 +335,6 @@ OSStatus alarm_sound_scan(void)
     uint8_t scan_count = 0;
     uint8_t i;
 
-scan_again:
-    scan_count++;
     alarm_log("alarm_number:%d", alarm_list.alarm_number);
 
     for (i = 0; i < alarm_list.alarm_number; i++)
@@ -377,8 +344,14 @@ scan_again:
             ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
         {
             alarm_log("SID:%ld", (alarm_list.alarm_lib + i)->alarm_sound_id);
+            scan_count = 0;
+        download_sid:
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
-            //require_noerr(err, exit);
+            if ((err != kNoErr) && (scan_count++ < 5))
+            {
+                mico_rtos_thread_msleep(500);
+                goto download_sid;
+            }
         }
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 2) ||
             ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
@@ -391,8 +364,14 @@ scan_again:
             }
             else
             {
+                scan_count = 0;
+            download_vid:
                 err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
-                //require_noerr(err, exit);
+                if ((err != kNoErr) && (scan_count++ < 5))
+                {
+                    mico_rtos_thread_msleep(500);
+                    goto download_vid;
+                }
             }
         }
         if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 10)
@@ -405,16 +384,16 @@ scan_again:
             }
             else
             {
+                scan_count = 0;
+            download_ofid:
                 err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
-                //require_noerr(err, exit);
+                if ((err != kNoErr) && (scan_count++ < 5))
+                {
+                    mico_rtos_thread_msleep(500);
+                    goto download_ofid;
+                }
             }
         }
-    }
-exit:
-    if ((err != kNoErr) && (scan_count < 5))
-    {
-        mico_rtos_thread_sleep(5);
-        goto scan_again;
     }
     return err;
 }
@@ -426,8 +405,7 @@ OSStatus weather_sound_scan(void)
     __elsv_alarm_data_t *nearest = NULL;
     nearest = get_nearest_alarm();
     require_quiet(nearest, exit);
-scan_again:
-    scan_count++;
+
     alarm_log("nearest_id:%s", nearest->alarm_id);
 
     if ((nearest->alarm_pattern == 2) ||
@@ -442,8 +420,14 @@ scan_again:
             goto exit;
         sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
         alarm_log("voice_id:%s", nearest->voice_alarm_id);
+        scan_count = 0;
+    weather_vid:
         err = alarm_sound_download(nearest, sound_type);
-        require_noerr(err, exit);
+        if ((err != kNoErr) && (scan_count++ < 5))
+        {
+            mico_rtos_thread_msleep(500);
+            goto weather_vid;
+        }
     }
 
     if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
@@ -459,16 +443,17 @@ scan_again:
             goto exit;
         sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
         alarm_log("voice_id:%s", nearest->alarm_off_voice_alarm_id);
+        scan_count = 0;
+    weather_ofid:
         err = alarm_sound_download(nearest, sound_type);
-        require_noerr(err, exit);
+        if ((err != kNoErr) && (scan_count++ < 5))
+        {
+            mico_rtos_thread_msleep(500);
+            goto weather_ofid;
+        }
     }
 
 exit:
-    if ((err != kNoErr) && (scan_count < 5))
-    {
-        mico_rtos_thread_sleep(5);
-        goto scan_again;
-    }
     return err;
 }
 
@@ -806,7 +791,7 @@ start_play_voice:
 falsh_read_start:
     HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
     err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
-    require_noerr(err, exit);
+    require_noerr_action(err, exit, eland_error(true, EL_FLASH_READ));
     if (data_pos == 0)
     {
         flash_read_stream.total_len = HTTP_W_R_struct.alarm_w_r_queue->total_len;
@@ -820,7 +805,7 @@ audio_transfer:
         if (err != kNoErr)
         {
             alarm_log("audio_stream_play() error!!!!");
-            goto exit;
+            require_noerr_action(err, exit, eland_error(true, EL_AUDIO_PLAY));
         }
         else
         {
@@ -865,7 +850,7 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("alarm_id:%s", alarm_data->alarm_id);
     alarm_log("alarm_color:%d", alarm_data->alarm_color);
     alarm_log("alarm_time:%s", alarm_data->alarm_time);
-    alarm_log("alarm_off_dates:%s", alarm_data->alarm_off_dates);
+
     alarm_log("snooze_enabled:%d", alarm_data->snooze_enabled);
     alarm_log("snooze_count:%d", alarm_data->snooze_count);
     alarm_log("snooze_interval_min:%d", alarm_data->snooze_interval_min);
@@ -878,15 +863,13 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("alarm_continue_min:%d", alarm_data->alarm_continue_min);
     alarm_log("alarm_repeat:%d", alarm_data->alarm_repeat);
     alarm_log("alarm_on_days_of_week:%s", alarm_data->alarm_on_days_of_week);
-    alarm_log("\r\alarm_data_for_eland");
+    alarm_log("\r\nalarm_data_for_eland");
     alarm_log("moment_second:%ld", alarm_data->alarm_data_for_eland.moment_second);
     alarm_log("color:%d", alarm_data->alarm_color);
     alarm_log("snooze_count:%d", alarm_data->snooze_count);
-    alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
-    alarm_log("\r\n_alarm_mcu_data_t");
+    alarm_log("\r\nalarm_mcu_data_t");
     alarm_log("color:%d", alarm_data->alarm_data_for_mcu.alarm_color);
     alarm_log("snooze_count:%d", alarm_data->alarm_data_for_mcu.snooze_enabled);
-    alarm_log("alarm_on_days_of_week:%d", alarm_data->alarm_data_for_eland.alarm_on_days_of_week);
     alarm_log("moment_time:%02d-%02d-%02d %d %02d-%02d-%02d",
               alarm_data->alarm_data_for_mcu.moment_time.year,
               alarm_data->alarm_data_for_mcu.moment_time.month,
@@ -990,53 +973,71 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         break;
     case 1:
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-        if (alarm->alarm_data_for_eland.moment_second < utc_time)
-            alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
-        break;
-    case 2:
         i = 0;
         do
         {
-            if (((week_day + i) == 1) ||
-                ((week_day + i) == 7) ||
-                today_is_holiday(&date_time, i))
+            if ((alarm->alarm_data_for_eland.moment_second < utc_time) ||
+                today_is_alarm_off_day(&date_time, i, alarm))
             {
                 i++;
+                alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
                 continue;
             }
             break;
         } while (1);
-        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + SECOND_ONE_DAY * i;
+        break;
+    case 2:
+        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        i = 0;
+        do
+        {
+            if ((((week_day + i - 1) % 7) == 0) ||
+                (((week_day + i - 1) % 7) == 6) ||
+                today_is_holiday(&date_time, i) ||
+                today_is_alarm_off_day(&date_time, i, alarm) ||
+                (alarm->alarm_data_for_eland.moment_second < utc_time))
+            {
+                i++;
+                alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
+                continue;
+            }
+            break;
+        } while (1);
         alarm_log("utc_time:%ld", alarm->alarm_data_for_eland.moment_second);
         break;
     case 3:
-        for (i = 0; i < 7; i++)
+        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
+        i = 0;
+        do
         {
-            if ((((week_day + i - 1) % 7) == 0) || (((week_day + i - 1) % 7) == 6))
+            if (((((week_day + i - 1) % 7) != 0) && (((week_day + i - 1) % 7) != 6)) ||
+                today_is_alarm_off_day(&date_time, i, alarm) ||
+                (alarm->alarm_data_for_eland.moment_second < utc_time))
             {
-                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + i * SECOND_ONE_DAY;
-                if (alarm->alarm_data_for_eland.moment_second < utc_time)
-                    continue;
-                else
-                    break;
+                i++;
+                alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
+                continue;
             }
-        }
+            break;
+        } while (1);
+        break;
     case 4:
+        alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         for (i = 0; i < 7; i++)
         {
-            if (alarm->alarm_data_for_eland.alarm_on_days_of_week & (1 << ((week_day + i - 1) % 7)))
+            if ((alarm->alarm_on_days_of_week[(week_day + i - 1) % 7] == '0') ||
+                today_is_alarm_off_day(&date_time, i, alarm) ||
+                (alarm->alarm_data_for_eland.moment_second < utc_time))
             {
-                alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time) + (i * SECOND_ONE_DAY);
-                if (alarm->alarm_data_for_eland.moment_second < utc_time)
-                    continue;
-                else
-                    break;
+                i++;
+                alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
+                continue;
             }
         }
         break;
-    case 5:
+    case 5: //do not check alarm_off_dates
         alarm_log("utc_time:%ld", utc_time);
-        for (i = 0; i < ALARM_ON_DATES_COUNT; i++)
+        for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
         {
             if (alarm->alarm_on_dates[i] == 0)
                 break;
@@ -1198,6 +1199,7 @@ OSStatus Alarm_build_JSON(char *json_str)
     json_object *Json = NULL;
     json_object *AlarmJson = NULL;
     json_object *AlarmOnDaysJson = NULL;
+    json_object *AlarmOffDaysJson = NULL;
     __elsv_alarm_data_t *alarm_now;
     const char *generate_data = NULL;
     uint32_t generate_data_len = 0;
@@ -1211,13 +1213,27 @@ OSStatus Alarm_build_JSON(char *json_str)
     AlarmJson = json_object_new_object();
     require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmJson object error!");
     AlarmOnDaysJson = json_object_new_array();
-    require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmJson object error!");
+    require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmOnJson object error!");
+    AlarmOffDaysJson = json_object_new_array();
+    require_action_string(AlarmJson, exit, err = kNoMemoryErr, "create AlarmOffJson object error!");
 
     alarm_log("Begin add AlarmJson object");
     json_object_object_add(AlarmJson, "alarm_id", json_object_new_string(alarm_now->alarm_id));
     json_object_object_add(AlarmJson, "alarm_color", json_object_new_int(alarm_now->alarm_color));
     json_object_object_add(AlarmJson, "alarm_time", json_object_new_string(alarm_now->alarm_time));
-    json_object_object_add(AlarmJson, "alarm_off_dates", json_object_new_string(alarm_now->alarm_off_dates));
+    for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
+    {
+        if (alarm_now->alarm_off_dates[i] == 0)
+            break;
+        memset(stringbuf, 0, 20);
+        sprintf(stringbuf, "%d-%02d-%02d",
+                alarm_now->alarm_off_dates[i] / SIMULATE_DAYS_OF_YEAR + 2000,
+                alarm_now->alarm_off_dates[i] % SIMULATE_DAYS_OF_YEAR / SIMULATE_DAYS_OF_MONTH,
+                alarm_now->alarm_off_dates[i] % SIMULATE_DAYS_OF_YEAR % SIMULATE_DAYS_OF_MONTH);
+        json_object_array_add(AlarmOffDaysJson, json_object_new_string(stringbuf));
+    }
+    json_object_object_add(AlarmJson, "alarm_off_dates", AlarmOffDaysJson);
+
     json_object_object_add(AlarmJson, "snooze_enabled", json_object_new_int(alarm_now->snooze_enabled));
     json_object_object_add(AlarmJson, "snooze_count", json_object_new_int(alarm_now->snooze_count));
     json_object_object_add(AlarmJson, "snooze_interval_min", json_object_new_int(alarm_now->snooze_interval_min));
@@ -1230,15 +1246,15 @@ OSStatus Alarm_build_JSON(char *json_str)
     json_object_object_add(AlarmJson, "volume_stepup_enabled", json_object_new_int(alarm_now->volume_stepup_enabled));
     json_object_object_add(AlarmJson, "alarm_continue_min", json_object_new_int(alarm_now->alarm_continue_min));
     json_object_object_add(AlarmJson, "alarm_repeat", json_object_new_int(alarm_now->alarm_repeat));
-    for (i = 0; i < ALARM_ON_DATES_COUNT; i++)
+    for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
     {
         if (alarm_now->alarm_on_dates[i] == 0)
             break;
         memset(stringbuf, 0, 20);
         sprintf(stringbuf, "%d-%02d-%02d",
                 alarm_now->alarm_on_dates[i] / SIMULATE_DAYS_OF_YEAR + 2000,
-                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR / 32,
-                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR % 32);
+                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR / SIMULATE_DAYS_OF_MONTH,
+                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR % SIMULATE_DAYS_OF_MONTH);
         json_object_array_add(AlarmOnDaysJson, json_object_new_string(stringbuf));
     }
     json_object_object_add(AlarmJson, "alarm_on_dates", AlarmOnDaysJson);
@@ -1279,7 +1295,33 @@ static bool today_is_holiday(DATE_TIME_t *date, uint8_t offset)
         if (Cache == *(holiday_list.list + i))
             return true;
     }
-
+    return false;
+}
+/**
+ ****************************************************************************
+ * @Function : static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_alarm_data_t *alarm)
+ * @File     : eland_alarm.c
+ * @Program  : date:today
+ *             offset: =0 today  =1 tomorrow.....
+ * @Created  : 2018-4-27 by seblee
+ * @Brief    :  
+ * @Version  : V1.0
+**/
+static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_alarm_data_t *alarm)
+{
+    uint16_t Cache = 0;
+    uint8_t i;
+    Cache = (date->iYear % 100) * SIMULATE_DAYS_OF_YEAR +
+            date->iMon * SIMULATE_DAYS_OF_MONTH +
+            date->iDay +
+            offset;
+    for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
+    {
+        if (alarm->alarm_off_dates[i] == 0)
+            break;
+        if (Cache == alarm->alarm_off_dates[i])
+            return true;
+    }
     return false;
 }
 

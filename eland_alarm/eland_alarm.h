@@ -18,10 +18,10 @@
 #include "netclock_uart.h"
 #include "eland_sound.h"
 /* Private define ------------------------------------------------------------*/
-#define ALARM_ID_LEN 36        //闹钟唯一识别的ID。
-#define ALARM_TIME_LEN 8       //時刻是"HH:mm:ss"的形式。
-#define ALARM_OFF_DATES_LEN 11 //日期是"yyyy-MM-dd"的形式
-#define ALARM_ON_DATES_COUNT 10
+#define ALARM_ID_LEN 36  //闹钟唯一识别的ID。
+#define ALARM_TIME_LEN 8 //時刻是"HH:mm:ss"的形式。
+#define ALARM_DATES_LEN 11
+#define ALARM_ON_OFF_DATES_COUNT 50
 #define VOICE_ALARM_ID_LEN 37       //语音闹钟的ID
 #define ALARM_ON_DAYS_OF_WEEK_LEN 8 //鬧鐘播放的星期幾
 #define ALARM_ID_OF_SIMPLE_CLOCK "simple_clock"
@@ -60,7 +60,6 @@ typedef struct
 typedef struct
 {
     uint32_t moment_second;
-    uint8_t alarm_on_days_of_week;
 } _alarm_eland_data_t;
 
 typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
@@ -68,7 +67,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     char alarm_id[ALARM_ID_LEN + 1];                       //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
     int8_t alarm_color;                                    //鬧鐘顏色
     char alarm_time[ALARM_TIME_LEN + 1];                   //闹钟播放时刻
-    char alarm_off_dates[ALARM_OFF_DATES_LEN + 1];         //不播放闹钟的日期的排列 暫定一個
+    uint16_t alarm_off_dates[ALARM_ON_OFF_DATES_COUNT];    //不播放闹钟的日期的排列
     int8_t snooze_enabled;                                 //继续响铃 有效标志  0：无效   1：有效
     int8_t snooze_count;                                   //继续响铃的次数
     int8_t snooze_interval_min;                            //继续响铃的间隔。単位「分」
@@ -80,7 +79,7 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     int8_t volume_stepup_enabled;                          //音量升高功能是否有效的标志
     int8_t alarm_continue_min;                             //鬧鐘自動停止的時間
     int8_t alarm_repeat;                                   //鬧鐘反復條件
-    uint16_t alarm_on_dates[ALARM_ON_DATES_COUNT];         //鬧鐘日期排列
+    uint16_t alarm_on_dates[ALARM_ON_OFF_DATES_COUNT];     //鬧鐘日期排列
     char alarm_on_days_of_week[ALARM_ON_DAYS_OF_WEEK_LEN]; //鬧鐘播放的星期幾
     int8_t skip_flag;
     _alarm_eland_data_t alarm_data_for_eland;

@@ -26,9 +26,9 @@
 /* Private define ------------------------------------------------------------*/
 //#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
-#define elan_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
+#define eland_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
-#define elan_tcp_log(...)
+#define eland_tcp_log(...)
 #endif /* ! CONFIG_TCP_DEBUG */
 
 /* Private macro -------------------------------------------------------------*/
@@ -97,7 +97,7 @@ TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
     LinkStatusTypeDef link_status;
     memset(&link_status, 0, sizeof(link_status));
     micoWlanGetLinkStatus(&link_status);
-    elan_tcp_log("wifi link_status:%d", link_status.is_connected);
+    eland_tcp_log("wifi link_status:%d", link_status.is_connected);
     if (link_status.is_connected == true)
         return NETWORK_PHYSICAL_LAYER_CONNECTED;
     else
@@ -164,15 +164,15 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
                                    Params->DestinationPort,
                                    Params->timeout_ms);
     }
-    elan_tcp_log("TCP_Connect");
+    eland_tcp_log("TCP_Connect");
     err = usergethostbyname(pNetwork->tlsConnectParams.pDestinationURL, (uint8_t *)ipstr, sizeof(ipstr));
     if (err != kNoErr)
     {
-        elan_tcp_log("ERROR: Unable to resolute the host address.");
+        eland_tcp_log("ERROR: Unable to resolute the host address.");
         rc = TCP_CONNECTION_ERROR;
         goto exit;
     }
-    elan_tcp_log("host:%s, ip:%s, port:%d", pNetwork->tlsConnectParams.pDestinationURL, ipstr, pNetwork->tlsConnectParams.DestinationPort);
+    eland_tcp_log("host:%s, ip:%s, port:%d", pNetwork->tlsConnectParams.pDestinationURL, ipstr, pNetwork->tlsConnectParams.DestinationPort);
 
     socket_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
@@ -183,17 +183,17 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
     ret = user_set_tcp_keepalive(socket_fd, 3000, 3000, 6, 3, 3);
     if (ret < 0)
     {
-        elan_tcp_log("ERROR: Unable to resolute the tcp connect");
+        eland_tcp_log("ERROR: Unable to resolute the tcp connect");
         rc = TCP_SETUP_ERROR;
         goto exit;
     }
 
-    elan_tcp_log("start connect");
+    eland_tcp_log("start connect");
     err = connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr));
     if (err != kNoErr)
     {
-        elan_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-        elan_tcp_log("ERROR: Unable to resolute the tcp connect err:%d", err);
+        eland_tcp_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        eland_tcp_log("ERROR: Unable to resolute the tcp connect err:%d", err);
         rc = TCP_CONNECTION_ERROR;
         goto exit;
     }
@@ -206,35 +206,35 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
             pNetwork->tlsDataParams.clicert = pNetwork->tlsConnectParams.pDeviceCertLocation;
             pNetwork->tlsDataParams.pkey = pNetwork->tlsConnectParams.pDevicePrivateKeyLocation;
             ssl_set_client_cert(pNetwork->tlsDataParams.clicert, pNetwork->tlsDataParams.pkey);
-            elan_tcp_log("use client ca");
+            eland_tcp_log("use client ca");
         }
 
         if ((pNetwork->tlsConnectParams.ServerVerificationFlag == true))
         {
             pNetwork->tlsDataParams.cacert = pNetwork->tlsConnectParams.pRootCALocation;
             root_ca_len = strlen(pNetwork->tlsDataParams.cacert);
-            elan_tcp_log("use server ca");
+            eland_tcp_log("use server ca");
         }
         else
         {
             pNetwork->tlsDataParams.cacert = NULL;
             root_ca_len = 0;
         }
-        elan_tcp_log("start ssl_connect");
+        eland_tcp_log("start ssl_connect");
         pNetwork->tlsDataParams.ssl = ssl_connect(socket_fd,
                                                   root_ca_len,
                                                   pNetwork->tlsDataParams.cacert, &errno);
-        elan_tcp_log("fd: %d, err:  %d", socket_fd, errno);
+        eland_tcp_log("fd: %d, err:  %d", socket_fd, errno);
         if (pNetwork->tlsDataParams.ssl == NULL)
         {
-            elan_tcp_log("ssl connect err");
+            eland_tcp_log("ssl connect err");
             close(socket_fd);
             pNetwork->tlsDataParams.server_fd = -1;
             err = kGeneralErr;
             rc = SSL_CONNECTION_ERROR;
             goto exit;
         }
-        elan_tcp_log("ssl connected");
+        eland_tcp_log("ssl connected");
     }
     pNetwork->tlsDataParams.server_fd = socket_fd;
     return TCP_SUCCESS;
@@ -266,7 +266,7 @@ TCP_Error_t TCP_Write(Network_t *pNetwork,
         {
             if (ret < 0)
             {
-                elan_tcp_log(" failed");
+                eland_tcp_log(" failed");
                 /* All other negative return values indicate connection needs to be reset.
                  * Will be caught in ping request so ignored here */
                 isError_flag = true;
@@ -279,7 +279,7 @@ TCP_Error_t TCP_Write(Network_t *pNetwork,
         }
     }
     *written_len = written_so_far;
-    elan_tcp_log("socket write done");
+    eland_tcp_log("socket write done");
     if (isError_flag)
     {
         return NETWORK_SSL_WRITE_ERROR;
@@ -328,14 +328,14 @@ startread:
             else
             {
                 ret = select(fd + 1, &readfds, NULL, NULL, &time);
-                elan_tcp_log("select ret %d fd %d", ret, fd);
+                eland_tcp_log("select ret %d fd %d", ret, fd);
                 if (ret <= 0)
                 {
                     break;
                 }
                 if (!FD_ISSET(fd, &readfds))
                 {
-                    elan_tcp_log("fd is set err");
+                    eland_tcp_log("fd is set err");
                     break;
                 }
                 ret = ssl_recv(pNetwork->tlsDataParams.ssl, pMsg_p, len);
@@ -365,13 +365,13 @@ startread:
         }
         else if (ret < 0)
         {
-            elan_tcp_log("socket read err");
+            eland_tcp_log("socket read err");
             return NETWORK_SSL_READ_ERROR;
         }
         // Evaluate timeout after the read to make sure read is done at least once
         if (has_timer_expired(&timeforward))
         {
-            elan_tcp_log("read time out");
+            eland_tcp_log("read time out");
             break;
         }
     }
@@ -469,7 +469,7 @@ OSStatus TCP_Service_Start(void)
                                   0x3000, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
-    elan_tcp_log("TCP_Service_Start err = %d", err);
+    eland_tcp_log("TCP_Service_Start err = %d", err);
     return err;
 }
 static void TCP_thread_main(mico_thread_arg_t arg)
@@ -493,7 +493,7 @@ GET_CONNECT_INFO:
 
     if (TCP_Physical_is_connected(&(Eland_Client.networkStack)) == NETWORK_MANUALLY_DISCONNECTED)
     {
-        elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
+        eland_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
         mico_rtos_thread_sleep(1);
         goto GET_CONNECT_INFO;
     }
@@ -502,20 +502,20 @@ GET_CONNECT_INFO:
 
     if ((netclock_des_g != NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
     {
-        elan_tcp_log("tcpIP_host");
+        eland_tcp_log("tcpIP_host");
         serverPara.pDestinationURL = netclock_des_g->tcpIP_host;
         serverPara.DestinationPort = netclock_des_g->tcpIP_port;
     }
     else
     {
-        elan_tcp_log("default");
+        eland_tcp_log("default");
         serverPara.pDestinationURL = ELAND_HTTP_DOMAIN_NAME;
         serverPara.DestinationPort = 6380;
     }
     rc = TCP_Client_Init(&Eland_Client, &serverPara);
     if (TCP_SUCCESS != rc)
     {
-        elan_tcp_log("Shadow Connection Error");
+        eland_tcp_log("Shadow Connection Error");
         goto exit;
     }
 
@@ -528,12 +528,12 @@ RECONN:
         mico_rtos_delete_thread(NULL);
     }
 
-    elan_tcp_log("Shadow Connect...");
+    eland_tcp_log("Shadow Connect...");
     rc = eland_tcp_connect(&Eland_Client, NULL);
-    elan_tcp_log("Connect.over..");
+    eland_tcp_log("Connect.over..");
     if (TCP_SUCCESS != rc)
     {
-        elan_tcp_log("Server Connection Error,rc = %d", rc);
+        eland_tcp_log("Server Connection Error,rc = %d", rc);
         if (rc == NETWORK_MANUALLY_DISCONNECTED)
             mico_thread_sleep(5);
         else
@@ -542,13 +542,13 @@ RECONN:
     }
 cycle_loop:
 
-    elan_tcp_log("TCP_connection_request");
+    eland_tcp_log("TCP_connection_request");
     /**Connection Request**/
     rc = TCP_connection_request(&Eland_Client);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
         else if (rc == NETWORK_SSL_NOTHING_TO_READ)
@@ -559,7 +559,7 @@ cycle_loop:
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
@@ -568,14 +568,14 @@ cycle_loop:
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
     }
     /**holiday data **/
     rc = TCP_update_holiday(&Eland_Client);
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
@@ -584,7 +584,7 @@ cycle_loop:
     if (TCP_SUCCESS != rc)
     {
         mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
@@ -592,7 +592,7 @@ cycle_loop:
     rc = TCP_request_response(&Eland_Client, SD00, SD01);
     {
         mico_thread_sleep(1);
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
@@ -602,12 +602,12 @@ little_cycle_loop:
     rc = TCP_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
-        elan_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit; //reconnect
     }
     MicoRtcGetTime(&cur_time);
-    elan_tcp_log("cur_time.sec:%d", cur_time.sec);
+    eland_tcp_log("cur_time.sec:%d", cur_time.sec);
     if ((cur_time.sec == HC00_moment_sec) && (cur_time.min != HC00_moment_min))
     {
         tcp_HC_flag = true;
@@ -619,7 +619,9 @@ little_cycle_loop:
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
+            eland_tcp_log("Connection Error rc = %d", rc);
+            if (rc != TCP_SUCCESS)
+                goto exit;
         }
         else
             tcp_HC_flag = false;
@@ -641,7 +643,7 @@ pop_queue:
         /*******delete tcp thread***********/
         else if (tcp_message == TCP_Stop_Sem)
         {
-            elan_tcp_log("TCP_Stop_Sem");
+            eland_tcp_log("TCP_Stop_Sem");
             Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
             Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
             if (Eland_Client.clientData.readBuf != NULL)
@@ -665,11 +667,10 @@ pop_queue:
                 eland_push_http_queue(DOWNLOAD_OTA);
             }
         }
-
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
-            elan_tcp_log("Connection Error rc = %d", rc);
+            eland_tcp_log("Connection Error rc = %d", rc);
         }
         else
             goto pop_queue;
@@ -678,7 +679,7 @@ pop_queue:
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
-    SendElandStateQueue(WifyConnected);
+    SendElandStateQueue(HTTP_Get_HOST_INFO);
 
     goto RECONN;
     if (Eland_Client.clientData.readBuf != NULL)
@@ -698,7 +699,7 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
     rc = TCP_Physical_is_connected(&(pClient->networkStack));
     if (rc != NETWORK_PHYSICAL_LAYER_CONNECTED)
     {
-        elan_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
+        eland_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
         return rc;
     }
 
@@ -737,7 +738,7 @@ static TCP_Error_t TCP_connection_request(_Client_t *pClient)
     rc = TCP_receive_packet(pClient, &timer);
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("connection_request:OK");
+    eland_tcp_log("connection_request:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -796,7 +797,7 @@ static TCP_Error_t TCP_update_alarm(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_alarm:OK");
+    eland_tcp_log("update_alarm:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -824,7 +825,7 @@ static TCP_Error_t TCP_update_holiday(_Client_t *pClient)
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("update_holiday:OK");
+    eland_tcp_log("update_holiday:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HD01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -855,8 +856,8 @@ static TCP_Error_t TCP_health_check(_Client_t *pClient)
     if (rc != TCP_SUCCESS)
         return rc;
     eland_set_time();
-    elan_tcp_log("health_check:OK");
-    // elan_tcp_log("health_check:OK json:%s", pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
+    eland_tcp_log("health_check:OK");
+    // eland_tcp_log("health_check:OK json:%s", pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[HC01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -885,7 +886,7 @@ static TCP_Error_t TCP_request_response(_Client_t *pClient, _TCP_CMD_t request, 
 
     if (rc != TCP_SUCCESS)
         return rc;
-    elan_tcp_log("eland_IF:OK");
+    eland_tcp_log("eland_IF:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     if (strncmp(telegram->command, CommandTable[response], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
@@ -905,11 +906,11 @@ static TCP_Error_t TCP_upload(_Client_t *pClient, _TCP_CMD_t tcp_cmd)
     if (rc != TCP_SUCCESS)
         return rc;
 
-    elan_tcp_log("upload %c%c%c%c:OK",
-                 CommandTable[tcp_cmd][0],
-                 CommandTable[tcp_cmd][1],
-                 CommandTable[tcp_cmd][2],
-                 CommandTable[tcp_cmd][3]);
+    eland_tcp_log("upload %c%c%c%c:OK",
+                  CommandTable[tcp_cmd][0],
+                  CommandTable[tcp_cmd][1],
+                  CommandTable[tcp_cmd][2],
+                  CommandTable[tcp_cmd][3]);
     return rc;
 }
 
@@ -951,27 +952,27 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
         /*build eland json data*/
         InitUpLoadData(telegram_data);
         telegram->lenth = strlen(telegram_data);
-        elan_tcp_log("CN00 len:%ld,json:%s", telegram->lenth, telegram_data);
+        eland_tcp_log("CN00 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case HT00:
         /*build alarm json data*/
         Alarm_build_JSON(telegram_data);
         telegram->lenth = strlen(telegram_data);
-        elan_tcp_log("HT00 len:%ld,json:%s", telegram->lenth, telegram_data);
+        eland_tcp_log("HT00 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case HT01:
         history_data_p = get_alarm_history_data();
         if (history_data_p)
             alarm_off_history_json_data_build(history_data_p, (char *)telegram_data);
         telegram->lenth = strlen(telegram_data);
-        elan_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
+        eland_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
         set_alarm_history_data_state(DONE_UPLOAD);
         break;
     case HT02:
         /*build alarm json data*/
         Alarm_build_JSON(telegram_data);
         telegram->lenth = strlen(telegram_data);
-        elan_tcp_log("HT02 len:%ld,json:%s", telegram->lenth, telegram_data);
+        eland_tcp_log("HT02 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case FW01:
         break;
@@ -1061,7 +1062,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
             break;
     }
     tep_cmd = (_TCP_CMD_t)i;
-    elan_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
+    eland_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
     switch (tep_cmd)
     {
     case CN00: //00 Connection Request
@@ -1078,7 +1079,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case DV01: //05 eland info response
     case DV02: //06 eland info change Notification
         SendElandStateQueue(TCP_DV00);
-        //   elan_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
+        //   eland_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
         rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
         break;
     case DV03: //07 eland info remove Notification
@@ -1098,7 +1099,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case HD01: //14 holiday data response
     case HD02: //15 holiday data change notice
         rc = TCP_Operate_HD0X((char *)(buff + sizeof(_TELEGRAM_t)), &holiday_list);
-        elan_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case HT00: //16 alarm on notification
         break;
@@ -1134,13 +1135,13 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
     memset(time_str_cache, 0, 30);
     if (*buf != '{')
     {
-        elan_tcp_log("error:received err json format data");
+        eland_tcp_log("error:received err json format data");
         return JSON_PARSE_ERROR;
     }
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
-        elan_tcp_log("json_tokener_parse error");
+        eland_tcp_log("json_tokener_parse error");
         return JSON_PARSE_ERROR;
     }
     json_object_object_foreach(ReceivedJsonCache, key, val)
@@ -1166,7 +1167,6 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
 static TCP_Error_t TCP_Operate_DV01(char *buf)
 {
     TCP_Error_t rc = TCP_SUCCESS;
-    __msg_function_t eland_cmd = ELAND_DATA_0C;
     bool des_data_chang_flag = false;
 
     json_object *ReceivedJsonCache = NULL, *device_JSON = NULL;
@@ -1176,21 +1176,21 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
 
     if (*buf != '{')
     {
-        elan_tcp_log("error:received err json format data");
+        eland_tcp_log("error:received err json format data");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
-        elan_tcp_log("json_tokener_parse error");
+        eland_tcp_log("json_tokener_parse error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     device_JSON = json_object_object_get(ReceivedJsonCache, "device");
     if ((device_JSON == NULL) || ((json_object_get_object(device_JSON)->head) == NULL))
     {
-        elan_tcp_log("get device_JSON error");
+        eland_tcp_log("get device_JSON error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
@@ -1201,7 +1201,7 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         {
             if (des_data_cache.eland_id != json_object_get_int(val))
             {
-                elan_tcp_log("get eland_id error");
+                eland_tcp_log("get eland_id error");
                 rc = JSON_PARSE_ERROR;
                 goto exit;
             }
@@ -1212,7 +1212,7 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
             sprintf(des_data_cache.user_id, "%s", json_object_get_string(val));
             if (!strncmp(des_data_cache.user_id, "\0", 1))
             {
-                elan_tcp_log("user_id  = %s", des_data_cache.user_id);
+                eland_tcp_log("user_id  = %s", des_data_cache.user_id);
                 rc = JSON_PARSE_ERROR;
                 goto exit;
             }
@@ -1234,8 +1234,8 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         {
             if (strcmp(des_data_cache.serial_number, json_object_get_string(val)))
             {
-                elan_tcp_log("serial des:%s", des_data_cache.serial_number);
-                elan_tcp_log("serial elsv:%s", json_object_get_string(val));
+                eland_tcp_log("serial des:%s", des_data_cache.serial_number);
+                eland_tcp_log("serial elsv:%s", json_object_get_string(val));
                 rc = JSON_PARSE_ERROR;
                 goto exit;
             }
@@ -1291,7 +1291,7 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         des_data_chang_flag = true;
     memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
-    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 0);
+    eland_push_uart_send_queue(ELAND_DATA_0C);
     /**refresh flash inside**/
     eland_update_flash();
     /**stop tcp communication**/
@@ -1310,14 +1310,14 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
     __elsv_alarm_data_t alarm_data_cache;
     if (*buf != '{')
     {
-        elan_tcp_log("error:received err json format data");
+        eland_tcp_log("error:received err json format data");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
-        elan_tcp_log("json_tokener_parse error");
+        eland_tcp_log("json_tokener_parse error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
@@ -1328,17 +1328,17 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         alarm_array = json_object_object_get(ReceivedJsonCache, "alarms");
         if ((alarm_array == NULL) || ((json_object_get_object(alarm_array)->head) == NULL))
         {
-            elan_tcp_log("get alarm_array error");
+            eland_tcp_log("get alarm_array error");
             rc = JSON_PARSE_ERROR;
             goto exit;
         }
         list_len = json_object_array_length(alarm_array);
-        elan_tcp_log("alarm_array list_len:%d", list_len);
+        eland_tcp_log("alarm_array list_len:%d", list_len);
         for (i = 0; i < list_len; i++)
         {
             alarm = json_object_array_get_idx(alarm_array, i);
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
-            elan_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
+            eland_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
             elsv_alarm_data_sort_out(&alarm_data_cache);
             alarm_list_add(&alarm_list, &alarm_data_cache);
         }
@@ -1350,7 +1350,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         alarm = json_object_object_get(ReceivedJsonCache, "alarm");
         if ((alarm == NULL) || ((json_object_get_object(alarm)->head) == NULL))
         {
-            elan_tcp_log("get alarm error");
+            eland_tcp_log("get alarm error");
             rc = JSON_PARSE_ERROR;
             goto exit;
         }
@@ -1360,7 +1360,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
             alarm_list_minus(&alarm_list, &alarm_data_cache);
         else
             alarm_list_add(&alarm_list, &alarm_data_cache);
-        elan_tcp_log("alarm_number:%d", alarm_list.alarm_number);
+        eland_tcp_log("alarm_number:%d", alarm_list.alarm_number);
     }
 exit:
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
@@ -1369,8 +1369,8 @@ exit:
 }
 void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
 {
-    char alarm_on_dates_buffer[ALARM_OFF_DATES_LEN + 1]; //鬧鐘日期排列
-    json_object *alarm_on_dates = NULL;
+    char alarm_dates_buffer[ALARM_DATES_LEN + 1]; //鬧鐘日期排列
+    json_object *alarm_on_dates = NULL, *alarm_off_dates = NULL;
     uint8_t list_len = 0, i, j;
     uint16_t Cache;
     int year, month, day;
@@ -1382,7 +1382,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             sprintf(alarm_data->alarm_id, "%s", json_object_get_string(val));
             if (!strncmp(alarm_data->alarm_id, "\0", 1))
             {
-                elan_tcp_log("alarm_id:%s", alarm_data->alarm_id);
+                eland_tcp_log("alarm_id:%s", alarm_data->alarm_id);
                 continue;
             }
         }
@@ -1395,7 +1395,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             sprintf(alarm_data->alarm_time, "%s", json_object_get_string(val));
             if (!strncmp(alarm_data->alarm_time, "\0", 1))
             {
-                elan_tcp_log("alarm_time = %s", alarm_data->alarm_time);
+                eland_tcp_log("alarm_time = %s", alarm_data->alarm_time);
                 continue;
             }
         }
@@ -1428,7 +1428,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             sprintf(alarm_data->voice_alarm_id, "%s", json_object_get_string(val));
             if (!strncmp(alarm_data->voice_alarm_id, "\0", 1))
             {
-                elan_tcp_log("voice_alarm_id = %s", alarm_data->voice_alarm_id);
+                eland_tcp_log("voice_alarm_id = %s", alarm_data->voice_alarm_id);
             }
         }
         else if (!strcmp(key, "alarm_off_voice_alarm_id"))
@@ -1436,7 +1436,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             sprintf(alarm_data->alarm_off_voice_alarm_id, "%s", json_object_get_string(val));
             if (!strncmp(alarm_data->alarm_off_voice_alarm_id, "\0", 1))
             {
-                elan_tcp_log("alarm_off_voice_alarm_id = %s", alarm_data->alarm_off_voice_alarm_id);
+                eland_tcp_log("alarm_off_voice_alarm_id = %s", alarm_data->alarm_off_voice_alarm_id);
             }
         }
         else if (!strcmp(key, "alarm_volume"))
@@ -1460,7 +1460,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             sprintf(alarm_data->alarm_on_days_of_week, "%s", json_object_get_string(val));
             if (!strncmp(alarm_data->alarm_on_days_of_week, "\0", 1))
             {
-                elan_tcp_log("alarm_on_days_of_week = %s", alarm_data->alarm_on_days_of_week);
+                eland_tcp_log("alarm_on_days_of_week = %s", alarm_data->alarm_on_days_of_week);
             }
         }
         else if (!strcmp(key, "skip_flag"))
@@ -1468,24 +1468,60 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             alarm_data->skip_flag = json_object_get_int(val);
         }
     }
+    /***alarm_off_dates***/
+    alarm_off_dates = json_object_object_get(alarm, "alarm_off_dates");
+    list_len = json_object_array_length(alarm_off_dates);
+    eland_tcp_log("list_len:%d ", list_len);
+    memset(alarm_data->alarm_off_dates, 0, ALARM_ON_OFF_DATES_COUNT);
+    for (i = 0; i < list_len; i++)
+    {
+        if (i < ALARM_ON_OFF_DATES_COUNT)
+        {
+            memset(alarm_dates_buffer, 0, ALARM_DATES_LEN + 1);
+            sprintf(alarm_dates_buffer, "%s",
+                    json_object_get_string(json_object_array_get_idx(alarm_off_dates, i)));
+            sscanf((const char *)alarm_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
+            alarm_data->alarm_off_dates[i] = (year % 100) * SIMULATE_DAYS_OF_YEAR +
+                                             month * SIMULATE_DAYS_OF_MONTH + day;
+            eland_tcp_log("alarm_off_dates%d:%d", i, alarm_data->alarm_off_dates[i]);
+        }
+        else
+            break;
+    }
+    /*****Sequence*****/
+    for (i = 0; i < list_len - 1; i++)
+    {
+        for (j = 0; j < list_len - i - 1; j++)
+        {
+            if (alarm_data->alarm_off_dates[j] > alarm_data->alarm_off_dates[j + 1])
+            {
+                Cache = alarm_data->alarm_off_dates[j + 1];
+                alarm_data->alarm_off_dates[j + 1] = alarm_data->alarm_off_dates[j];
+                alarm_data->alarm_off_dates[j] = Cache;
+            }
+        }
+    }
+    free_json_obj(&alarm_off_dates);
+
+    /***alarm_on_dates***/
     if (alarm_data->alarm_repeat == 5)
     {
         alarm_on_dates = json_object_object_get(alarm, "alarm_on_dates");
         list_len = json_object_array_length(alarm_on_dates);
-        elan_tcp_log("list_len:%d ", list_len);
-        memset(alarm_data->alarm_on_dates, 0, ALARM_ON_DATES_COUNT);
+        eland_tcp_log("list_len:%d ", list_len);
+        memset(alarm_data->alarm_on_dates, 0, ALARM_ON_OFF_DATES_COUNT);
 
         for (i = 0; i < list_len; i++)
         {
-            if (i < ALARM_ON_DATES_COUNT)
+            if (i < ALARM_ON_OFF_DATES_COUNT)
             {
-                memset(alarm_on_dates_buffer, 0, ALARM_OFF_DATES_LEN + 1);
-                sprintf(alarm_on_dates_buffer, "%s",
+                memset(alarm_dates_buffer, 0, ALARM_DATES_LEN + 1);
+                sprintf(alarm_dates_buffer, "%s",
                         json_object_get_string(json_object_array_get_idx(alarm_on_dates, i)));
-                sscanf((const char *)alarm_on_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
+                sscanf((const char *)alarm_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
                 alarm_data->alarm_on_dates[i] = (year % 100) * SIMULATE_DAYS_OF_YEAR +
                                                 month * SIMULATE_DAYS_OF_MONTH + day;
-                elan_tcp_log("alarm_on_dates%d:%d", i, alarm_data->alarm_on_dates[i]);
+                eland_tcp_log("alarm_on_dates%d:%d", i, alarm_data->alarm_on_dates[i]);
             }
             else
                 break;
@@ -1509,27 +1545,27 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
 static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
 {
     json_object *ReceivedJsonCache = NULL, *holiday_array = NULL;
-    char holiday_dates_buffer[ALARM_OFF_DATES_LEN + 1]; //holiday buf
+    char holiday_dates_buffer[ALARM_DATES_LEN + 1]; //holiday buf
     int year, month, day;
     TCP_Error_t rc = TCP_SUCCESS;
     uint8_t list_len = 0, i;
     if (*buf != '{')
     {
-        elan_tcp_log("error:received err json format data");
+        eland_tcp_log("error:received err json format data");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
-        elan_tcp_log("json_tokener_parse error");
+        eland_tcp_log("json_tokener_parse error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     holiday_array = json_object_object_get(ReceivedJsonCache, "holidays");
     if ((holiday_array == NULL) || ((json_object_get_object(holiday_array)->head) == NULL))
     {
-        elan_tcp_log("get holiday_array error");
+        eland_tcp_log("get holiday_array error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
@@ -1542,16 +1578,16 @@ static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
     }
     list_len = json_object_array_length(holiday_array);
     list->list = calloc(list_len, sizeof(uint16_t));
-    elan_tcp_log("holiday_array list_len:%d", list_len);
+    eland_tcp_log("holiday_array list_len:%d", list_len);
     for (i = 0; i < list_len; i++)
     {
-        memset(holiday_dates_buffer, 0, ALARM_OFF_DATES_LEN + 1);
+        memset(holiday_dates_buffer, 0, ALARM_DATES_LEN + 1);
         sprintf(holiday_dates_buffer, "%s",
                 json_object_get_string(json_object_array_get_idx(holiday_array, i)));
         sscanf((const char *)holiday_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
         *(list->list + i) = (year % 100) * SIMULATE_DAYS_OF_YEAR +
                             month * SIMULATE_DAYS_OF_MONTH + day;
-        //  elan_tcp_log("holiday%d:%04d-%02d-%02d", i, year, month, day);
+        //  eland_tcp_log("holiday%d:%04d-%02d-%02d", i, year, month, day);
     }
     list->number = list_len;
     mico_rtos_unlock_mutex(&list->holidaymutex);
@@ -1568,21 +1604,21 @@ static TCP_Error_t TCP_Operate_FW00(char *buf)
     char Cache_hash[hash_Len];
     if (*buf != '{')
     {
-        elan_tcp_log("error:received err json format data");
+        eland_tcp_log("error:received err json format data");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
-        elan_tcp_log("json_tokener_parse error");
+        eland_tcp_log("json_tokener_parse error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     firmware_json = json_object_object_get(ReceivedJsonCache, "FirmwareUpdateData");
     if ((firmware_json == NULL) || ((json_object_get_object(firmware_json)->head) == NULL))
     {
-        elan_tcp_log("get firmware_json error");
+        eland_tcp_log("get firmware_json error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
@@ -1592,10 +1628,10 @@ static TCP_Error_t TCP_Operate_FW00(char *buf)
         {
             memset(Cache_version, 0, firmware_version_len);
             sprintf(Cache_version, "%s", json_object_get_string(val));
-            elan_tcp_log("version:%s", Cache_version);
+            eland_tcp_log("version:%s", Cache_version);
             if (!strncmp(Cache_version, "\0", 1))
             {
-                elan_tcp_log("version not Available");
+                eland_tcp_log("version not Available");
                 goto exit;
             }
         }
@@ -1603,10 +1639,10 @@ static TCP_Error_t TCP_Operate_FW00(char *buf)
         {
             memset(Cache_url, 0, URL_Len);
             sprintf(Cache_url, "%s", json_object_get_string(val));
-            elan_tcp_log("download_url:%s", Cache_url);
+            eland_tcp_log("download_url:%s", Cache_url);
             if (!strncmp(Cache_url, "\0", 1))
             {
-                elan_tcp_log("download_url not Available");
+                eland_tcp_log("download_url not Available");
                 goto exit;
             }
         }
@@ -1614,10 +1650,10 @@ static TCP_Error_t TCP_Operate_FW00(char *buf)
         {
             memset(Cache_hash, 0, hash_Len);
             sprintf(Cache_hash, "%s", json_object_get_string(val));
-            elan_tcp_log("hash:%s", Cache_hash);
+            eland_tcp_log("hash:%s", Cache_hash);
             if (!strncmp(Cache_hash, "\0", 1))
             {
-                elan_tcp_log("hash not Available");
+                eland_tcp_log("hash not Available");
                 goto exit;
             }
         }
@@ -1640,14 +1676,14 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
 
     if (*buf != '{')
     {
-        elan_tcp_log("error:received err json format data");
+        eland_tcp_log("error:received err json format data");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
-        elan_tcp_log("json_tokener_parse error");
+        eland_tcp_log("json_tokener_parse error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
@@ -1656,12 +1692,12 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
 
     if ((schedule_array == NULL) || ((json_object_get_object(schedule_array)->head) == NULL))
     {
-        elan_tcp_log("get schedule_array error");
+        eland_tcp_log("get schedule_array error");
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
     list_len = json_object_array_length(schedule_array);
-    elan_tcp_log("schedule_array list_len:%d", list_len);
+    eland_tcp_log("schedule_array list_len:%d", list_len);
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     memset(&alarm_list.schedules, 0, sizeof(alarm_list.schedules));
     alarm_list.schedules_num = list_len;
@@ -1736,7 +1772,6 @@ static void time_record(TIME_RECORD_T_t type, mico_utc_time_t *value)
 static void eland_set_time(void)
 {
     mico_utc_time_ms_t utc_time_ms;
-    __msg_function_t eland_cmd = TIME_SET_03;
     struct tm *currentTime;
     iso8601_time_t iso8601_time;
     mico_utc_time_t utc_time;
@@ -1752,7 +1787,7 @@ static void eland_set_time(void)
 
     mico_time_get_utc_time(&utc_time);
     utc_time += offset_time;
-    elan_tcp_log("utc_time:%ld", utc_time);
+    eland_tcp_log("utc_time:%ld", utc_time);
     utc_time_ms = (mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000);
     mico_time_set_utc_time_ms(&utc_time_ms);
 
@@ -1768,9 +1803,9 @@ static void eland_set_time(void)
     rtc_time.year = (currentTime->tm_year + 1900) % 100;
     MicoRtcSetTime(&rtc_time);
     mico_time_get_iso8601_time(&iso8601_time);
-    elan_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
+    eland_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
     /*send time to lcd*/
-    mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
+    eland_push_uart_send_queue(TIME_SET_03);
     if ((offset_time > 86400) || (offset_time < -86400))
         mico_rtos_set_semaphore(&alarm_update);
 }
@@ -1784,7 +1819,7 @@ void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
 {
     uint8_t i;
     char alarm_id[ALARM_ID_LEN + 1];
-    char date_buffer[ALARM_OFF_DATES_LEN + 1];
+    char date_buffer[ALARM_DATES_LEN + 1];
     char time_buffer[ALARM_TIME_LEN + 1];
     int year, month, day;
     int ho, mi, se;
@@ -1798,7 +1833,7 @@ void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
         }
         else if (!strcmp(key, "date"))
         {
-            memset(date_buffer, 0, ALARM_OFF_DATES_LEN + 1);
+            memset(date_buffer, 0, ALARM_DATES_LEN + 1);
             sprintf(date_buffer, "%s", json_object_get_string(val));
             sscanf((const char *)date_buffer, "%04d-%02d-%02d", &year, &month, &day);
             date_time.iYear = year;
@@ -1826,5 +1861,5 @@ void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
             break;
         }
     }
-    // elan_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
+    // eland_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
 }

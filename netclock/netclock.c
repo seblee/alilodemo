@@ -631,7 +631,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
                              ELAND_HTTP_DOMAIN_NAME, //主機域名
                              NULL,                   //request body
                              &user_http_res);        //response 接收緩存
-    require_noerr(err, exit);
+                                                     // require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)
     {
@@ -640,15 +640,22 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     else if (user_http_res.status_code == 204)
     {
         Eland_log("<===== alarm_sound_download end 204<======");
+        eland_error(true, EL_HTTP_204);
+    }
+    else if (user_http_res.status_code == 400)
+    {
+        eland_error(true, EL_HTTP_400);
+        Eland_log("alarm_sound_download error %ld", user_http_res.status_code);
+        err = kGeneralErr;
     }
     else
     {
+        eland_error(true, EL_HTTP_OTHER);
         Eland_log("alarm_sound_download error %ld", user_http_res.status_code);
         err = kGeneralErr;
-        goto exit;
     }
-
 exit:
+
     /**************/
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     //释放资源
