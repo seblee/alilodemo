@@ -687,6 +687,9 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
     //   client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
+
+    ssl_set_using_nonblock(client_ssl, 1);
+
     client_log("ssl_send request");
     /* Send HTTP Request */
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
@@ -776,7 +779,6 @@ exit:
         ssl_close(client_ssl);
         client_ssl = NULL;
     }
-
     SocketClose(&http_fd);
 
     /*free request buf*/
@@ -787,6 +789,9 @@ exit:
     }
     HTTPHeaderDestory(&httpHeader);
     mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
+    if (err != kNoErr)
+        client_log("ERROR:%d", err);
+
     return err;
 }
 
@@ -800,11 +805,11 @@ static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader, uint32_t inPo
     static AUDIO_STREAM_PALY_S fm_stream;
     static uint8_t fm_test_cnt;
 
-    if (inHeader->chunkedData == false)
-        client_log("This is not a chunked data");
     //Extra data with a content length value
     if (inPos == 0 && context->content == NULL)
     {
+        if (inHeader->chunkedData == false)
+            client_log("This is not a chunked data");
         context->content = calloc(1501, sizeof(uint8_t));
         require_action(context->content, exit, err = kNoMemoryErr);
         context->content_length = inHeader->contentLength;

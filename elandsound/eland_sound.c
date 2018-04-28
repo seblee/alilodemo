@@ -288,13 +288,22 @@ void file_download(void)
 wait_for_queue:
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
+operation_queue:
     switch (download_type)
     {
     case DOWNLOAD_SCAN:
         alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
+        sound_log("DOWNLOAD_OID");
         alarm_sound_oid();
+        while (!mico_rtos_is_queue_empty(&http_queue))
+        {
+            mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_NO_WAIT);
+            if (download_type != DOWNLOAD_OID)
+                goto operation_queue;
+        }
+        // eland_push_http_queue(DOWNLOAD_OID);
         break;
     case DOWNLOAD_OTA:
         eland_ota();

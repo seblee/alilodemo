@@ -1,4 +1,34 @@
 # Netclock
+
+# v01.14
+2018年4月28日14:19:34
+## 
+    1 alarm led display;
+    2 issue ALARM_SKIP mode alarm not operation;
+    3 simple clock operation;
+    4 add area code in eland data;
+    5 issue alarm_number =0 clear alarm display;
+    6 add led bright in eland data;
+    7 alarm skip according to elsv
+    8 add oid sound control;
+    9 add download fail count out;
+    10 issue alarm skip push failed;
+    11 add oid sound volume;
+    12 add data get_notification_volume;    
+    13 add alarm_nearest temporary memory;
+    14 change flash sector erase in SOUND_FILE_CLEAR;
+    15 add Alarm clock schedule request;
+    16 display alarm clock schedule operation NA mode
+    17 add timezone area code save in flash inside;
+    18 add weather file download;
+    19 add eland_error;
+    20 wait weather queue operation
+    21 issue file download err exit;
+    22 tcp health check err --> reconnect;
+
+    23 change muc iwdg 1.717s
+
+
 # v01.12
 2018年4月12日14:31:13
 * change lcd 5V（LCD_All_angle_view）
