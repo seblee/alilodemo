@@ -17,10 +17,11 @@
 #include "eland_sound.h"
 #include "netclock_ota.h"
 #include "eland_alarm.h"
+#include "netclock_wifi.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_SOUND_DEBUG
+//#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -112,7 +113,7 @@ exit:
             break;
         case SOUND_FILE_SID:
             //    sound_log("sound:%d,sid :%ld", i, *((int32_t *)((sound_list->lib + i)->alarm_ID)));
-            sound_log("sound:%d,sid :%ld", i, *((int32_t *)((int)(sound_list->lib + i)->alarm_ID)));
+            // sound_log("sound:%d,sid :%ld", i, *((int32_t *)((int)(sound_list->lib + i)->alarm_ID)));
             break;
         case SOUND_FILE_OFID:
             sound_log("sound:%d,ofid :%s", i, (sound_list->lib + i)->alarm_ID);
@@ -311,6 +312,10 @@ operation_queue:
     case DOWNLOAD_WEATHER:
         weather_sound_scan();
         break;
+    case GO_INTO_AP_MODE:
+        Start_wifi_Station_SoftSP_Thread(Soft_AP);
+        break;
+
     default:
         break;
     }
@@ -431,7 +436,7 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
             if (((alarm_list->alarm_lib + i)->alarm_pattern == 1) &&
                 (sound_id == (alarm_list->alarm_lib + i)->alarm_sound_id))
             {
-                sound_log("FILE_SID %ld is usable", *((int32_t *)(sound_file->alarm_ID)));
+                //  sound_log("FILE_SID %ld is usable", *((int32_t *)(sound_file->alarm_ID)));
                 return true;
             }
         }

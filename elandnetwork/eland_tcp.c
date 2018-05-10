@@ -483,12 +483,13 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _time_t timer;
     mico_rtc_time_t cur_time = {0};
     _tcp_cmd_sem_t tcp_message;
+    _ELAND_MODE_t eland_mode;
 
     HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
 GET_CONNECT_INFO:
     /*pop queue*/
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
-    if ((err == kNoErr) && (tcp_message = TCP_Stop_Sem))
+    if ((err == kNoErr) && (tcp_message == TCP_Stop_Sem))
         mico_rtos_delete_thread(NULL);
 
     if (TCP_Physical_is_connected(&(Eland_Client.networkStack)) == NETWORK_MANUALLY_DISCONNECTED)
@@ -588,24 +589,9 @@ cycle_loop:
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit;
     }
-    /**Alarm clock schedule**/
-    rc = TCP_request_response(&Eland_Client, SD00, SD01);
-    {
-        mico_thread_sleep(1);
-        eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-            goto exit;
-    }
+
+    tcp_HC_flag = true;
 little_cycle_loop:
-    timer.tv_sec = 1;
-    timer.tv_usec = 0;
-    rc = TCP_receive_packet(&Eland_Client, &timer);
-    if (TCP_SUCCESS != rc)
-    {
-        eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-            goto exit; //reconnect
-    }
     MicoRtcGetTime(&cur_time);
     eland_tcp_log("cur_time.sec:%d", cur_time.sec);
     if ((cur_time.sec == HC00_moment_sec) && (cur_time.min != HC00_moment_min))
@@ -626,6 +612,15 @@ little_cycle_loop:
         else
             tcp_HC_flag = false;
     }
+    timer.tv_sec = 1;
+    timer.tv_usec = 0;
+    rc = TCP_receive_packet(&Eland_Client, &timer);
+    if (TCP_SUCCESS != rc)
+    {
+        eland_tcp_log("Connection Error rc = %d", rc);
+        if (rc == NETWORK_SSL_READ_ERROR)
+            goto exit; //reconnect
+    }
 pop_queue:
     /*pop queue*/
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
@@ -640,7 +635,7 @@ pop_queue:
         /*******upload alarm skip notice********/
         else if (tcp_message == TCP_HT02_Sem)
             rc = TCP_upload(&Eland_Client, HT02);
-        /*******delete tcp thread***********/
+        /*******stop tcp thread***********/
         else if (tcp_message == TCP_Stop_Sem)
         {
             eland_tcp_log("TCP_Stop_Sem");
@@ -653,20 +648,34 @@ pop_queue:
             }
             mico_rtos_delete_thread(NULL);
         }
+        /*******health check***********/
         else if (tcp_message == TCP_HC00_Sem)
         {
             tcp_HC_flag = true;
         }
+        /*******OTA start***********/
         else if (tcp_message == TCP_FW01_Sem)
         {
             rc = TCP_upload(&Eland_Client, FW01);
             if (TCP_SUCCESS == rc)
             {
                 set_eland_mode(ELAND_OTA);
-                eland_push_uart_send_queue(SEND_LINK_STATE_08);
                 eland_push_http_queue(DOWNLOAD_OTA);
             }
         }
+        /**Alarm clock schedule**/
+        else if (tcp_message == TCP_SD00_Sem)
+        {
+            rc = TCP_request_response(&Eland_Client, SD00, SD01);
+            if (TCP_SUCCESS != rc)
+            {
+                mico_thread_sleep(1);
+                eland_tcp_log("Connection Error rc = %d", rc);
+                if (rc == NETWORK_SSL_READ_ERROR)
+                    goto exit;
+            }
+        }
+
         if (TCP_SUCCESS != rc)
         {
             mico_thread_sleep(1);
@@ -675,11 +684,25 @@ pop_queue:
         else
             goto pop_queue;
     }
-    goto little_cycle_loop;
+    eland_mode = get_eland_mode();
+    if ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC))
+        goto exit;
+    else
+        goto little_cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
+
     SendElandStateQueue(HTTP_Get_HOST_INFO);
+    do
+    {
+        err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
+        if ((err == kNoErr) && (tcp_message == TCP_Stop_Sem))
+            mico_rtos_delete_thread(NULL);
+
+        eland_mode = get_eland_mode();
+        mico_thread_sleep(2);
+    } while ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC));
 
     goto RECONN;
     if (Eland_Client.clientData.readBuf != NULL)
@@ -1078,9 +1101,9 @@ static TCP_Error_t TCP_Operate(const char *buff)
         break;
     case DV01: //05 eland info response
     case DV02: //06 eland info change Notification
-        SendElandStateQueue(TCP_DV00);
         //   eland_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
         rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
+        eland_push_uart_send_queue(ELAND_DATA_0C);
         break;
     case DV03: //07 eland info remove Notification
         reset_eland_flash_para(ELAND_DELETE_0E);
@@ -1236,8 +1259,8 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
             {
                 eland_tcp_log("serial des:%s", des_data_cache.serial_number);
                 eland_tcp_log("serial elsv:%s", json_object_get_string(val));
-                rc = JSON_PARSE_ERROR;
-                goto exit;
+                // rc = JSON_PARSE_ERROR;
+                // goto exit;
             }
         }
         else if (!strcmp(key, "dhcp_enabled"))
@@ -1286,12 +1309,11 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         }
     }
     mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
-    if (des_data_cache.timezone_offset_sec !=
-        netclock_des_g->timezone_offset_sec)
+    if (des_data_cache.timezone_offset_sec != netclock_des_g->timezone_offset_sec)
         des_data_chang_flag = true;
     memcpy(netclock_des_g, &des_data_cache, sizeof(ELAND_DES_S));
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
-    eland_push_uart_send_queue(ELAND_DATA_0C);
+
     /**refresh flash inside**/
     eland_update_flash();
     /**stop tcp communication**/
@@ -1697,10 +1719,10 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
         goto exit;
     }
     list_len = json_object_array_length(schedule_array);
-    eland_tcp_log("schedule_array list_len:%d", list_len);
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     memset(&alarm_list.schedules, 0, sizeof(alarm_list.schedules));
     alarm_list.schedules_num = list_len;
+    eland_tcp_log("schedule_array list_len:%d", get_schedules_number());
     for (i = 0; i < list_len; i++)
     {
         schedule_json = json_object_array_get_idx(schedule_array, i);

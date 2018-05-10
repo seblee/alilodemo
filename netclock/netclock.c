@@ -62,7 +62,7 @@ OSStatus netclock_desInit(void)
     device_state = (_ELAND_DEVICE_t *)mico_system_context_get_user_data(context);
     require_action_string(device_state != NULL, exit, err = kGeneralErr, "[ERROR]device_state is NULL!!!");
 
-    netclock_des_g = (ELAND_DES_S *)calloc(1, sizeof(ELAND_DES_S) + 1);
+    netclock_des_g = (ELAND_DES_S *)calloc(sizeof(ELAND_DES_S) + 1, sizeof(uint8_t));
     require_action_string(netclock_des_g != NULL, exit, err = kGeneralErr, "[ERROR]netclock_des_g is NULL!!!");
 
     err = mico_rtos_init_mutex(&netclock_des_g->des_mutex);
@@ -225,18 +225,19 @@ OSStatus Netclock_des_recovery(void)
     /***clear device data***/
     memset(device_state, 0, sizeof(_ELAND_DEVICE_t));
     /***copy para***/
+    device_state->IsAlreadySet = device_temp.IsAlreadySet;
     device_state->eland_id = device_temp.eland_id;
     memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
+    device_state->dhcp_enabled = 1;
     device_state->timezone_offset_sec = DEFAULT_TIMEZONE;
     device_state->area_code = DEFAULT_AREACODE;
-    device_state->dhcp_enabled = 1;
 
     context = mico_system_context_get();
     /***clear wifi para***/
     if (context->micoSystemConfig.configured != unConfigured)
         context->micoSystemConfig.configured = unConfigured;
     mico_system_context_update(context);
-    mico_rtos_thread_msleep(200);
+    mico_rtos_thread_msleep(300);
     return kNoErr;
 }
 

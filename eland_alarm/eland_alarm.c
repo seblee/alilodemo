@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ALARM_DEBUG
+//#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -1023,7 +1023,8 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         break;
     case 4:
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-        for (i = 0; i < 7; i++)
+        i = 0;
+        do
         {
             if ((alarm->alarm_on_days_of_week[(week_day + i - 1) % 7] == '0') ||
                 today_is_alarm_off_day(&date_time, i, alarm) ||
@@ -1033,7 +1034,9 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
                 alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
                 continue;
             }
-        }
+            else
+                break;
+        } while (1);
         break;
     case 5: //do not check alarm_off_dates
         alarm_log("utc_time:%ld", utc_time);
@@ -1060,11 +1063,12 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
     }
     /*******Calculate date for mcu*********/
     UCT_Convert_Date(&(alarm->alarm_data_for_eland.moment_second), &(alarm->alarm_data_for_mcu.moment_time));
-    if ((utc_time < alarm->alarm_data_for_eland.moment_second) &&
-        ((alarm->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY))
-        alarm->alarm_data_for_mcu.next_alarm = 1;
-    else
-        alarm->alarm_data_for_mcu.next_alarm = 0;
+    /*if alarm > one day then next alaarm disappeared*/
+    // if ((utc_time < alarm->alarm_data_for_eland.moment_second) &&
+    //     ((alarm->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY))
+    alarm->alarm_data_for_mcu.next_alarm = 1;
+    // else
+    //     alarm->alarm_data_for_mcu.next_alarm = 0;
     alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
               alarm->alarm_data_for_mcu.moment_time.year + 2000,
               alarm->alarm_data_for_mcu.moment_time.month,
@@ -1361,6 +1365,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         {
             list->weather_need_refreshed = true;
             eland_push_http_queue(DOWNLOAD_SCAN);
+            TCP_Push_MSG_queue(TCP_SD00_Sem);
             alarm_log("get alarm_nearest alarm_id:%s", (*alarm_nearest)->alarm_id);
         }
         else
@@ -1389,8 +1394,7 @@ OSStatus alarm_sound_oid(void)
     }
 
     /******************/
-    // sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
-    sprintf(uri_str, ELAND_SOUND_OFID_URI, netclock_des_g->eland_id, "00000000-0000-0000-0000-000000000000");
+    sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
     alarm_log("uri_str:%s", uri_str);
     err = eland_http_file_download(ELAND_DOWN_LOAD_METHOD, uri_str, ELAND_HTTP_DOMAIN_NAME, NULL, DOWNLOAD_OID);
     require_noerr(err, exit);

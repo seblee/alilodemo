@@ -36,7 +36,8 @@
 #define SCHEDULE_MAX 50
 /* Private typedef -----------------------------------------------------------*/
 
-typedef enum {
+typedef enum
+{
     ALARM_IDEL,
     ALARM_ADD,
     ALARM_MINUS,
@@ -99,7 +100,8 @@ typedef struct
     bool alarm_stoped;
     mico_mutex_t AlarmStateMutex;
 } _alarm_state_t;
-typedef enum {
+typedef enum
+{
     STREAM_IDEL,
     STREAM_PLAY,
     STREAM_STOP,
@@ -115,7 +117,8 @@ typedef struct
     uint16_t stream_count;
     _stream_state_t state;
 } _alarm_stream_t;
-typedef enum {
+typedef enum
+{
     ALARM_ON = (uint8_t)0,
     ALARM_OFF_SNOOZE = (uint8_t)1,
     ALARM_OFF_ALARMOFF = (uint8_t)2,
@@ -123,7 +126,8 @@ typedef enum {
     ALARM_OFF_SKIP = (uint8_t)4,
     ALARM_SNOOZE = (uint8_t)5,
 } alarm_off_history_record_t;
-typedef enum {
+typedef enum
+{
     IDEL_UPLOAD = 0,
     READY_UPLOAD,
     WAIT_UPLOAD,
@@ -171,12 +175,14 @@ typedef struct
     /************************/
 } _eland_alarm_list_t;
 
-typedef enum {
+typedef enum
+{
     DOWNLOAD_IDEL,
     DOWNLOAD_SCAN,
     DOWNLOAD_OID,
     DOWNLOAD_OTA,
     DOWNLOAD_WEATHER,
+    GO_INTO_AP_MODE,
 } _download_type_t;
 /* Private macro -------------------------------------------------------------*/
 

@@ -27,7 +27,8 @@ typedef struct _Eland_Network Network_t;
  * Value of 0 is a generic success response
  * Values greater than 0 are specific non-error return codes
  */
-typedef enum {
+typedef enum
+{
     /** Returned when the Network physical layer is connected */
     NETWORK_PHYSICAL_LAYER_CONNECTED = 6,
     /** Returned when the Network is manually disconnected */
@@ -147,7 +148,8 @@ typedef enum {
     BACK_DATA_MEMERY_ERROR = -51,
 } TCP_Error_t;
 
-typedef enum _TCP_CMD {
+typedef enum _TCP_CMD
+{
     CN00 = 0,   //00 Connection Request
     CN01,       //01 Connection Response
     HC00,       //02 health check request
@@ -181,7 +183,8 @@ typedef enum _TCP_CMD {
  * Defining a type for MQTT Client State
  *
  */
-typedef enum _ClientState {
+typedef enum _ClientState
+{
     CLIENT_STATE_INVALID = 0,
     CLIENT_STATE_INITIALIZED = 1,
     CLIENT_STATE_CONNECTING = 2,
@@ -345,20 +348,23 @@ typedef struct date_time
     int16_t iMsec;
 } DATE_TIME_t;
 
-typedef enum TIME_RECORD_T {
+typedef enum TIME_RECORD_T
+{
     SET_ELAND_SEND_TIME,
     SET_ELAND_RECE_TIME,
     SET_ELSV_SEND_TIME,
     SET_ELSV_RECE_TIME,
 } TIME_RECORD_T_t;
 
-typedef enum TCP_CMD_SEM {
-    TCP_Stop_Sem, //delete tcp thread
+typedef enum TCP_CMD_SEM
+{
+    TCP_Stop_Sem, //stop tcp thread
     TCP_HT00_Sem, //alarm on notice
     TCP_HT01_Sem, //alarm off notice
     TCP_HT02_Sem, //ALARM skip notice
     TCP_HC00_Sem, //helth check
     TCP_FW01_Sem, //OTA start
+    TCP_SD00_Sem, //OTA start
 } _tcp_cmd_sem_t;
 /* Private define ------------------------------------------------------------*/
 #define TELEGRAMHEADER "EL"

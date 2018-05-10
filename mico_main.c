@@ -75,9 +75,9 @@ int application_start(void)
     start_uart_service();
 
     /*start Soft_AP mode*/
-    // Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    //Start_wifi_Station_SoftSP_Thread(Soft_AP);
 
-    /* Wait for wlan connection*/
+    /* Wait for wlan connection */
     app_netclock_log("wait for wifi");
     mico_rtos_get_semaphore(&wifi_netclock, MICO_WAIT_FOREVER);
     SendElandStateQueue(WifyConnected);
