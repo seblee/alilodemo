@@ -332,6 +332,8 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(ipstr);
     addr.sin_port = htons(ELAND_HTTP_PORT_SSL); //HTTP SSL端口 443
+    client_log("host:%s", ipstr);
+    client_log("sin_port:%d", ELAND_HTTP_PORT_SSL);
 
     //设置tcp keep_alive 参数
     ret = user_set_tcp_keepalive(http_fd,
@@ -353,8 +355,8 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     ssl_set_client_cert(certificate, private_key);
     ssl_set_client_version(TLS_V1_2_MODE);
     client_log("start ssl_connect");
-    client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
-    // client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
+    // client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
     client_log("ssl_send request");
     /* Send HTTP Request */
@@ -659,6 +661,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
         err = kGeneralErr;
         goto exit;
     }
+
     http_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = inet_addr(ipstr);
@@ -684,11 +687,11 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     ssl_set_client_cert(certificate, private_key);
     ssl_set_client_version(TLS_V1_2_MODE);
     client_log("start ssl_connect");
-    client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
-    //   client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
+    //  client_ssl = ssl_connect(http_fd, strlen(capem), capem, &ssl_errno);
+    client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
 
-    ssl_set_using_nonblock(client_ssl, 1);
+    // ssl_set_using_nonblock(client_ssl, 1);
 
     client_log("ssl_send request");
     /* Send HTTP Request */

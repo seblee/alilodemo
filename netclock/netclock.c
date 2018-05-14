@@ -536,7 +536,7 @@ exit:
     }
     if (err != kNoErr)
     {
-        Eland_log("<===== device_sync_status error <======");
+        Eland_log("<===== device_sync_status error = %d <======", err);
     }
     else
         SendElandStateQueue(HTTP_Get_HOST_INFO);

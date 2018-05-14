@@ -25,9 +25,9 @@
 
 #define HTTP_YIELD_TMIE (2000) //http超时时间
 
-#define ELAND_HTTP_DOMAIN_NAME ("160.16.237.210") //HTTP服务器地址
-#define ELAND_HTTP_PORT_SSL (443)                 //fog v2 http SSL端口
-#define HTTP_REQ_LOG (0)                          //log 打印信息開關 1:enable 0:disable
+#define ELAND_HTTP_DOMAIN_NAME ("www.linktime-beta.info") //HTTP服务器地址
+#define ELAND_HTTP_PORT_SSL (443)                         //fog v2 http SSL端口
+#define HTTP_REQ_LOG (0)                                  //log 打印信息開關 1:enable 0:disable
 
 #define HTTP_REQUEST_BODY_MAX_LEN (2048)
 #define HTTP_REQUEST_HOST_NAME_MAX_LEN (64)
@@ -42,19 +42,22 @@
 #define HTTP_MAX_RETRY_TIMES (4)          //最大重试次数
 /* Private typedef -----------------------------------------------------------*/
 
-typedef enum {
+typedef enum
+{
     HTTP_POST = 1,
     HTTP_GET = 2,
 } ELAND_HTTP_METHOD;
 
-typedef enum {
+typedef enum
+{
     HTTP_REQUEST_ERROR = 1,    //请求错误
     HTTP_CONNECT_ERROR = 2,    //连接失败
     HTTP_RESPONSE_SUCCESS = 3, //成功
     HTTP_RESPONSE_FAILURE = 4, //失败
 } ELAND_HTTP_RESPONSE_E;
 
-typedef enum {
+typedef enum
+{
     ELAND_REQUEST_NONE,           //eland NONE
     ELAND_COMMUNICATION_INFO_GET, //eland 情報取得
     ELAND_ALARM_GET,              //eland 鬧鐘聲音取得
@@ -83,7 +86,8 @@ typedef struct _http_context_t
     char *content;
     uint64_t content_length;
 } http_context_t;
-typedef enum __SOUND_DOWNLOAD_STATUS {
+typedef enum __SOUND_DOWNLOAD_STATUS
+{
     SOUND_DOWNLOAD_IDLE,
     SOUND_DOWNLOAD_START,
     SOUND_DOWNLOAD_PAUSE,

@@ -159,6 +159,7 @@ static void eland_check_ssid(void)
         }
         context->micoSystemConfig.configured = allConfigured;
         mico_system_context_update(context);
+        mico_rtos_thread_msleep(400);
     }
     else
     {
@@ -168,7 +169,7 @@ static void eland_check_ssid(void)
         //Start_wifi_Station_SoftSP_Thread(Soft_AP);
     }
     app_httpd_log("system restart");
-    mico_rtos_thread_msleep(200);
+
     mico_system_power_perform(context, eState_Software_Reset);
     mico_rtos_thread_sleep(2);
     flagHttpdServerAP = 1;

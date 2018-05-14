@@ -72,10 +72,13 @@ int application_start(void)
     require_noerr(err, exit);
 
     /*start init uart & start service*/
+#ifdef MICO_DISABLE_STDIO
     start_uart_service();
+#endif
 
     /*start Soft_AP mode*/
-    //Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    // Start_wifi_Station_SoftSP_Thread(Soft_AP);
+    // mico_rtos_delete_thread(NULL);
 
     /* Wait for wlan connection */
     app_netclock_log("wait for wifi");
@@ -95,11 +98,8 @@ int application_start(void)
     err = get_eland_mode();
     app_netclock_log("eland_mode:%d", err);
 
-    if (err > ELAND_CLOCK_ALARM)
-    {
-        err = TCP_Service_Start();
-        require_noerr(err, exit);
-    }
+    err = TCP_Service_Start();
+    require_noerr(err, exit);
     err = kNoErr;
 exit:
     if (err != kNoErr)

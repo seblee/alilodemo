@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_TCP_DEBUG
+//#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define eland_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
@@ -466,7 +466,7 @@ OSStatus TCP_Service_Start(void)
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
-                                  0x3000, (mico_thread_arg_t)NULL);
+                                  0x2800, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
     eland_tcp_log("TCP_Service_Start err = %d", err);
@@ -484,8 +484,34 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     mico_rtc_time_t cur_time = {0};
     _tcp_cmd_sem_t tcp_message;
     _ELAND_MODE_t eland_mode;
-
     HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
+
+#ifdef MICO_DISABLE_STDIO
+recheck_mode:
+    eland_mode = get_eland_mode();
+    switch (eland_mode)
+    {
+    case ELAND_MODE_NONE:
+    case ELAND_CLOCK_MON:
+    case ELAND_CLOCK_ALARM:
+        mico_thread_sleep(2);
+        break;
+    case ELAND_NC:
+    case ELAND_NA:
+        goto GET_CONNECT_INFO;
+        break;
+    case ELAND_AP:
+    case ELAND_OTA:
+        mico_rtos_delete_thread(NULL);
+        break;
+    default:
+        break;
+    }
+    err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
+    if ((err == kNoErr) && (tcp_message == TCP_Stop_Sem))
+        mico_rtos_delete_thread(NULL);
+    goto recheck_mode;
+#endif
 GET_CONNECT_INFO:
     /*pop queue*/
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
@@ -617,7 +643,7 @@ little_cycle_loop:
     rc = TCP_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
-        eland_tcp_log("Connection Error rc = %d", rc);
+        // eland_tcp_log("Connection Error rc = %d", rc);
         if (rc == NETWORK_SSL_READ_ERROR)
             goto exit; //reconnect
     }
@@ -684,16 +710,19 @@ pop_queue:
         else
             goto pop_queue;
     }
+#ifdef MICO_DISABLE_STDIO
     eland_mode = get_eland_mode();
     if ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC))
         goto exit;
     else
+#endif
         goto little_cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
 
     SendElandStateQueue(HTTP_Get_HOST_INFO);
+#ifdef MICO_DISABLE_STDIO
     do
     {
         err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
@@ -701,9 +730,10 @@ exit:
             mico_rtos_delete_thread(NULL);
 
         eland_mode = get_eland_mode();
+        eland_tcp_log("offline mode");
         mico_thread_sleep(2);
     } while ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC));
-
+#endif
     goto RECONN;
     if (Eland_Client.clientData.readBuf != NULL)
     {
@@ -1884,4 +1914,8 @@ void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
         }
     }
     // eland_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
+}
+
+void TCP_eland_mode_check_wait(void)
+{
 }

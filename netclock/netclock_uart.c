@@ -36,7 +36,7 @@
 
 #define UART_BUFFER_LENGTH 1024
 #define UART_ONE_PACKAGE_LENGTH 512
-#define STACK_SIZE_UART_RECV_THREAD 0x2000
+#define STACK_SIZE_UART_RECV_THREAD 0x1000
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -852,8 +852,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             set_alarm_state(ALARM_STOP);
         if ((Key_Count_Trg & KEY_Snooze) &&
             (eland_mode != ELAND_CLOCK_MON) &&
-            (eland_mode != ELAND_CLOCK_ALARM)) ////sound oid
-        {
+            (eland_mode != ELAND_CLOCK_ALARM) &&
+            (eland_mode != ELAND_NA))
+        { //sound oid
             if (get_alarm_stream_state() == STREAM_PLAY)
                 set_alarm_stream_state(STREAM_STOP);
             else
@@ -967,6 +968,8 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 set_eland_mode(ELAND_AP);
                 time_delay_counter = 0;
                 eland_push_http_queue(GO_INTO_AP_MODE);
+                if (!get_wifi_status())
+                    Start_wifi_Station_SoftSP_Thread(Soft_AP);
             }
             break;
         case ELAND_NA:

@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ALARM_DEBUG
+#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -742,7 +742,7 @@ static void play_voice(mico_thread_arg_t arg)
     _alarm_stream_t *stream = (_alarm_stream_t *)arg;
     AUDIO_STREAM_PALY_S flash_read_stream;
     mscp_status_t audio_status;
-    OSStatus err = kGeneralErr;
+    OSStatus err = kNoErr;
     mscp_result_t result = MSCP_RST_ERROR;
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
@@ -756,6 +756,9 @@ start_play_voice:
     switch (stream_state)
     {
     case STREAM_STOP:
+        audio_service_get_audio_status(&result, &audio_status);
+        if (audio_status != MSCP_STATUS_IDLE)
+            audio_service_stream_stop(&result, alarm_stream.stream_id);
         goto exit;
         break;
     case STREAM_PLAY:
@@ -791,13 +794,16 @@ start_play_voice:
 falsh_read_start:
     HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
     err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
-    require_noerr_action(err, exit, eland_error(true, EL_FLASH_READ));
+    if (err != kNoErr)
+    {
+        alarm_log("sound_file_read_write error!!!!");
+        require_noerr_action(err, exit, eland_error(true, EL_FLASH_READ));
+    }
     if (data_pos == 0)
     {
         flash_read_stream.total_len = HTTP_W_R_struct.alarm_w_r_queue->total_len;
     }
     flash_read_stream.stream_len = HTTP_W_R_struct.alarm_w_r_queue->len;
-
 audio_transfer:
     if (get_alarm_stream_state() == STREAM_PLAY)
     {
@@ -827,16 +833,14 @@ audio_transfer:
             data_pos = 0;
         alarm_log("state is_SUCCESS !");
     }
+    else
+        alarm_log("player stoped");
+
     goto start_play_voice;
 exit:
     if (err != kNoErr)
         alarm_log("err =%d", err);
-    if (get_alarm_stream_state() == STREAM_STOP)
-    {
-        audio_service_get_audio_status(&result, &audio_status);
-        if (audio_status != MSCP_STATUS_IDLE)
-            audio_service_stream_stop(&result, alarm_stream.stream_id);
-    }
+
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     free(flashdata);
     set_alarm_stream_state(STREAM_IDEL);

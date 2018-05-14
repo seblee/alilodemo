@@ -21,7 +21,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_SOUND_DEBUG
+#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -304,7 +304,7 @@ operation_queue:
             if (download_type != DOWNLOAD_OID)
                 goto operation_queue;
         }
-        // eland_push_http_queue(DOWNLOAD_OID);
+        //   eland_push_http_queue(DOWNLOAD_OID);
         break;
     case DOWNLOAD_OTA:
         eland_ota();
@@ -314,6 +314,7 @@ operation_queue:
         break;
     case GO_INTO_AP_MODE:
         Start_wifi_Station_SoftSP_Thread(Soft_AP);
+        return;
         break;
 
     default:
