@@ -260,7 +260,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     int ssl_errno = 0;
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
-    struct timeval t = {0, HTTP_YIELD_TMIE * 1000};
+    struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
 
     if (http_body)
         http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
@@ -440,6 +440,13 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
                     memcpy(user_http_response->eland_response_body, context.content, context.content_length);
                 }
             }
+            if (httpHeader->statusCode == 204) //正常應答
+            {
+                client_log("data lenth = %ld", (uint32_t)context.content_length);
+                user_http_response->send_status = HTTP_RESPONSE_SUCCESS;
+                user_http_response->status_code = httpHeader->statusCode;
+                user_http_response->eland_response_body = NULL;
+            }
             break;
         }
         case EWOULDBLOCK:
@@ -495,7 +502,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         //Extra data with a content length value
         if (inPos == 0 && context->content == NULL)
         {
-            client_log("This is not a chunked data");
+            client_log("This is not a chunked data,contentLength = %ld", (int32_t)inHeader->contentLength);
             if (strstr(inHeader->buf, "audio/x-mp3"))
                 is_sound_data = true;
             else

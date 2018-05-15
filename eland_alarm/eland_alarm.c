@@ -92,8 +92,7 @@ OSStatus Start_Alarm_service(void)
     err = mico_rtos_init_mutex(&off_history.off_Mutex);
     require_noerr(err, exit);
 
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager",
-                                  Alarm_Manager, 0x800, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager", Alarm_Manager, 0x800, 0);
     require_noerr(err, exit);
 exit:
     return err;
@@ -147,15 +146,21 @@ _alarm_list_state_t get_alarm_state(void)
 void set_alarm_state(_alarm_list_state_t state)
 {
     iso8601_time_t iso8601_time;
+    bool Alarm_refresh_flag = false;
     if (state == ALARM_ING)
     {
         mico_time_get_iso8601_time(&iso8601_time);
         alarm_off_history_record_time(ALARM_ON, &iso8601_time);
     }
+    if ((alarm_list.state.state == ALARM_ING) ||
+        (alarm_list.state.state == ALARM_SNOOZ_STOP) ||
+        (state == ALARM_ING) ||
+        (state == ALARM_SNOOZ_STOP))
+        Alarm_refresh_flag = true;
     mico_rtos_lock_mutex(&alarm_list.state.AlarmStateMutex);
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
-    if ((state == ALARM_ING) || (state == ALARM_SNOOZ_STOP))
+    if (Alarm_refresh_flag)
         eland_push_uart_send_queue(ALARM_SEND_0B);
 }
 static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
@@ -419,7 +424,6 @@ OSStatus weather_sound_scan(void)
         else
             goto exit;
         sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
-        alarm_log("voice_id:%s", nearest->voice_alarm_id);
         scan_count = 0;
     weather_vid:
         err = alarm_sound_download(nearest, sound_type);
@@ -442,7 +446,6 @@ OSStatus weather_sound_scan(void)
         else
             goto exit;
         sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
-        alarm_log("voice_id:%s", nearest->alarm_off_voice_alarm_id);
         scan_count = 0;
     weather_ofid:
         err = alarm_sound_download(nearest, sound_type);
@@ -716,22 +719,20 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
     }
     else //stop
     {
+        alarm_log("player_flash_thread");
         if (get_alarm_stream_state() == STREAM_PLAY)
             set_alarm_stream_state(STREAM_STOP);
-        if (audio_status != MSCP_STATUS_IDLE)
-            audio_service_stream_stop(&result, alarm_stream.stream_id);
         if ((strlen(alarm->alarm_off_voice_alarm_id) > 10) && //alarm off oid
             !voic_stoped)
         {
             voic_stoped = true;
-            init_alarm_stream(alarm, SOUND_FILE_OFID);
             do
             {
-                audio_service_get_audio_status(&result, &audio_status);
                 mico_rtos_thread_msleep(200);
-            } while (audio_status != MSCP_STATUS_IDLE);
+            } while (get_alarm_stream_state() != STREAM_IDEL);
+            init_alarm_stream(alarm, SOUND_FILE_OFID);
             set_alarm_stream_state(STREAM_PLAY);
-            mico_rtos_thread_msleep(200);
+            alarm_log("start play ofid");
             mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }
     }
@@ -796,7 +797,7 @@ falsh_read_start:
     err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
     if (err != kNoErr)
     {
-        alarm_log("sound_file_read_write error!!!!");
+        alarm_log("sound_file_read error!!!!");
         require_noerr_action(err, exit, eland_error(true, EL_FLASH_READ));
     }
     if (data_pos == 0)
@@ -834,16 +835,16 @@ audio_transfer:
         alarm_log("state is_SUCCESS !");
     }
     else
-        alarm_log("player stoped");
+        alarm_log("player stoped %d", get_alarm_stream_state());
 
     goto start_play_voice;
 exit:
     if (err != kNoErr)
         alarm_log("err =%d", err);
 
+    set_alarm_stream_state(STREAM_IDEL);
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     free(flashdata);
-    set_alarm_stream_state(STREAM_IDEL);
     mico_rtos_delete_thread(NULL);
 }
 

@@ -65,7 +65,7 @@ exit:
 OSStatus sound_file_sort(_sound_file_lib_t *sound_list)
 {
     OSStatus err;
-    uint32_t sector_count = 0;
+    uint32_t sector_count = 0, sound_id = 0;
     uint8_t i;
     _sound_file_type_t alarm_file_temp;
     err = mico_rtos_lock_mutex(&eland_sound_mutex);
@@ -112,14 +112,15 @@ exit:
             sound_log("sound:%d,vid :%s", i, (sound_list->lib + i)->alarm_ID);
             break;
         case SOUND_FILE_SID:
-            //    sound_log("sound:%d,sid :%ld", i, *((int32_t *)((sound_list->lib + i)->alarm_ID)));
-            // sound_log("sound:%d,sid :%ld", i, *((int32_t *)((int)(sound_list->lib + i)->alarm_ID)));
+            memcpy(&sound_id, (sound_list->lib + i)->alarm_ID, sizeof(int32_t));
+            sound_log("sound:%d,sid :%ld", i, sound_id);
             break;
         case SOUND_FILE_OFID:
             sound_log("sound:%d,ofid :%s", i, (sound_list->lib + i)->alarm_ID);
             break;
         case SOUND_FILE_DEFAULT:
             sound_log("sound:%d,default:%s", i, (sound_list->lib + i)->alarm_ID);
+            break;
         case SOUND_FILE_WEATHER_0:
         case SOUND_FILE_WEATHER_E:
         case SOUND_FILE_WEATHER_F:
@@ -130,6 +131,8 @@ exit:
             break;
         }
     }
+    sound_log("flash_capacity:%ld", get_flash_capacity());
+
     err = mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
 }
@@ -431,13 +434,12 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
         break;
     case SOUND_FILE_SID:
         memcpy(&sound_id, sound_file->alarm_ID, sizeof(sound_id));
-
         for (i = 0; i < alarm_list->alarm_number; i++)
         {
             if (((alarm_list->alarm_lib + i)->alarm_pattern == 1) &&
                 (sound_id == (alarm_list->alarm_lib + i)->alarm_sound_id))
             {
-                //  sound_log("FILE_SID %ld is usable", *((int32_t *)(sound_file->alarm_ID)));
+                sound_log("FILE_SID %ld is usable", sound_id);
                 return true;
             }
         }

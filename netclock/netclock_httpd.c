@@ -317,7 +317,6 @@ exit:
 static int web_send_Post_setting_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
-    int ret;
     int buf_size = 1024;
     char *buf = NULL;
 
@@ -327,7 +326,7 @@ static int web_send_Post_setting_Request(httpd_request_t *req)
     app_httpd_log("post");
     SendElandStateQueue(ELAPPConnected);
     /* read and parse header */
-    ret = httpd_get_data(req, buf, buf_size);
+     httpd_get_data(req, buf, buf_size);
     if (strncasecmp(HTTP_CONTENT_JSON_STR, req->content_type, strlen(HTTP_CONTENT_JSON_STR)) == 0) //json data
     {
         app_httpd_log("JSON*************");

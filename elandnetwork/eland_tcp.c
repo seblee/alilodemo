@@ -540,11 +540,7 @@ GET_CONNECT_INFO:
         serverPara.DestinationPort = 6380;
     }
     rc = TCP_Client_Init(&Eland_Client, &serverPara);
-    if (TCP_SUCCESS != rc)
-    {
-        eland_tcp_log("Shadow Connection Error");
-        goto exit;
-    }
+    require_string(TCP_SUCCESS == rc, exit, "Shadow Connection Error");
 
 RECONN:
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
@@ -567,54 +563,27 @@ RECONN:
             mico_thread_sleep(3);
         goto RECONN;
     }
-cycle_loop:
 
     eland_tcp_log("TCP_connection_request");
     /**Connection Request**/
     rc = TCP_connection_request(&Eland_Client);
-    if (TCP_SUCCESS != rc)
-    {
-        mico_thread_sleep(1);
-        eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-            goto exit;
-        else if (rc == NETWORK_SSL_NOTHING_TO_READ)
-            goto cycle_loop;
-    }
+    require_string(TCP_SUCCESS == rc, exit, "TCP_connection_request Error");
+
     /**eland info**/
     rc = TCP_update_elandinfo(&Eland_Client);
-    if (TCP_SUCCESS != rc)
-    {
-        mico_thread_sleep(1);
-        eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-            goto exit;
-    }
+    require_string(TCP_SUCCESS == rc, exit, "TCP_update_elandinfo Error");
+
     /**health check**/
     rc = TCP_health_check(&Eland_Client);
-    if (TCP_SUCCESS != rc)
-    {
-        mico_thread_sleep(1);
-        eland_tcp_log("Connection Error rc = %d", rc);
-    }
+    require_string(TCP_SUCCESS == rc, exit, "TCP_health_check Error");
+
     /**holiday data **/
     rc = TCP_update_holiday(&Eland_Client);
-    if (TCP_SUCCESS != rc)
-    {
-        mico_thread_sleep(1);
-        eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-            goto exit;
-    }
+    require_string(TCP_SUCCESS == rc, exit, "TCP_update_holiday Error");
+
     /**alarm info **/
     rc = TCP_update_alarm(&Eland_Client);
-    if (TCP_SUCCESS != rc)
-    {
-        mico_thread_sleep(1);
-        eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
-            goto exit;
-    }
+    require_string(TCP_SUCCESS == rc, exit, "TCP_update_alarm Error");
 
     tcp_HC_flag = true;
 little_cycle_loop:
@@ -628,15 +597,8 @@ little_cycle_loop:
     if (tcp_HC_flag)
     {
         rc = TCP_health_check(&Eland_Client);
-        if (TCP_SUCCESS != rc)
-        {
-            mico_thread_sleep(1);
-            eland_tcp_log("Connection Error rc = %d", rc);
-            if (rc != TCP_SUCCESS)
-                goto exit;
-        }
-        else
-            tcp_HC_flag = false;
+        require_string(TCP_SUCCESS == rc, exit, "TCP_health_check Error");
+        tcp_HC_flag = false;
     }
     timer.tv_sec = 1;
     timer.tv_usec = 0;
@@ -683,23 +645,16 @@ pop_queue:
         else if (tcp_message == TCP_FW01_Sem)
         {
             rc = TCP_upload(&Eland_Client, FW01);
-            if (TCP_SUCCESS == rc)
-            {
-                set_eland_mode(ELAND_OTA);
-                eland_push_http_queue(DOWNLOAD_OTA);
-            }
+            require_string(TCP_SUCCESS == rc, exit, "TCP_upload FW01 Error");
+
+            set_eland_mode(ELAND_OTA);
+            eland_push_http_queue(DOWNLOAD_OTA);
         }
         /**Alarm clock schedule**/
         else if (tcp_message == TCP_SD00_Sem)
         {
             rc = TCP_request_response(&Eland_Client, SD00, SD01);
-            if (TCP_SUCCESS != rc)
-            {
-                mico_thread_sleep(1);
-                eland_tcp_log("Connection Error rc = %d", rc);
-                if (rc == NETWORK_SSL_READ_ERROR)
-                    goto exit;
-            }
+            require_string(TCP_SUCCESS == rc, exit, "TCP_request_response SD00, SD01 Error");
         }
 
         if (TCP_SUCCESS != rc)
@@ -707,16 +662,14 @@ pop_queue:
             mico_thread_sleep(1);
             eland_tcp_log("Connection Error rc = %d", rc);
         }
-        else
-            goto pop_queue;
+        goto pop_queue;
     }
 #ifdef MICO_DISABLE_STDIO
     eland_mode = get_eland_mode();
     if ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC))
         goto exit;
-    else
 #endif
-        goto little_cycle_loop;
+    goto little_cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
