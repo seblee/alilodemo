@@ -334,7 +334,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     addr.sin_port = htons(ELAND_HTTP_PORT_SSL); //HTTP SSL端口 443
     client_log("host:%s", ipstr);
     client_log("sin_port:%d", ELAND_HTTP_PORT_SSL);
-
+    client_log("request_uri:%s", request_uri);
     //设置tcp keep_alive 参数
     ret = user_set_tcp_keepalive(http_fd,
                                  ELAND_HTTP_SEND_TIME_OUT,   //http tcp 發送超時
@@ -535,7 +535,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             HTTP_W_R_struct.alarm_w_r_queue->len = inLen;
             HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
             HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
-            HTTP_W_R_struct.alarm_w_r_queue->is_read = false;
+            HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
             err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
             if (sound_flash_pos == 0)
                 client_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);

@@ -485,6 +485,7 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _tcp_cmd_sem_t tcp_message;
     _ELAND_MODE_t eland_mode;
     HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
+    //  uint8_t flag_temp = 0;
 
 #ifdef MICO_DISABLE_STDIO
 recheck_mode:
@@ -669,6 +670,12 @@ pop_queue:
     if ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC))
         goto exit;
 #endif
+    // if (flag_temp++ > 20)
+    // {
+    //     eland_tcp_log("begin push TCP_HT02_Sem");
+    //     TCP_Push_MSG_queue(TCP_HT02_Sem);
+    //     flag_temp = 0;
+    // }
     goto little_cycle_loop;
 exit:
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);

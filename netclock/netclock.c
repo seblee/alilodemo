@@ -596,7 +596,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     else
         goto exit;
     HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
-    HTTP_W_R_struct.alarm_w_r_queue->is_read = true;
+    HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_READ;
     HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
     HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
     HTTP_W_R_struct.alarm_w_r_queue->len = 8;
@@ -651,6 +651,9 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     }
     else
     {
+        HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_REMOVE;
+        err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+
         eland_error(true, EL_HTTP_OTHER);
         Eland_log("alarm_sound_download error %ld", user_http_res.status_code);
         err = kGeneralErr;

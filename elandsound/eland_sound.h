@@ -51,11 +51,17 @@ typedef struct __SOUND_FILE_LIB_
     uint32_t sector_end;
 } _sound_file_lib_t;
 
+typedef enum _FILE_OPERATION_MODE_
+{
+    FILE_READ,   /**read file**/
+    FILE_WRITE,  /**write file**/
+    FILE_REMOVE, /**remove file**/
+} _file_operation_t;
 typedef struct __SOUND_READ_WRITE_TYPE_
 {
     char alarm_ID[ALARM_ID_LEN + 1];
     uint8_t sound_type;
-    bool is_read;
+    _file_operation_t operation_mode;
     uint32_t total_len;
     uint32_t file_address;
     uint32_t len;
@@ -69,12 +75,14 @@ typedef struct SOUND_OPRATION_STRUCT__
     mico_mutex_t mutex;
 } _http_w_r_struct_t;
 
-typedef enum {
+typedef enum
+{
     ERRNONE,
     FILE_NOT_FIND,
 } SOUND_FILE_ERR_TYPE;
 
-typedef enum {
+typedef enum
+{
     FILE_SCAN_START,     //沒有文件
     FIND_A_FILE,         //有文件
     GET_FILE_SCAN_START, //開始掃描文件起始

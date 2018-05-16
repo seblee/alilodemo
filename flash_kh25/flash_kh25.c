@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_FLASH_DEBUG
+#define CONFIG_FLASH_DEBUG
 #ifdef CONFIG_FLASH_DEBUG
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 #else
@@ -200,7 +200,7 @@ void flash_kh25_sector_erase(uint32_t address)
     flash_kh25_write_disable();
     free(spireadbuffer);
     flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待300ms
-    flash_kh25_log("sector_erase end");
+    flash_kh25_log("sector_erase end address:%ld", address);
 }
 void flash_kh25_block_erase(uint32_t address)
 {
@@ -221,7 +221,7 @@ void flash_kh25_block_erase(uint32_t address)
     flash_kh25_write_disable();
     free(spireadbuffer);
     flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX); //最長等待
-    flash_kh25_log("block_erase end");
+    flash_kh25_log("block_erase end address:%ld", address);
 }
 void flash_kh25_chip_erase(void)
 {
@@ -261,16 +261,22 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
     {
         if (NumOfPage == 0) /* NumByteToWrite < KH25L8006_PAGE_SIZE */
         {
+            if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                flash_kh25_sector_erase(writeaddr);
             flash_kh25_write(scr, writeaddr, NumByteToWrite);
         }
         else
         {
             while (NumOfPage--)
             {
+                if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                    flash_kh25_sector_erase(writeaddr);
                 flash_kh25_write(scr + dataAlreadyWrite, writeaddr, KH25L8006_PAGE_SIZE);
                 writeaddr += KH25L8006_PAGE_SIZE;
                 dataAlreadyWrite += KH25L8006_PAGE_SIZE;
             }
+            if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                flash_kh25_sector_erase(writeaddr);
             flash_kh25_write(scr + dataAlreadyWrite, writeaddr, NumOfSingle);
         }
     }
@@ -284,10 +290,14 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
                 flash_kh25_write(scr + dataAlreadyWrite, writeaddr, count);
                 dataAlreadyWrite += count;
                 writeaddr += count;
+                if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                    flash_kh25_sector_erase(writeaddr);
                 flash_kh25_write(scr + dataAlreadyWrite, writeaddr, temp);
             }
             else
             {
+                if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                    flash_kh25_sector_erase(writeaddr);
                 flash_kh25_write(scr + dataAlreadyWrite, writeaddr, NumOfSingle);
             }
         }
@@ -301,12 +311,16 @@ void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length)
             writeaddr += count;
             while (NumOfPage--)
             {
+                if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                    flash_kh25_sector_erase(writeaddr);
                 flash_kh25_write(scr + dataAlreadyWrite, writeaddr, KH25L8006_PAGE_SIZE);
                 writeaddr += KH25L8006_PAGE_SIZE;
                 dataAlreadyWrite += KH25L8006_PAGE_SIZE;
             }
             if (NumOfSingle != 0)
             {
+                if (writeaddr % KH25L8006_SECTOR_SIZE == 0)
+                    flash_kh25_sector_erase(writeaddr);
                 flash_kh25_write(scr + dataAlreadyWrite, writeaddr, NumOfSingle);
             }
         }

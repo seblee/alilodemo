@@ -344,11 +344,10 @@ OSStatus alarm_sound_scan(void)
 
     for (i = 0; i < alarm_list.alarm_number; i++)
     {
-        alarm_log("alarm:%d", i);
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 1) ||
             ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
         {
-            alarm_log("SID:%ld", (alarm_list.alarm_lib + i)->alarm_sound_id);
+            alarm_log("alarm:%d,SID:%ld", i, (alarm_list.alarm_lib + i)->alarm_sound_id);
             scan_count = 0;
         download_sid:
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
@@ -361,7 +360,7 @@ OSStatus alarm_sound_scan(void)
         if (((alarm_list.alarm_lib + i)->alarm_pattern == 2) ||
             ((alarm_list.alarm_lib + i)->alarm_pattern == 3))
         {
-            alarm_log("VID:%s", (alarm_list.alarm_lib + i)->voice_alarm_id);
+            alarm_log("alarm:%d,VID:%s", i, (alarm_list.alarm_lib + i)->voice_alarm_id);
             if (strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "ffffffff") ||
                 strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "eeeeeeee") ||
                 strstr((alarm_list.alarm_lib + i)->voice_alarm_id, "00000000"))
@@ -379,9 +378,9 @@ OSStatus alarm_sound_scan(void)
                 }
             }
         }
-        if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 10)
+        if (strlen((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id) > 20)
         {
-            alarm_log("OFID:%s", (alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id);
+            alarm_log("alarm:%d,OFID:%s", i, (alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id);
             if (strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "ffffffff") ||
                 strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "eeeeeeee") ||
                 strstr((alarm_list.alarm_lib + i)->alarm_off_voice_alarm_id, "00000000"))
@@ -416,13 +415,13 @@ OSStatus weather_sound_scan(void)
     if ((nearest->alarm_pattern == 2) ||
         (nearest->alarm_pattern == 3))
     {
-        alarm_log("VID:%s", nearest->voice_alarm_id);
         if (strstr(nearest->voice_alarm_id, "ffffffff"))
             sound_type = SOUND_FILE_WEATHER_F;
         else if (strstr(nearest->voice_alarm_id, "00000000"))
             sound_type = SOUND_FILE_WEATHER_0;
         else
-            goto exit;
+            goto checkout_ofid;
+        alarm_log("VID:%s", nearest->voice_alarm_id);
         sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
         scan_count = 0;
     weather_vid:
@@ -433,6 +432,7 @@ OSStatus weather_sound_scan(void)
             goto weather_vid;
         }
     }
+checkout_ofid:
 
     if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
     {
@@ -602,11 +602,10 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     audio_service_volume_up(&result, 1);
                 }
             }
-            if (utc_time > alarm_moment)
+            if (utc_time >= alarm_moment)
             {
                 mico_time_get_iso8601_time(&iso8601_time);
                 alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
-                alarm_log("alarm_time up");
                 set_alarm_state(ALARM_SNOOZ_STOP);
             }
             else
@@ -627,13 +626,14 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             {
                 if (first_to_snooze)
                 {
+                    alarm_log("time up alarm_moment:%ld", alarm_moment);
+                    alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
                     if (alarm->volume_stepup_enabled)
                     {
                         for (i = volume_value; i > 0; i--)
                             audio_service_volume_down(&result, 1);
                         volume_value = 0;
                     }
-                    alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
                     mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)alarm_moment * 1000), &iso8601_time);
                     alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
                     /**add json for tcp**/
@@ -642,12 +642,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     first_to_snooze = false;
                     first_to_alarming = true;
                 }
-                if (utc_time > alarm_moment)
+                if (utc_time >= alarm_moment)
                 {
+                    alarm_moment = utc_time + (uint32_t)alarm->alarm_continue_min * 60;
                     alarm_log("alarm_time on again %d", snooze_count);
                     set_alarm_state(ALARM_ING);
                     snooze_count--;
-                    alarm_moment = utc_time + (uint32_t)alarm->alarm_continue_min * 60;
                 }
             }
             else
@@ -682,12 +682,14 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
                 init_alarm_stream(alarm, SOUND_FILE_SID);
                 set_alarm_stream_state(STREAM_PLAY);
                 mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
+                isVoice = false;
             }
             else if (alarm->alarm_pattern == 2)
             {
                 init_alarm_stream(alarm, SOUND_FILE_VID);
                 set_alarm_stream_state(STREAM_PLAY);
                 mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
+                isVoice = false;
             }
             else if (alarm->alarm_pattern == 3)
             {
@@ -714,11 +716,13 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
                 init_alarm_stream(alarm, SOUND_FILE_DEFAULT);
                 set_alarm_stream_state(STREAM_PLAY);
                 mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
+                isVoice = false;
             }
         }
     }
     else //stop
     {
+        isVoice = false;
         alarm_log("player_flash_thread");
         if (get_alarm_stream_state() == STREAM_PLAY)
             set_alarm_stream_state(STREAM_STOP);
@@ -788,7 +792,7 @@ start_play_voice:
     memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
     memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
     HTTP_W_R_struct.alarm_w_r_queue->sound_type = stream->sound_type;
-    HTTP_W_R_struct.alarm_w_r_queue->is_read = true;
+    HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_READ;
     HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
     HTTP_W_R_struct.alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
     alarm_log("id:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
@@ -819,7 +823,7 @@ audio_transfer:
             if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
             {
                 alarm_log("new slave set pause!!!");
-                mico_rtos_thread_msleep(1000); //time set 1000ms!!!
+                mico_rtos_thread_msleep(200); //time set 1000ms!!!
                 goto audio_transfer;
             }
             else
