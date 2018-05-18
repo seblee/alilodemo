@@ -21,7 +21,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_SOUND_DEBUG
+//#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -323,7 +323,7 @@ operation_queue:
         alarm_sound_oid();
         while (!mico_rtos_is_queue_empty(&http_queue))
         {
-            err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_NO_WAIT);
+            err = mico_rtos_pop_from_queue(&http_queue, &download_type, 0);
             require_noerr(err, exit);
             if (download_type != DOWNLOAD_OID)
             {
