@@ -20,7 +20,8 @@
 /* Private typedef -----------------------------------------------------------*/
 //状态宏定义
 /*Eland 状态*/
-typedef enum {
+typedef enum
+{
     ElandNone = 0,
     ElandBegin,
     APStatusStart,
@@ -39,7 +40,8 @@ typedef enum {
     TCP_HD00,
     TCP_HC00,
 } Eland_Status_type_t;
-typedef enum {
+typedef enum
+{
     KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
     KEY_Reset = (uint16_t)0x0002,     /*!< 軟件復位 */
     KEY_Add = (uint16_t)0x0004,       /*!< 時間＋   */
@@ -51,17 +53,20 @@ typedef enum {
     KEY_Alarm = (uint16_t)0x0100,     /*!< 鬧鐘     */
 } KEY_State_TypeDef;
 
-typedef enum {
+typedef enum
+{
     EL_ERROR_NONE = 0x00, /*error none */
     EL_HTTP_TIMEOUT,      /*http time out*/
     EL_HTTP_204,          /*http 204*/
     EL_HTTP_400,          /*http 400*/
     EL_HTTP_OTHER,        /*http other error*/
     EL_FLASH_READ,        /*flash read error*/
-    EL_AUDIO_PLAY         /*audio play error*/
+    EL_AUDIO_PLAY,        /*audio play error*/
+    EL_MAIN_THREAD,       /*file download  error*/
 } __eland_error_t;
 
-typedef enum {
+typedef enum
+{
     KEY_FUN_NONE = 0x00, /* 空命令*/
     SEND_ELAND_ERR_01,   /* SEND ELAND ERROR CODE*/
     KEY_READ_02,         /* READ MCU KEY STATE*/
@@ -79,14 +84,16 @@ typedef enum {
     ELAND_DELETE_0E,     /* DEVICE DATA DELETE */
 } __msg_function_t;
 
-typedef enum {
+typedef enum
+{
     REFRESH_NONE = 0,
     REFRESH_TIME,
     REFRESH_ALARM,
     REFRESH_ELAND_DATA,
     REFRESH_MAX,
 } MCU_Refresh_type_t;
-typedef enum {
+typedef enum
+{
     LEVEL0 = (uint8_t)0x00,
     LEVEL1 = (uint8_t)0x08,
     LEVEL2 = (uint8_t)0x0C,
@@ -95,7 +102,8 @@ typedef enum {
     LEVELNUM = (uint8_t)0xFF,
 } LCD_Wifi_Rssi_t;
 
-typedef enum _eland_mode {
+typedef enum _eland_mode
+{
     ELAND_MODE_NONE = (uint8_t)0x00,
     ELAND_CLOCK_MON,
     ELAND_CLOCK_ALARM,

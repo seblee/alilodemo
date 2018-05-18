@@ -28,7 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_CLIENT_DEBUG
+//#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
@@ -262,6 +262,8 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     fd_set readfds;
     struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
 
+    err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
+    client_log("lock http_mutex");
     if (http_body)
         http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
     else
@@ -279,8 +281,6 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
         err = kGeneralErr;
         goto exit;
     }
-    client_log("http_send_setting_mutex");
-    err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     /******set request mode******/
     if (method == HTTP_POST)
     {
@@ -482,8 +482,8 @@ exit:
         eland_http_requeset = NULL;
     }
     HTTPHeaderDestory(&httpHeader);
-    mico_thread_msleep(200);
     mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
+    client_log("unlock http_mutex");
     return err;
 }
 
@@ -600,6 +600,8 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     fd_set readfds;
     struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
 
+    err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
+    client_log("lock http_mutex");
     if (http_body)
         http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
     else
@@ -617,8 +619,6 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
         err = kGeneralErr;
         goto exit;
     }
-    client_log("http_send_setting_mutex");
-    err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     /******set request mode******/
     if (method == HTTP_POST)
     {
@@ -799,6 +799,7 @@ exit:
     }
     HTTPHeaderDestory(&httpHeader);
     mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
+    client_log("unlock http_mutex");
     if (err != kNoErr)
         client_log("ERROR:%d", err);
 

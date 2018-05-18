@@ -312,6 +312,7 @@ void file_download(void)
 wait_for_queue:
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
+    mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
 operation_queue:
     switch (download_type)
     {
@@ -319,13 +320,16 @@ operation_queue:
         alarm_sound_scan();
         break;
     case DOWNLOAD_OID:
-        sound_log("DOWNLOAD_OID");
         alarm_sound_oid();
         while (!mico_rtos_is_queue_empty(&http_queue))
         {
-            mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_NO_WAIT);
+            err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_NO_WAIT);
+            require_noerr(err, exit);
             if (download_type != DOWNLOAD_OID)
+            {
+                sound_log("goto operation_queue");
                 goto operation_queue;
+            }
         }
         //   eland_push_http_queue(DOWNLOAD_OID);
         break;
@@ -339,11 +343,11 @@ operation_queue:
         Start_wifi_Station_SoftSP_Thread(Soft_AP);
         return;
         break;
-
     default:
         break;
     }
 exit:
+    mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     goto wait_for_queue;
 }
 

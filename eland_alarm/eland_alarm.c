@@ -167,7 +167,6 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
-    alarm_stream.stream_id = audio_service_system_generate_stream_id();
     alarm_stream.sound_type = sound_type;
 
     if ((alarm->alarm_pattern == 3) ||
@@ -269,7 +268,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     __elsv_alarm_data_t elsv_alarm_data_temp;
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
-    set_alarm_state(ALARM_IDEL);
     alarm_log("alarm_number = %d", list->alarm_number);
     if (list->alarm_number == 0)
     {
@@ -331,6 +329,7 @@ exit:
         near_alarm_data = calloc(sizeof(__elsv_alarm_data_t), sizeof(uint8_t));
         memcpy(near_alarm_data, elsv_alarm_data, sizeof(__elsv_alarm_data_t));
     }
+    set_alarm_state(ALARM_IDEL);
     return near_alarm_data;
 }
 
@@ -730,10 +729,14 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             !voic_stoped)
         {
             voic_stoped = true;
+            alarm_log("wait for sudio stoped");
             do
             {
                 mico_rtos_thread_msleep(200);
-            } while (get_alarm_stream_state() != STREAM_IDEL);
+                audio_service_get_audio_status(&result, &audio_status);
+            } while ((get_alarm_stream_state() != STREAM_IDEL) &&
+                     (audio_status != MSCP_STATUS_IDLE));
+            alarm_log("*****sudio stoped");
             init_alarm_stream(alarm, SOUND_FILE_OFID);
             set_alarm_stream_state(STREAM_PLAY);
             alarm_log("start play ofid");
@@ -1385,18 +1388,21 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
 
 OSStatus alarm_sound_oid(void)
 {
-    OSStatus err;
+    OSStatus err = kNoErr;
     uint8_t i;
     char uri_str[100] = {0};
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
     uint8_t oid_volume = 0;
-
+    /******other mode exit********/
+#ifdef MICO_DISABLE_STDIO
+    require_string(get_eland_mode() == ELAND_NC, exit, "mode err");
+#endif
     set_alarm_stream_state(STREAM_PLAY);
     for (i = 0; i < 33; i++)
         audio_service_volume_down(&result, 1);
     oid_volume = get_notification_volume();
-    //for (i = 0; i < 33 /* (oid_volume * 32 / 100 + 1)*/; i++)
+    alarm_log("oid_volume:%d", oid_volume);
     for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
     {
         audio_service_volume_up(&result, 1);
@@ -1418,13 +1424,14 @@ check_audio:
         goto check_audio;
     }
 exit:
+    audio_service_get_audio_status(&result, &audio_status);
     if (audio_status != MSCP_STATUS_IDLE)
     {
         alarm_log("stop playing");
         audio_service_stream_stop(&result, alarm_stream.stream_id);
     }
     set_alarm_stream_state(STREAM_IDEL);
-    alarm_log("play stopped");
+    alarm_log("play stopped err:%d", err);
 
     return err;
 }

@@ -483,7 +483,9 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _time_t timer;
     mico_rtc_time_t cur_time = {0};
     _tcp_cmd_sem_t tcp_message;
+#ifdef MICO_DISABLE_STDIO
     _ELAND_MODE_t eland_mode;
+#endif
     HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
     //  uint8_t flag_temp = 0;
 
@@ -526,7 +528,12 @@ GET_CONNECT_INFO:
         goto GET_CONNECT_INFO;
     }
     err = eland_communication_info_get();
-    require_noerr(err, GET_CONNECT_INFO);
+    if (err != kNoErr)
+    {
+        eland_tcp_log("eland_communication err:%d", err);
+        mico_thread_sleep(3);
+        goto RECONN;
+    }
 
     if ((netclock_des_g != NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
     {
@@ -931,6 +938,12 @@ static TCP_Error_t TCP_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _tim
 {
     size_t wrtied_len = 0;
     TCP_Error_t rc = TCP_SUCCESS;
+#ifdef MICO_DISABLE_STDIO
+    _ELAND_MODE_t eland_mode;
+    eland_mode = get_eland_mode();
+    if ((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA))
+        goto exit;
+#endif
     if (NULL == pClient)
     {
         return NULL_VALUE_ERROR;
@@ -941,6 +954,7 @@ static TCP_Error_t TCP_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _tim
                                      pClient->clientData.writeBuf,
                                      timer,
                                      &wrtied_len);
+exit:
     return rc;
 }
 
@@ -999,6 +1013,12 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer)
 {
     TCP_Error_t rc = TCP_SUCCESS;
     size_t readed_len = 0;
+#ifdef MICO_DISABLE_STDIO
+    _ELAND_MODE_t eland_mode;
+    eland_mode = get_eland_mode();
+    if ((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA))
+        goto exit;
+#endif
     if (NULL == pClient)
     {
         return NULL_VALUE_ERROR;
@@ -1013,9 +1033,13 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer)
                                     (uint8_t **)(&(pClient->clientData.readBuf)),
                                     timer,
                                     &readed_len);
+#ifdef MICO_DISABLE_STDIO
+    if ((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA))
+        goto exit;
+#endif
     if (rc == TCP_SUCCESS)
         TCP_Operate((const char *)pClient->clientData.readBuf);
-
+exit:
     return rc;
 }
 

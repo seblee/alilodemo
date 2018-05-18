@@ -117,7 +117,7 @@ static void _recordKeyAction_cb(ROBOT_USER_EVENT event, void *data)
     }
 }
 
-  OSStatus user_key_init(void)
+OSStatus user_key_init(void)
 {
     return robot_event_service_start(_recordKeyAction_cb);
 }

@@ -12,6 +12,7 @@
         "robot_event.h": "c",
         "eland_http_client.h": "c",
         "netclockconfig.h": "c",
-        "xstddef": "c"
+        "xstddef": "c",
+        "audio_service.h": "c"
     }
 }

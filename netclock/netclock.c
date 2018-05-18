@@ -555,7 +555,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
     /******check sound*************/
     flashdata = malloc(10);
-    mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
+
     memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
     if (sound_type == SOUND_FILE_SID)
         memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
@@ -661,7 +661,6 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 exit:
 
     /**************/
-    mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     //释放资源
     free(flashdata);
 
@@ -796,13 +795,17 @@ int8_t get_notification_volume(void)
 {
     int ho, mi, se;
     uint32_t begin_second, end_second, now_second;
-    mico_utc_time_t utc_time;
+    iso8601_time_t iso8601_time;
+    mico_utc_time_t utc_time = 0;
 
     sscanf((const char *)(&(netclock_des_g->night_mode_begin_time)), "%02d:%02d:%02d", &ho, &mi, &se);
     begin_second = (uint32_t)ho * SECOND_ONE_HOUR + (uint32_t)mi * SECOND_ONE_MINUTE + (uint32_t)se;
     sscanf((const char *)(&(netclock_des_g->night_mode_end_time)), "%02d:%02d:%02d", &ho, &mi, &se);
     end_second = (uint32_t)ho * SECOND_ONE_HOUR + (uint32_t)mi * SECOND_ONE_MINUTE + (uint32_t)se;
-
+    mico_time_get_iso8601_time(&iso8601_time);
+    Eland_log("night_mode_begin_time:%s", netclock_des_g->night_mode_begin_time);
+    Eland_log("night_mode_end_time:%s", netclock_des_g->night_mode_end_time);
+    Eland_log("iso8601_time:%26s", (char *)&iso8601_time);
     mico_time_get_utc_time(&utc_time);
     now_second = utc_time % SECOND_ONE_DAY;
     if (netclock_des_g->night_mode_enabled)
