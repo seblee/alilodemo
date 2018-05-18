@@ -1,5 +1,38 @@
 # Netclock
 
+# v01.16
+2018年5月18日16:14:14
+##  5V LCD
+
+##
+    set v01.16
+    issue alarm stop double times then do not play ofid 
+    change HTTP_W_R_struct.mutex place,make sure ,alarm and file download only one display
+    eland_communication_info_get err wait 3s before again
+    TCP_send receive goto exit when != eland_NC eland_NA
+    issue two https request mutex not useful err
+    change stream_id to only one
+    oid do net play in other mode but nc
+    issue weather scan when ppattern ==2 ==3 do not download ofid
+    issue alarm play 61 seconde; add sound file remove operation
+    issue sound file arrange delete other file
+    change flash erase when writing
+    issue is_sound_file_usable pattern ==3 sid return false bug
+    add file download err remove file
+    add oid eeeeee 204 error bug
+    change alarm ofid play bug
+    change domain name
+    issue week alarm bug
+    issue next alarm not display befor one day more; add Alarm clock schedule get when alarm refreshed
+    issue odi just weather bug
+    change AP mode function to function file_download
+    issue des_recovery IsAlreadySet set 0 bug
+    issue simple clock mode oid bug
+    AP mode change to simple clock mode reboot mcu
+    online offline mode do not restart system
+    send eland mode to mcu when set_eland_mode    
+
+
 # v01.15
 2018年4月28日14:56:18
 ##  3.3V LCD 
