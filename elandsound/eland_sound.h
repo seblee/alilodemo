@@ -21,8 +21,9 @@
 /* Private define ------------------------------------------------------------*/
 #define ALARM_ID_LEN 36
 #define ALARM_SIZE_LEN 4
-#define ALARM_FILE_FLAG_LEN 9
-#define ALARM_FILE_FLAG_STRING "ALARMFILE"
+#define ALARM_FILE_HEADER_LEN 9
+#define ALARM_FILE_HEADER_STRING "ALARMFILE"
+#define ALARM_FILE_END_STRING "ALARMFILEEND"
 #define SOUND_STREAM_DEFAULT_LENGTH 2000
 
 #define SOUND_FILE_VID (uint8_t)0X01
@@ -36,7 +37,7 @@
 
 typedef struct __SOUND_FILE_TYPE_
 {
-    char flag[ALARM_FILE_FLAG_LEN + 1];
+    char flag[ALARM_FILE_HEADER_LEN + 1];
     char alarm_ID[ALARM_ID_LEN + 1];
     uint8_t sound_type;
     uint32_t file_len;

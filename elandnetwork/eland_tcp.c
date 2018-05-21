@@ -954,7 +954,9 @@ static TCP_Error_t TCP_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _tim
                                      pClient->clientData.writeBuf,
                                      timer,
                                      &wrtied_len);
+#ifdef MICO_DISABLE_STDIO
 exit:
+#endif
     return rc;
 }
 
@@ -1039,7 +1041,9 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer)
 #endif
     if (rc == TCP_SUCCESS)
         TCP_Operate((const char *)pClient->clientData.readBuf);
-exit:
+#ifdef MICO_DISABLE_STDIO
+    exit:
+#endif
     return rc;
 }
 

@@ -114,7 +114,11 @@ void Alarm_Manager(uint32_t arg)
     {
         combing_alarm(&alarm_list, &(alarm_list.alarm_nearest));
         alarm_state = get_alarm_state();
-        if ((alarm_state == ALARM_IDEL) || (alarm_state == ALARM_SKIP))
+        if ((alarm_state == ALARM_IDEL) ||
+            (alarm_state == ALARM_SKIP) /* ||
+            (alarm_state == ALARM_ING) ||
+            (alarm_state == ALARM_SNOOZ_STOP)*/
+        )
         {
             if (alarm_list.alarm_nearest)
             {
@@ -156,7 +160,10 @@ void set_alarm_state(_alarm_list_state_t state)
         (alarm_list.state.state == ALARM_SNOOZ_STOP) ||
         (state == ALARM_ING) ||
         (state == ALARM_SNOOZ_STOP))
+    {
+        alarm_log("##### alarm refreshed ######");
         Alarm_refresh_flag = true;
+    }
     mico_rtos_lock_mutex(&alarm_list.state.AlarmStateMutex);
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
@@ -921,7 +928,8 @@ void set_display_na_serial(uint8_t serial)
     alarm_list.na_display_serial = serial;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
-    eland_push_uart_send_queue(ALARM_SEND_0B);
+    if (get_eland_mode() == ELAND_NA)
+        eland_push_uart_send_queue(ALARM_SEND_0B);
 }
 _alarm_mcu_data_t *get_alarm_mcu_data(void)
 {
@@ -1346,11 +1354,18 @@ void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time)
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest)
 {
     OSStatus err = kGeneralErr;
-
+    _alarm_list_state_t alarm_state;
     err = mico_rtos_get_semaphore(&alarm_update, 500);
+    alarm_state = get_alarm_state();
     if (list->list_refreshed ||
         list->state.alarm_stoped ||
-        (err == kNoErr))
+        (err == kNoErr) ||
+        (alarm_state == ALARM_ADD) ||
+        (alarm_state == ALARM_MINUS) ||
+        (alarm_state == ALARM_SORT) ||
+        (alarm_state == ALARM_STOP) ||
+        (alarm_state == ALARM_ING) ||
+        (alarm_state == ALARM_SNOOZ_STOP))
     {
         /**refresh point**/
         alarm_log("list_refreshed");
@@ -1371,6 +1386,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         }
         else
             alarm_log("NO alarm_nearest ");
+        eland_push_uart_send_queue(ALARM_SEND_0B);
         set_display_na_serial(SCHEDULE_MAX);
     }
 }

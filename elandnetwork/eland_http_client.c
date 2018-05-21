@@ -541,6 +541,19 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
                 client_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
             require_noerr(err, exit);
             sound_flash_pos += inLen;
+            if (sound_flash_pos == inHeader->contentLength) //写入文件尾标志
+            {
+                HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
+                memcpy(context->content, inData, inLen);
+                HTTP_W_R_struct.alarm_w_r_queue->len = strlen(ALARM_FILE_END_STRING);
+                HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
+                memset(context->content, 0, 1501);
+                strncpy(context->content, ALARM_FILE_END_STRING, strlen(ALARM_FILE_END_STRING));
+                HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
+                HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
+                err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+                require_noerr(err, exit);
+            }
         }
         else
             memcpy(context->content + inPos, inData, inLen);
