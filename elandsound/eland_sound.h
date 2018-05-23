@@ -109,6 +109,7 @@ OSStatus SOUND_FILE_CLEAR(void);
 void file_download(void);
 int32_t get_flash_capacity(void);
 OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list);
+OSStatus eland_play_oid_error_sound(void);
 /*************************/
 
 #endif

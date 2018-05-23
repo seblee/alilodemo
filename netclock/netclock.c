@@ -29,7 +29,7 @@
 #include "eland_tcp.h"
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ELAND_DEBUG
+//#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else

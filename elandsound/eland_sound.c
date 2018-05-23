@@ -18,10 +18,12 @@
 #include "netclock_ota.h"
 #include "eland_alarm.h"
 #include "netclock_wifi.h"
+#include "audio_service.h"
+#include "error_bin.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_SOUND_DEBUG
+//#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -338,7 +340,7 @@ void file_download(void)
 {
     OSStatus err;
     _download_type_t download_type;
-    //  eland_push_http_queue(DOWNLOAD_OID);
+    // eland_push_http_queue(DOWNLOAD_OID);
 wait_for_queue:
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
@@ -361,7 +363,7 @@ operation_queue:
                 goto operation_queue;
             }
         }
-        //   eland_push_http_queue(DOWNLOAD_OID);
+        // eland_push_http_queue(DOWNLOAD_OID);
         break;
     case DOWNLOAD_OTA:
         eland_ota();
@@ -578,5 +580,76 @@ OSStatus alarm_sound_file_check(char *alarm_id)
     sound_log("Do not find file");
 exit:
     mico_rtos_unlock_mutex(&eland_sound_mutex);
+    return err;
+}
+
+OSStatus eland_play_oid_error_sound(void)
+{
+    OSStatus err = kNoErr;
+    uint8_t fm_test_cnt = 0;
+    AUDIO_STREAM_PALY_S fm_stream;
+    mscp_result_t result = MSCP_RST_ERROR;
+    mscp_status_t audio_status;
+    uint32_t inPos = 0;
+    sound_log("error sound");
+
+    fm_stream.type = AUDIO_STREAM_TYPE_MP3;
+    fm_stream.stream_id = audio_service_system_generate_stream_id();
+    fm_stream.total_len = sizeof(error_sound);
+start_start:
+    fm_stream.pdata = (const uint8_t *)error_sound + inPos;
+    if ((fm_stream.total_len - inPos) > 4000) //len
+        fm_stream.stream_len = 4000;
+    else
+        fm_stream.stream_len = fm_stream.total_len - inPos;
+    if ((++fm_test_cnt) >= 10)
+    {
+        fm_test_cnt = 0;
+        sound_log("fm_stream.type[%d],fm_stream.stream_id[%d],fm_stream.total_len[%d],fm_stream.stream_len[%d]",
+                  (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
+    }
+audio_transfer:
+    require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
+    err = audio_service_stream_play(&result, &fm_stream);
+    if (err != kNoErr)
+    {
+        sound_log("audio_stream_play() error!!!!");
+        return false;
+    }
+    else
+    {
+        if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
+        {
+            sound_log("new slave set pause!!!");
+            mico_rtos_thread_msleep(500); //time set 1000ms!!!
+            goto audio_transfer;
+        }
+        else
+        {
+            err = kNoErr;
+        }
+    }
+    inPos += fm_stream.stream_len;
+    if (inPos < fm_stream.total_len)
+        goto start_start;
+
+check_audio:
+    require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
+    audio_service_get_audio_status(&result, &audio_status);
+    if (audio_status == MSCP_STATUS_STREAM_PLAYING)
+    {
+        mico_rtos_thread_msleep(500);
+        sound_log("oid playing");
+        goto check_audio;
+    }
+exit:
+    audio_service_get_audio_status(&result, &audio_status);
+    if (audio_status != MSCP_STATUS_IDLE)
+    {
+        sound_log("stop playing");
+        audio_service_stream_stop(&result, fm_stream.stream_id);
+    }
+
+    sound_log("play stopped err:%d", err);
     return err;
 }

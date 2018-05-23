@@ -162,7 +162,7 @@ void set_alarm_state(_alarm_list_state_t state)
         (state == ALARM_ING) ||
         (state == ALARM_SNOOZ_STOP))
     {
-        alarm_log("##### alarm refreshed ######");
+        alarm_log("##%d# alarm state refreshed #%d##", alarm_list.state.state, state);
         Alarm_refresh_flag = true;
     }
     mico_rtos_lock_mutex(&alarm_list.state.AlarmStateMutex);
@@ -271,6 +271,8 @@ OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
     err = alarm_list_clear(&alarm_list);
     require_noerr(err, exit);
     alarm_list_add(&alarm_list, &alarm_data_cache);
+    alarm_list.list_refreshed = true;
+    set_alarm_state(ALARM_ADD);
 exit:
     return err;
 }
@@ -424,7 +426,7 @@ OSStatus weather_sound_scan(void)
     nearest = get_nearest_alarm();
     require_quiet(nearest, exit);
 
-    alarm_log("nearest_id:%s", nearest->alarm_id);
+    //   alarm_log("nearest_id:%s", nearest->alarm_id);
 
     if ((nearest->alarm_pattern == 2) ||
         (nearest->alarm_pattern == 3))
@@ -492,6 +494,7 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
                 if (eland_alarm_is_same(AlarmList->alarm_lib + i, inData))
                 {
                     alarm_log("duplicate data");
+                    err = kGeneralErr;
                     goto exit_nothing_done;
                 }
                 alarm_log("alarm change");
@@ -508,8 +511,7 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
     }
 exit:
     alarm_log("alarm_add success!");
-    AlarmList->list_refreshed = true;
-    set_alarm_state(ALARM_ADD);
+
 exit_nothing_done:
     return err;
 }
@@ -1094,13 +1096,13 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
     alarm->alarm_data_for_mcu.next_alarm = 1;
     // else
     //     alarm->alarm_data_for_mcu.next_alarm = 0;
-    alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
-              alarm->alarm_data_for_mcu.moment_time.year + 2000,
-              alarm->alarm_data_for_mcu.moment_time.month,
-              alarm->alarm_data_for_mcu.moment_time.date,
-              alarm->alarm_data_for_mcu.moment_time.hr,
-              alarm->alarm_data_for_mcu.moment_time.min,
-              alarm->alarm_data_for_mcu.moment_time.sec);
+    // alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
+    //           alarm->alarm_data_for_mcu.moment_time.year + 2000,
+    //           alarm->alarm_data_for_mcu.moment_time.month,
+    //           alarm->alarm_data_for_mcu.moment_time.date,
+    //           alarm->alarm_data_for_mcu.moment_time.hr,
+    //           alarm->alarm_data_for_mcu.moment_time.min,
+    //           alarm->alarm_data_for_mcu.moment_time.sec);
     // alarm_log("alarm_id:%s", alarm->alarm_id);
 }
 
@@ -1397,7 +1399,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
             list->weather_need_refreshed = true;
             eland_push_http_queue(DOWNLOAD_SCAN);
             TCP_Push_MSG_queue(TCP_SD00_Sem);
-            alarm_log("get alarm_nearest alarm_id:%s", (*alarm_nearest)->alarm_id);
+            alarm_log("alarm_nearest time:%s,second:%ld,alarm_id:%s", (*alarm_nearest)->alarm_time, (*alarm_nearest)->alarm_data_for_eland.moment_second, (*alarm_nearest)->alarm_id);
         }
         else
             alarm_log("NO alarm_nearest ");
@@ -1443,12 +1445,16 @@ check_audio:
         goto check_audio;
     }
 exit:
+
     audio_service_get_audio_status(&result, &audio_status);
     if (audio_status != MSCP_STATUS_IDLE)
     {
         alarm_log("stop playing");
         audio_service_stream_stop(&result, alarm_stream.stream_id);
     }
+    if ((get_alarm_stream_state() != STREAM_STOP) && (err != kNoErr))
+        err = eland_play_oid_error_sound();
+
     set_alarm_stream_state(STREAM_IDEL);
     alarm_log("play stopped err:%d", err);
 
@@ -1508,6 +1514,12 @@ static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t
         alarm_log("alarm_color:%d", alarm2->alarm_color);
         return false;
     }
+    if (strncmp(alarm1->alarm_time, alarm2->alarm_time, ALARM_TIME_LEN))
+    {
+        alarm_log("alarm_time:%s", alarm1->alarm_time);
+        alarm_log("alarm_time:%s", alarm2->alarm_time);
+        return false;
+    }
     if (memcmp(alarm1->alarm_off_dates, alarm2->alarm_off_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint8_t)))
     {
         alarm_log("alarm_off_dates ");
@@ -1564,8 +1576,8 @@ static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t
     }
     if (alarm1->volume_stepup_enabled != alarm2->volume_stepup_enabled)
     {
-        alarm_log("alarm_volume:%d", alarm1->alarm_volume);
-        alarm_log("alarm_volume:%d", alarm2->alarm_volume);
+        alarm_log("volume_stepup_enabled:%d", alarm1->volume_stepup_enabled);
+        alarm_log("volume_stepup_enabled:%d", alarm2->volume_stepup_enabled);
         return false;
     }
     if (alarm1->alarm_continue_min != alarm2->alarm_continue_min)

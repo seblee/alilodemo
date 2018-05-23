@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_TCP_DEBUG
+//#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define eland_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
@@ -564,10 +564,7 @@ RECONN:
     if (TCP_SUCCESS != rc)
     {
         eland_tcp_log("Server Connection Error,rc = %d", rc);
-        if (rc == NETWORK_MANUALLY_DISCONNECTED)
-            mico_thread_sleep(5);
-        else
-            mico_thread_sleep(3);
+        mico_thread_sleep(5);
         goto RECONN;
     }
 
@@ -1346,6 +1343,8 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
     TCP_Error_t rc = TCP_SUCCESS;
     uint8_t list_len = 0, i;
     __elsv_alarm_data_t alarm_data_cache;
+    OSStatus err;
+    bool alarm_add_flag = false;
     if (*buf != '{')
     {
         eland_tcp_log("error:received err json format data");
@@ -1378,7 +1377,14 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
             eland_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
             elsv_alarm_data_sort_out(&alarm_data_cache);
-            alarm_list_add(&alarm_list, &alarm_data_cache);
+            err = alarm_list_add(&alarm_list, &alarm_data_cache);
+            if (err == kNoErr)
+                alarm_add_flag = true;
+        }
+        if (alarm_add_flag)
+        {
+            alarm_list.list_refreshed = true;
+            set_alarm_state(ALARM_ADD);
         }
     }
     else if ((telegram_cmd == AL02) ||
@@ -1397,7 +1403,14 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         if (telegram_cmd == AL04)
             alarm_list_minus(&alarm_list, &alarm_data_cache);
         else
-            alarm_list_add(&alarm_list, &alarm_data_cache);
+        {
+            err = alarm_list_add(&alarm_list, &alarm_data_cache);
+            if (err == kNoErr)
+            {
+                alarm_list.list_refreshed = true;
+                set_alarm_state(ALARM_ADD);
+            }
+        }
         eland_tcp_log("alarm_number:%d", alarm_list.alarm_number);
     }
 exit:
