@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_TCP_DEBUG
+#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define eland_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
@@ -487,7 +487,6 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     _ELAND_MODE_t eland_mode;
 #endif
     HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
-    //  uint8_t flag_temp = 0;
 
 #ifdef MICO_DISABLE_STDIO
 recheck_mode:
@@ -532,7 +531,7 @@ GET_CONNECT_INFO:
     {
         eland_tcp_log("eland_communication err:%d", err);
         mico_thread_sleep(3);
-        goto RECONN;
+        goto GET_CONNECT_INFO;
     }
 
     if ((netclock_des_g != NULL) && (strlen(netclock_des_g->tcpIP_host) != 0))
@@ -593,10 +592,9 @@ RECONN:
     rc = TCP_update_alarm(&Eland_Client);
     require_string(TCP_SUCCESS == rc, exit, "TCP_update_alarm Error");
 
-    tcp_HC_flag = true;
 little_cycle_loop:
     MicoRtcGetTime(&cur_time);
-    eland_tcp_log("cur_time.sec:%d", cur_time.sec);
+    eland_tcp_log("cur_time.sec:%d,CHUNKS:%d,memory:%d", cur_time.sec, MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     if ((cur_time.sec == HC00_moment_sec) && (cur_time.min != HC00_moment_min))
     {
         tcp_HC_flag = true;
@@ -677,14 +675,10 @@ pop_queue:
     if ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC))
         goto exit;
 #endif
-    // if (flag_temp++ > 20)
-    // {
-    //     eland_tcp_log("begin push TCP_HT02_Sem");
-    //     TCP_Push_MSG_queue(TCP_HT02_Sem);
-    //     flag_temp = 0;
-    // }
+
     goto little_cycle_loop;
 exit:
+    eland_tcp_log("Error rc = %d", rc);
     Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
     Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
 
@@ -701,12 +695,12 @@ exit:
         mico_thread_sleep(2);
     } while ((eland_mode != ELAND_NA) && (eland_mode != ELAND_NC));
 #endif
-    goto RECONN;
     if (Eland_Client.clientData.readBuf != NULL)
     {
         free(Eland_Client.clientData.readBuf);
         Eland_Client.clientData.readBuf = NULL;
     }
+    goto RECONN;
     mico_rtos_delete_thread(NULL);
 }
 static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerParams)
@@ -760,6 +754,7 @@ static TCP_Error_t TCP_connection_request(_Client_t *pClient)
         return rc;
     eland_tcp_log("connection_request:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
@@ -874,7 +869,10 @@ static TCP_Error_t TCP_health_check(_Client_t *pClient)
     rc = TCP_receive_packet(pClient, &timer);
 
     if (rc != TCP_SUCCESS)
+    {
+        eland_tcp_log("health_check err rc = %d", rc);
         return rc;
+    }
     eland_set_time();
     eland_tcp_log("health_check:OK");
     // eland_tcp_log("health_check:OK json:%s", pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
@@ -1042,7 +1040,7 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer)
     if (rc == TCP_SUCCESS)
         TCP_Operate((const char *)pClient->clientData.readBuf);
 #ifdef MICO_DISABLE_STDIO
-    exit:
+exit:
 #endif
     return rc;
 }

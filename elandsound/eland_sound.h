@@ -102,6 +102,7 @@ extern _sound_file_lib_t sound_file_list;
 /* Private functions ---------------------------------------------------------*/
 OSStatus start_eland_flash_service(void);
 OSStatus sound_file_sort(_sound_file_lib_t *sound_list);
+OSStatus alarm_sound_file_check(char *alarm_id);
 OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_type_t *alarm_w_r_temp);
 OSStatus SOUND_CHECK_DEFAULT_FILE(void);
 OSStatus SOUND_FILE_CLEAR(void);

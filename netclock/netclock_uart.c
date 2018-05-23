@@ -426,12 +426,6 @@ static void Eland_H02_Send(uint8_t *Cache)
         *(Cache + 4) = Uart_Packet_Trail;
         len = 4 + 1;
     }
-    // *Cache = Uart_Packet_Header;
-    // *(Cache + 1) = KEY_READ_02;
-    // *(Cache + 2) = 1;
-    // *(Cache + 3) = timesend02++;
-    // *(Cache + 4) = Uart_Packet_Trail;
-    // len = 4 + 1;
 
     sended_times--;
     err = elandUsartSendData(Cache, len);

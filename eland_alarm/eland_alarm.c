@@ -56,6 +56,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
 static bool today_is_holiday(DATE_TIME_t *date, uint8_t offset);
 static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_alarm_data_t *alarm);
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest);
+static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2);
 static OSStatus set_alarm_history_send_sem(void);
 /* Private functions ---------------------------------------------------------*/
 OSStatus Start_Alarm_service(void)
@@ -172,6 +173,7 @@ void set_alarm_state(_alarm_list_state_t state)
 }
 static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
+    OSStatus err = kGeneralErr;
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
     alarm_stream.sound_type = sound_type;
@@ -194,10 +196,16 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         memcpy(alarm_stream.alarm_id, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
         break;
     case SOUND_FILE_DEFAULT:
-        memcpy(alarm_stream.alarm_id, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK));
+        memcpy(alarm_stream.alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
         break;
     default:
         break;
+    }
+    err = alarm_sound_file_check(alarm_stream.alarm_id);
+    if (err != kNoErr)
+    {
+        memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
+        strncpy(alarm_stream.alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
     }
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
@@ -224,7 +232,7 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
 {
     _alarm_mcu_data_t *alarm_mcu_data = NULL;
     int ho, mi, se;
-    set_alarm_state(ALARM_SORT);
+    //  set_alarm_state(ALARM_SORT);
     if (elsv_alarm_data == NULL)
         return;
     alarm_mcu_data = &(elsv_alarm_data->alarm_data_for_mcu);
@@ -248,7 +256,7 @@ OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
         goto exit;
     memset(&alarm_data_cache, 0, sizeof(__elsv_alarm_data_t));
     memcpy(&alarm_data_cache.alarm_data_for_mcu, alarm_mcu_data, sizeof(_alarm_mcu_data_t));
-    strcpy(alarm_data_cache.alarm_id, ALARM_ID_OF_SIMPLE_CLOCK);
+    strcpy(alarm_data_cache.alarm_id, ALARM_ID_OF_DEFAULT_CLOCK);
     alarm_data_cache.alarm_color = 0;
     sprintf(alarm_data_cache.alarm_time, "%02d:%02d:%02d", alarm_mcu_data->moment_time.hr, alarm_mcu_data->moment_time.min, alarm_mcu_data->moment_time.sec);
     alarm_data_cache.snooze_enabled = 1;
@@ -357,7 +365,7 @@ OSStatus alarm_sound_scan(void)
             scan_count = 0;
         download_sid:
             err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_SID);
-            if ((err != kNoErr) && (scan_count++ < 5))
+            if ((err != kNoErr) && (scan_count++ < 3))
             {
                 mico_rtos_thread_msleep(500);
                 goto download_sid;
@@ -377,7 +385,7 @@ OSStatus alarm_sound_scan(void)
                 scan_count = 0;
             download_vid:
                 err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_VID);
-                if ((err != kNoErr) && (scan_count++ < 5))
+                if ((err != kNoErr) && (scan_count++ < 3))
                 {
                     mico_rtos_thread_msleep(500);
                     goto download_vid;
@@ -397,7 +405,7 @@ OSStatus alarm_sound_scan(void)
                 scan_count = 0;
             download_ofid:
                 err = alarm_sound_download(alarm_list.alarm_lib + i, SOUND_FILE_OFID);
-                if ((err != kNoErr) && (scan_count++ < 5))
+                if ((err != kNoErr) && (scan_count++ < 3))
                 {
                     mico_rtos_thread_msleep(500);
                     goto download_ofid;
@@ -432,7 +440,7 @@ OSStatus weather_sound_scan(void)
         scan_count = 0;
     weather_vid:
         err = alarm_sound_download(nearest, sound_type);
-        if ((err != kNoErr) && (scan_count++ < 5))
+        if ((err != kNoErr) && (scan_count++ < 3))
         {
             mico_rtos_thread_msleep(500);
             goto weather_vid;
@@ -455,7 +463,7 @@ checkout_ofid:
         scan_count = 0;
     weather_ofid:
         err = alarm_sound_download(nearest, sound_type);
-        if ((err != kNoErr) && (scan_count++ < 5))
+        if ((err != kNoErr) && (scan_count++ < 3))
         {
             mico_rtos_thread_msleep(500);
             goto weather_ofid;
@@ -481,13 +489,19 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
         {
             if (strcmp((AlarmList->alarm_lib + i)->alarm_id, inData->alarm_id) == 0)
             {
+                if (eland_alarm_is_same(AlarmList->alarm_lib + i, inData))
+                {
+                    alarm_log("duplicate data");
+                    goto exit_nothing_done;
+                }
+                alarm_log("alarm change");
                 memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, i * sizeof(__elsv_alarm_data_t));
                 memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
                 goto exit;
             }
         }
         /**a new alarm**/
-        alarm_log("alarm_id is new");
+        alarm_log("alarm_id add");
         memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
         memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
         AlarmList->alarm_number++;
@@ -496,6 +510,7 @@ exit:
     alarm_log("alarm_add success!");
     AlarmList->list_refreshed = true;
     set_alarm_state(ALARM_ADD);
+exit_nothing_done:
     return err;
 }
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
@@ -928,8 +943,8 @@ void set_display_na_serial(uint8_t serial)
     alarm_list.na_display_serial = serial;
     if (alarm_list.AlarmSerialMutex != NULL)
         mico_rtos_unlock_mutex(&alarm_list.AlarmSerialMutex);
-    if (get_eland_mode() == ELAND_NA)
-        eland_push_uart_send_queue(ALARM_SEND_0B);
+
+    eland_push_uart_send_queue(ALARM_SEND_0B);
 }
 _alarm_mcu_data_t *get_alarm_mcu_data(void)
 {
@@ -1386,7 +1401,6 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         }
         else
             alarm_log("NO alarm_nearest ");
-        eland_push_uart_send_queue(ALARM_SEND_0B);
         set_display_na_serial(SCHEDULE_MAX);
     }
 }
@@ -1478,4 +1492,111 @@ void eland_push_http_queue(_download_type_t msg)
 {
     _download_type_t http_msg = msg;
     mico_rtos_push_to_queue(&http_queue, &http_msg, 10);
+}
+/***alarm compare***/
+static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2)
+{
+    if (strncmp(alarm1->alarm_id, alarm2->alarm_id, ALARM_ID_LEN))
+    {
+        alarm_log("alarm_id:%s", alarm1->alarm_id);
+        alarm_log("alarm_id:%s", alarm2->alarm_id);
+        return false;
+    }
+    if (alarm1->alarm_color != alarm2->alarm_color)
+    {
+        alarm_log("alarm_color:%d", alarm1->alarm_color);
+        alarm_log("alarm_color:%d", alarm2->alarm_color);
+        return false;
+    }
+    if (memcmp(alarm1->alarm_off_dates, alarm2->alarm_off_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint8_t)))
+    {
+        alarm_log("alarm_off_dates ");
+        alarm_log("alarm_off_dates ");
+        return false;
+    }
+    if (alarm1->snooze_enabled != alarm2->snooze_enabled)
+    {
+        alarm_log("snooze_enabled:%d", alarm1->snooze_enabled);
+        alarm_log("snooze_enabled:%d", alarm2->snooze_enabled);
+        return false;
+    }
+    if (alarm1->snooze_count != alarm2->snooze_count)
+    {
+        alarm_log("snooze_count:%d", alarm1->snooze_count);
+        alarm_log("snooze_count:%d", alarm2->snooze_count);
+        return false;
+    }
+    if (alarm1->snooze_interval_min != alarm2->snooze_interval_min)
+    {
+        alarm_log("snooze_interval_min:%d", alarm1->snooze_interval_min);
+        alarm_log("snooze_interval_min:%d", alarm2->snooze_interval_min);
+        return false;
+    }
+    if (alarm1->alarm_pattern != alarm2->alarm_pattern)
+    {
+        alarm_log("alarm_pattern:%d", alarm1->alarm_pattern);
+        alarm_log("alarm_pattern:%d", alarm2->alarm_pattern);
+        return false;
+    }
+    if (alarm1->alarm_sound_id != alarm2->alarm_sound_id)
+    {
+        alarm_log("alarm_sound_id:%ld", alarm1->alarm_sound_id);
+        alarm_log("alarm_sound_id:%ld", alarm2->alarm_sound_id);
+        return false;
+    }
+    if (strncmp(alarm1->voice_alarm_id, alarm2->voice_alarm_id, VOICE_ALARM_ID_LEN))
+    {
+        alarm_log("voice_alarm_id:%s", alarm1->voice_alarm_id);
+        alarm_log("voice_alarm_id:%s", alarm2->voice_alarm_id);
+        return false;
+    }
+    if (strncmp(alarm1->alarm_off_voice_alarm_id, alarm2->alarm_off_voice_alarm_id, VOICE_ALARM_ID_LEN))
+    {
+        alarm_log("alarm_off_voice_alarm_id:%s", alarm1->alarm_off_voice_alarm_id);
+        alarm_log("alarm_off_voice_alarm_id:%s", alarm2->alarm_off_voice_alarm_id);
+        return false;
+    }
+    if (alarm1->alarm_volume != alarm2->alarm_volume)
+    {
+        alarm_log("alarm_volume:%d", alarm1->alarm_volume);
+        alarm_log("alarm_volume:%d", alarm2->alarm_volume);
+        return false;
+    }
+    if (alarm1->volume_stepup_enabled != alarm2->volume_stepup_enabled)
+    {
+        alarm_log("alarm_volume:%d", alarm1->alarm_volume);
+        alarm_log("alarm_volume:%d", alarm2->alarm_volume);
+        return false;
+    }
+    if (alarm1->alarm_continue_min != alarm2->alarm_continue_min)
+    {
+        alarm_log("alarm_continue_min:%d", alarm1->alarm_continue_min);
+        alarm_log("alarm_continue_min:%d", alarm2->alarm_continue_min);
+        return false;
+    }
+    if (alarm1->alarm_repeat != alarm2->alarm_repeat)
+    {
+        alarm_log("alarm_repeat:%d", alarm1->alarm_repeat);
+        alarm_log("alarm_repeat:%d", alarm2->alarm_repeat);
+        return false;
+    }
+    if (memcmp(alarm1->alarm_on_dates, alarm2->alarm_on_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint8_t)))
+    {
+        alarm_log("alarm_on_dates");
+        alarm_log("alarm_on_dates");
+        return false;
+    }
+    if (strncmp(alarm1->alarm_on_days_of_week, alarm2->alarm_on_days_of_week, ALARM_ON_DAYS_OF_WEEK_LEN))
+    {
+        alarm_log("alarm_on_days_of_week:%s", alarm1->alarm_on_days_of_week);
+        alarm_log("alarm_on_days_of_week:%s", alarm2->alarm_on_days_of_week);
+        return false;
+    }
+    if (alarm1->skip_flag != alarm2->skip_flag)
+    {
+        alarm_log("skip_flag:%d", alarm1->skip_flag);
+        alarm_log("skip_flag:%d", alarm2->skip_flag);
+        return false;
+    }
+    return true;
 }

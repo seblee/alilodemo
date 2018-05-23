@@ -144,7 +144,6 @@ start_Check:
         else
         {
             mico_Context_t *context = NULL;
-            Eland_log("Is not Activate clear the wifi para");
             context = mico_system_context_get();
             if (context->micoSystemConfig.configured != unConfigured)
             {
@@ -195,9 +194,6 @@ start_Check:
     netclock_des_g->night_mode_enabled = 0;
     strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
     strncpy(netclock_des_g->night_mode_end_time, "06:00:00", Time_Format_Len);
-
-    // Eland_log("area_code %d", offsetof(_ELAND_DEVICE_t, area_code));
-    // Eland_log("sizeof %d", sizeof(_ELAND_DEVICE_t));
 
     return kNoErr;
 exit:
@@ -547,65 +543,63 @@ exit:
 OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
     OSStatus err = kGeneralErr;
+    char alarm_id_temp[ALARM_ID_LEN + 1];
+    memset(alarm_id_temp, 0, sizeof(alarm_id_temp));
 
     ELAND_HTTP_RESPONSE_SETTING_S user_http_res;
     char uri_str[100] = {0};
-    //  _sound_read_write_type_t **alarm_w_r_queue = NULL;
-    uint8_t *flashdata = NULL;
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
-    /******check sound*************/
-    flashdata = malloc(10);
+    /******check sound******/
 
-    memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
     if (sound_type == SOUND_FILE_SID)
-        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
+        memcpy(alarm_id_temp, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
     else if (sound_type == SOUND_FILE_VID)
-        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+        memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
     else if (sound_type == SOUND_FILE_OFID)
-        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+        memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
     else if (sound_type == SOUND_FILE_DEFAULT)
-        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, ALARM_ID_OF_SIMPLE_CLOCK, strlen(ALARM_ID_OF_SIMPLE_CLOCK));
+        memcpy(alarm_id_temp, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
     else if (sound_type == SOUND_FILE_WEATHER_0)
     {
         if (strstr(alarm->voice_alarm_id, "00000000"))
-            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+            memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
         else if (strstr(alarm->alarm_off_voice_alarm_id, "00000000"))
-            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
         else
             goto exit;
-        Eland_log("00000000:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+        Eland_log("00000000:%s", alarm_id_temp);
     }
     else if (sound_type == SOUND_FILE_WEATHER_E)
     {
         if (strstr(alarm->alarm_off_voice_alarm_id, "eeeeeeee"))
-            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
         else
             goto exit;
-        Eland_log("eeeeeeee:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+        Eland_log("eeeeeeee:%s", alarm_id_temp);
     }
     else if (sound_type == SOUND_FILE_WEATHER_F)
     {
         if (strstr(alarm->voice_alarm_id, "ffffffff"))
-            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+            memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
         else if (strstr(alarm->alarm_off_voice_alarm_id, "ffffffff"))
-            memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
         else
             goto exit;
-        Eland_log("ffffffff:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+        Eland_log("ffffffff:%s", alarm_id_temp);
     }
     else
         goto exit;
-    HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
-    HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_READ;
-    HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
-    HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
-    HTTP_W_R_struct.alarm_w_r_queue->len = 8;
-    err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
-    if (err == kNoErr) //文件已下載
+    err = alarm_sound_file_check(alarm_id_temp);
+    if (err == kNoErr)
     {
-        Eland_log("ERRNONE");
+        Eland_log("file is exist");
         goto exit;
     }
+    memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+    HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
+    memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm_id_temp, sizeof(alarm_id_temp));
+    HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
+
     /*ready for uri*/
     memset(uri_str, 0, 100);
     if (sound_type == SOUND_FILE_SID)
@@ -659,10 +653,6 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         err = kGeneralErr;
     }
 exit:
-
-    /**************/
-    //释放资源
-    free(flashdata);
 
     if (user_http_res.eland_response_body != NULL)
     {

@@ -295,9 +295,11 @@ static int web_send_Get_ssids_Request(httpd_request_t *req)
     memset(&wifi_scan_list, 0, sizeof(__http_ssids_list_t));
     micoWlanStartScanAdv();
     err = mico_rtos_get_semaphore(&http_ssid_event_Sem, 5000);
-    require_noerr(err, exit);
 
-    build_ssids_json_string(upload_data, &wifi_scan_list);
+    if (err == kNoErr)
+        build_ssids_json_string(upload_data, &wifi_scan_list);
+    else
+        sprintf(upload_data, HTTPD_JSON_ERR_MSG, "timeout");
     app_httpd_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     err = httpd_send_all_header(req, HTTP_RES_200, strlen(upload_data), HTTP_CONTENT_JSON_STR);
@@ -326,7 +328,7 @@ static int web_send_Post_setting_Request(httpd_request_t *req)
     app_httpd_log("post");
     SendElandStateQueue(ELAPPConnected);
     /* read and parse header */
-     httpd_get_data(req, buf, buf_size);
+    httpd_get_data(req, buf, buf_size);
     if (strncasecmp(HTTP_CONTENT_JSON_STR, req->content_type, strlen(HTTP_CONTENT_JSON_STR)) == 0) //json data
     {
         app_httpd_log("JSON*************");

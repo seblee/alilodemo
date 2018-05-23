@@ -24,7 +24,7 @@
 #define ALARM_ON_OFF_DATES_COUNT 50
 #define VOICE_ALARM_ID_LEN 37       //语音闹钟的ID
 #define ALARM_ON_DAYS_OF_WEEK_LEN 8 //鬧鐘播放的星期幾
-#define ALARM_ID_OF_SIMPLE_CLOCK "simple_clock"
+#define ALARM_ID_OF_DEFAULT_CLOCK "simple_clock"
 
 #define SECOND_ONE_DAY 86400
 #define SECOND_ONE_HOUR 3600
