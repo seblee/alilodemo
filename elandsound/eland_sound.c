@@ -23,7 +23,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_SOUND_DEBUG
+#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -122,25 +122,25 @@ exit:
         switch ((sound_list->lib + i)->sound_type)
         {
         case SOUND_FILE_VID:
-            sound_log("sound:%d,vid :%s", i, (sound_list->lib + i)->alarm_ID);
+            sound_log("sound:%d,lenth:%ld,vid :%s", i, (sound_list->lib + i)->file_len, (sound_list->lib + i)->alarm_ID);
             break;
         case SOUND_FILE_SID:
             memcpy(&sound_id, (sound_list->lib + i)->alarm_ID, sizeof(int32_t));
-            sound_log("sound:%d,sid :%ld", i, sound_id);
+            sound_log("sound:%d,lenth:%ld,sid :%ld", i, (sound_list->lib + i)->file_len, sound_id);
             break;
         case SOUND_FILE_OFID:
-            sound_log("sound:%d,ofid :%s", i, (sound_list->lib + i)->alarm_ID);
+            sound_log("sound:%d,lenth:%ld,ofid :%s", i, (sound_list->lib + i)->file_len, (sound_list->lib + i)->alarm_ID);
             break;
         case SOUND_FILE_DEFAULT:
-            sound_log("sound:%d,default:%s", i, (sound_list->lib + i)->alarm_ID);
+            sound_log("sound:%d,lenth:%ld,default:%s", i, (sound_list->lib + i)->file_len, (sound_list->lib + i)->alarm_ID);
             break;
         case SOUND_FILE_WEATHER_0:
         case SOUND_FILE_WEATHER_E:
         case SOUND_FILE_WEATHER_F:
-            sound_log("sound:%d,weather:%s", i, (sound_list->lib + i)->alarm_ID);
+            sound_log("sound:%d,lenth:%ld,weather:%s", i, (sound_list->lib + i)->file_len, (sound_list->lib + i)->alarm_ID);
             break;
         default:
-            sound_log("sound:%d,type :%d", i, (sound_list->lib + i)->sound_type);
+            sound_log("sound:%d,lenth:%ld,type :%d", i, (sound_list->lib + i)->file_len, (sound_list->lib + i)->sound_type);
             break;
         }
     }

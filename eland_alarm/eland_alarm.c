@@ -733,6 +733,13 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
                 }
             }
         }
+        else if (alarm->alarm_pattern == 4) //default alarm
+        {
+            init_alarm_stream(alarm, SOUND_FILE_DEFAULT);
+            set_alarm_stream_state(STREAM_PLAY);
+            mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
+            isVoice = false;
+        }
     }
     else if ((CMD == 0) && (CMD_bak == 1)) //stop
     {
