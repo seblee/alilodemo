@@ -33,6 +33,12 @@
 #define SOUND_FILE_WEATHER_0 (uint8_t)0X05
 #define SOUND_FILE_WEATHER_E (uint8_t)0X06
 #define SOUND_FILE_WEATHER_F (uint8_t)0X07
+
+#define SOUND_DEFAULT_SECTOR 48
+#define SOUND_AREAx_SECTOR 77
+#define SOUND_AREA_OTHER 0
+#define SOUND_RESERVE_SECTOR 2
+
 /* Private typedef -----------------------------------------------------------*/
 
 typedef struct __SOUND_FILE_TYPE_
@@ -46,10 +52,11 @@ typedef struct __SOUND_FILE_TYPE_
 
 typedef struct __SOUND_FILE_LIB_
 {
-    _sound_file_type_t *lib;
-    uint16_t file_number;
-    uint32_t sector_start;
-    uint32_t sector_end;
+    _sound_file_type_t lib[7];
+    uint8_t cycle_write_point;
+    // uint16_t file_number;
+    // uint32_t sector_start;
+    // uint32_t sector_end;
 } _sound_file_lib_t;
 
 typedef enum _FILE_OPERATION_MODE_

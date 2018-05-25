@@ -540,9 +540,10 @@ exit:
 }
 
 //eland 鬧鐘聲音取得
-OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
+OSStatus alarm_sound_download(_alarm_sound_info_t *sound_info)
 {
     OSStatus err = kGeneralErr;
+    int32_t cache;
     char alarm_id_temp[ALARM_ID_LEN + 1];
     memset(alarm_id_temp, 0, sizeof(alarm_id_temp));
 
@@ -551,44 +552,10 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     memset(&user_http_res, 0, sizeof(ELAND_HTTP_RESPONSE_SETTING_S));
     /******check sound******/
 
-    if (sound_type == SOUND_FILE_SID)
-        memcpy(alarm_id_temp, &(alarm->alarm_sound_id), sizeof(alarm->alarm_sound_id));
-    else if (sound_type == SOUND_FILE_VID)
-        memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
-    else if (sound_type == SOUND_FILE_OFID)
-        memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
-    else if (sound_type == SOUND_FILE_DEFAULT)
-        memcpy(alarm_id_temp, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
-    else if (sound_type == SOUND_FILE_WEATHER_0)
-    {
-        if (strstr(alarm->voice_alarm_id, "00000000"))
-            memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
-        else if (strstr(alarm->alarm_off_voice_alarm_id, "00000000"))
-            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
-        else
-            goto exit;
-        Eland_log("00000000:%s", alarm_id_temp);
-    }
-    else if (sound_type == SOUND_FILE_WEATHER_E)
-    {
-        if (strstr(alarm->alarm_off_voice_alarm_id, "eeeeeeee"))
-            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
-        else
-            goto exit;
-        Eland_log("eeeeeeee:%s", alarm_id_temp);
-    }
-    else if (sound_type == SOUND_FILE_WEATHER_F)
-    {
-        if (strstr(alarm->voice_alarm_id, "ffffffff"))
-            memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
-        else if (strstr(alarm->alarm_off_voice_alarm_id, "ffffffff"))
-            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
-        else
-            goto exit;
-        Eland_log("ffffffff:%s", alarm_id_temp);
-    }
-    else
+    if (sound_info->sound_type == 0)
         goto exit;
+    memcpy(alarm_id_temp, sound_info->sound_id, ALARM_ID_LEN);
+
     err = alarm_sound_file_check(alarm_id_temp);
     if (err == kNoErr)
     {
@@ -596,25 +563,28 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         goto exit;
     }
     memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_type;
+    HTTP_W_R_struct.alarm_w_r_queue->sound_type = sound_info->sound_type;
     memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, alarm_id_temp, sizeof(alarm_id_temp));
     HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
 
     /*ready for uri*/
     memset(uri_str, 0, 100);
-    if (sound_type == SOUND_FILE_SID)
-        sprintf(uri_str, ELAND_SOUND_SID_URI, netclock_des_g->eland_id, alarm->alarm_sound_id);
-    else if (sound_type == SOUND_FILE_VID)
-        sprintf(uri_str, ELAND_SOUND_VID_URI, netclock_des_g->eland_id, alarm->voice_alarm_id);
-    else if (sound_type == SOUND_FILE_OFID)
-        sprintf(uri_str, ELAND_SOUND_OFID_URI, netclock_des_g->eland_id, alarm->alarm_off_voice_alarm_id);
-    else if (sound_type == SOUND_FILE_DEFAULT)
+    if (sound_info->sound_type == SOUND_FILE_SID)
+    {
+        memcpy(&cache, &(sound_info->sound_id), sizeof(int32_t));
+        sprintf(uri_str, ELAND_SOUND_SID_URI, netclock_des_g->eland_id, cache);
+    }
+    else if (sound_info->sound_type == SOUND_FILE_VID)
+        sprintf(uri_str, ELAND_SOUND_VID_URI, netclock_des_g->eland_id, sound_info->sound_id);
+    else if (sound_info->sound_type == SOUND_FILE_OFID)
+        sprintf(uri_str, ELAND_SOUND_OFID_URI, netclock_des_g->eland_id, sound_info->sound_id);
+    else if (sound_info->sound_type == SOUND_FILE_DEFAULT)
         sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
-    else if (sound_type == SOUND_FILE_WEATHER_0)
+    else if (sound_info->sound_type == SOUND_FILE_WEATHER_0)
         sprintf(uri_str, ELAND_WEATHER_0_URI, netclock_des_g->eland_id);
-    else if (sound_type == SOUND_FILE_WEATHER_E)
+    else if (sound_info->sound_type == SOUND_FILE_WEATHER_E)
         sprintf(uri_str, ELAND_WEATHER_E_URI, netclock_des_g->eland_id);
-    else if (sound_type == SOUND_FILE_WEATHER_F)
+    else if (sound_info->sound_type == SOUND_FILE_WEATHER_F)
         sprintf(uri_str, ELAND_WEATHER_F_URI, netclock_des_g->eland_id);
     else
         goto exit;

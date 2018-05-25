@@ -68,16 +68,16 @@ OSStatus sound_file_sort(_sound_file_lib_t *sound_list)
 {
     OSStatus err;
     uint32_t sector_count = 0, sound_id = 0;
-    uint8_t i;
+    uint8_t i, j;
     _sound_file_type_t alarm_file_temp;
     char string_buff[strlen(ALARM_FILE_END_STRING)];
     err = mico_rtos_lock_mutex(&eland_sound_mutex);
     require_noerr(err, exit);
     sound_log("sound_file_sort");
-    if (sound_list->lib)
-        free(sound_list->lib);
+
     memset(sound_list, 0, sizeof(_sound_file_lib_t));
-    do
+
+    for (i = 0; i < 7; i++)
     {
         flash_kh25_read((uint8_t *)(&alarm_file_temp), KH25L8006_SECTOR_SIZE * sector_count, sizeof(_sound_file_type_t));
         if (strncmp(alarm_file_temp.flag, ALARM_FILE_HEADER_STRING, ALARM_FILE_HEADER_LEN) == 0) //有文件头
@@ -86,38 +86,60 @@ OSStatus sound_file_sort(_sound_file_lib_t *sound_list)
             flash_kh25_read((uint8_t *)(string_buff), alarm_file_temp.file_len + alarm_file_temp.file_address, strlen(ALARM_FILE_END_STRING));
             if (strncmp(string_buff, ALARM_FILE_END_STRING, strlen(ALARM_FILE_END_STRING)) == 0) //有文件尾
             {
-                if (sound_list->file_number == 0)
+                for (j = 0; j < i; j++)
                 {
-                    sound_list->sector_start = sector_count * KH25L8006_SECTOR_SIZE;
-                    sound_list->lib = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
-                    memcpy(sound_list->lib, &alarm_file_temp, sizeof(_sound_file_type_t));
-                    sound_list->file_number++;
+                    if (memcmp((sound_list->lib + i)->alarm_ID, alarm_file_temp.alarm_ID, ALARM_ID_LEN) == 0)
+                        goto checkend;
                 }
-                else
-                {
-                    for (i = 0; i < sound_list->file_number; i++) //去重
-                    {
-                        if (memcmp((sound_list->lib + i)->alarm_ID, alarm_file_temp.alarm_ID, ALARM_ID_LEN) == 0)
-                            goto exit;
-                    }
-                    sound_list->lib = (_sound_file_type_t *)realloc(sound_list->lib, ((sound_list->file_number + 1) * sizeof(_sound_file_type_t)));
-                    memcpy((sound_list->lib + sound_list->file_number), &alarm_file_temp, sizeof(_sound_file_type_t));
-                    sound_list->file_number++;
-                }
-                sector_count += (alarm_file_temp.file_len + sizeof(_sound_file_type_t)) / KH25L8006_SECTOR_SIZE;
-                sector_count += (((alarm_file_temp.file_len + sizeof(_sound_file_type_t)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
-                sound_list->sector_end = sector_count * KH25L8006_SECTOR_SIZE;
+                memcpy(sound_list->lib + i, &alarm_file_temp, sizeof(_sound_file_type_t));
             }
-            else
-                break;
         }
-        else
-            break;
-    } while (sector_count < KH25_FLASH_FILE_COUNT);
+    checkend:
+        sector_count += ((i == 0) ? SOUND_DEFAULT_SECTOR : SOUND_AREAx_SECTOR);
+    }
+
+    /**************************************************************************/
+    // do
+    // {
+    //     flash_kh25_read((uint8_t *)(&alarm_file_temp), KH25L8006_SECTOR_SIZE * sector_count, sizeof(_sound_file_type_t));
+    //     if (strncmp(alarm_file_temp.flag, ALARM_FILE_HEADER_STRING, ALARM_FILE_HEADER_LEN) == 0) //有文件头
+    //     {
+    //         memset(string_buff, 0, strlen(ALARM_FILE_END_STRING));
+    //         flash_kh25_read((uint8_t *)(string_buff), alarm_file_temp.file_len + alarm_file_temp.file_address, strlen(ALARM_FILE_END_STRING));
+    //         if (strncmp(string_buff, ALARM_FILE_END_STRING, strlen(ALARM_FILE_END_STRING)) == 0) //有文件尾
+    //         {
+    //             if (sound_list->file_number == 0)
+    //             {
+    //                 sound_list->sector_start = sector_count * KH25L8006_SECTOR_SIZE;
+    //                 sound_list->lib = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
+    //                 memcpy(sound_list->lib, &alarm_file_temp, sizeof(_sound_file_type_t));
+    //                 sound_list->file_number++;
+    //             }
+    //             else
+    //             {
+    //                 for (i = 0; i < sound_list->file_number; i++) //去重
+    //                 {
+    //                     if (memcmp((sound_list->lib + i)->alarm_ID, alarm_file_temp.alarm_ID, ALARM_ID_LEN) == 0)
+    //                         goto exit;
+    //                 }
+    //                 sound_list->lib = (_sound_file_type_t *)realloc(sound_list->lib, ((sound_list->file_number + 1) * sizeof(_sound_file_type_t)));
+    //                 memcpy((sound_list->lib + sound_list->file_number), &alarm_file_temp, sizeof(_sound_file_type_t));
+    //                 sound_list->file_number++;
+    //             }
+    //             sector_count += (alarm_file_temp.file_len + sizeof(_sound_file_type_t)) / KH25L8006_SECTOR_SIZE;
+    //             sector_count += (((alarm_file_temp.file_len + sizeof(_sound_file_type_t)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
+    //             sound_list->sector_end = sector_count * KH25L8006_SECTOR_SIZE;
+    //         }
+    //         else
+    //             break;
+    //     }
+    //     else
+    //         break;
+    // } while (sector_count < KH25_FLASH_FILE_COUNT);
 
 exit:
-    sound_log("read file file_number:%d", sound_list->file_number);
-    for (i = 0; i < sound_list->file_number; i++)
+    sound_log("read file file_number:%d", sound_list->cycle_write_point);
+    for (i = 0; i < 7; i++)
     {
         switch ((sound_list->lib + i)->sound_type)
         {
@@ -144,7 +166,7 @@ exit:
             break;
         }
     }
-    sound_log("flash_capacity:%ld", get_flash_capacity());
+    // sound_log("flash_capacity:%ld", get_flash_capacity());
 
     err = mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
@@ -165,7 +187,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
         if (alarm_w_r_temp->pos == 0) //文件數據流首次讀取
         {
             sound_log("file read");
-            for (i = 0; i < sound_list->file_number; i++)
+            for (i = 0; i < 7; i++)
             {
                 if (memcmp((sound_list->lib + i)->alarm_ID, alarm_w_r_temp->alarm_ID, ALARM_ID_LEN) == 0)
                 {

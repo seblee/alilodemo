@@ -155,6 +155,12 @@ typedef struct ALARM_SCHEDULES //闹钟显示列表
     int8_t snooze_enabled;
 } _alarm_schedules_t;
 
+typedef struct ALARM_SOUND_INFO //闹钟显示列表
+{
+    uint8_t sound_type;
+    char sound_id[VOICE_ALARM_ID_LEN];
+} _alarm_sound_info_t;
+
 typedef struct
 {
     bool list_refreshed;
@@ -169,9 +175,10 @@ typedef struct
     _alarm_schedules_t schedules[SCHEDULE_MAX];
     uint8_t schedules_num;
     /***********/
-    __elsv_alarm_data_t *alarm_lib;
     uint8_t alarm_number;
+    __elsv_alarm_data_t *alarm_lib;
     __elsv_alarm_data_t *alarm_nearest;
+    _alarm_sound_info_t sound_array[6];
     /************************/
 } _eland_alarm_list_t;
 
