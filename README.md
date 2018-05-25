@@ -1,5 +1,23 @@
 # Netclock
 
+# v01.17
+2018年5月25日10:20:23
+##    
+    set version01.17
+    AP time out change tu 600 seconds
+    issue default alarm
+    add oid_error_sound
+    issue al01 do not refresh alarm,when alarms did not changed
+    alarm data duplicate add err = kGeneralErr
+    issue eland_alarm_is_same bug
+    add alarm same check
+    sound download retry time change to 3
+    change sound sort rule
+    add sound file checkout function
+    add ssid_scan time out response json
+    issue other mode alarm dead
+    sound file add file_end_string
+
 # v01.16
 2018年5月18日16:14:14
 ##  5V LCD

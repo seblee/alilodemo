@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define MCU_REVISION "01.16"
+#define MCU_REVISION "01.17"
 /* Define mcu power pin */
 #define MCU_POWER_GPIO MICO_GPIO_1
 
