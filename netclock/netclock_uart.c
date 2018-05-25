@@ -993,7 +993,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 (Key_Count_Trg & KEY_Set) ||
                 (Key_Count_Trg & KEY_Alarm) ||
                 (Key_Count_Trg & KEY_Snooze) ||
-                (time_delay_counter++ > 3000))
+                (time_delay_counter++ > 6000))
             {
                 /******back to nc********/
                 set_eland_mode(ELAND_NC);
