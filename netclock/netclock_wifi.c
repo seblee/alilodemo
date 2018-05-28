@@ -93,6 +93,7 @@ static void recorde_IPStatus(wlanInterfaceTypedef type)
 {
     IPStatusTypedef IPStatus_Cache;
     micoWlanGetIPStatus(&IPStatus_Cache, type);
+    netclock_des_g->dhcp_enabled = IPStatus_Cache.dhcp;
     memset(netclock_des_g->ip_address, 0, sizeof(netclock_des_g->ip_address));
     sprintf(netclock_des_g->ip_address, IPStatus_Cache.ip);
     memset(netclock_des_g->subnet_mask, 0, sizeof(netclock_des_g->subnet_mask));

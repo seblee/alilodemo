@@ -471,17 +471,20 @@ exit:
 
 static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_list_t *alarm_list)
 {
-    uint8_t i;
+    uint8_t i, temp_point = 0;
     int32_t sound_id;
     __elsv_alarm_data_t *nearest = NULL;
+    if (alarm_list->alarm_number == 0)
+        return false;
     switch (sound_file->sound_type)
     {
     case SOUND_FILE_VID:
-        for (i = 0; i < alarm_list->alarm_number; i++)
+        for (i = alarm_list->alarm_now_serial; i < (alarm_list->alarm_now_serial + 3); i++)
         {
-            if ((((alarm_list->alarm_lib + i)->alarm_pattern == 2) ||
-                 ((alarm_list->alarm_lib + i)->alarm_pattern == 3)) &&
-                (memcmp(sound_file->alarm_ID, (alarm_list->alarm_lib + i)->voice_alarm_id, ALARM_ID_LEN) == 0))
+            temp_point = i % alarm_list->alarm_number;
+            if ((((alarm_list->alarm_lib + temp_point)->alarm_pattern == 2) ||
+                 ((alarm_list->alarm_lib + temp_point)->alarm_pattern == 3)) &&
+                (memcmp(sound_file->alarm_ID, (alarm_list->alarm_lib + temp_point)->voice_alarm_id, ALARM_ID_LEN) == 0))
             {
                 sound_log("FILE_VID %s is usable", sound_file->alarm_ID);
                 goto exit;
@@ -491,13 +494,14 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
     case SOUND_FILE_SID:
         memcpy(&sound_id, sound_file->alarm_ID, sizeof(sound_id));
         sound_log("FILE_SID %ld", sound_id);
-        for (i = 0; i < alarm_list->alarm_number; i++)
+        for (i = alarm_list->alarm_now_serial; i < (alarm_list->alarm_now_serial + 3); i++)
         {
-            sound_log("alarm_sound_id %ld", (alarm_list->alarm_lib + i)->alarm_sound_id);
+            temp_point = i % alarm_list->alarm_number;
+            sound_log("alarm_sound_id %ld", (alarm_list->alarm_lib + temp_point)->alarm_sound_id);
 
-            if ((((alarm_list->alarm_lib + i)->alarm_pattern == 1) ||
-                 ((alarm_list->alarm_lib + i)->alarm_pattern == 3)) &&
-                (sound_id == (alarm_list->alarm_lib + i)->alarm_sound_id))
+            if ((((alarm_list->alarm_lib + temp_point)->alarm_pattern == 1) ||
+                 ((alarm_list->alarm_lib + temp_point)->alarm_pattern == 3)) &&
+                (sound_id == (alarm_list->alarm_lib + temp_point)->alarm_sound_id))
             {
                 sound_log("FILE_SID %ld is usable", sound_id);
                 goto exit;
@@ -505,9 +509,10 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
         }
         break;
     case SOUND_FILE_OFID:
-        for (i = 0; i < alarm_list->alarm_number; i++)
+        for (i = alarm_list->alarm_now_serial; i < (alarm_list->alarm_now_serial + 3); i++)
         {
-            if (memcmp(sound_file->alarm_ID, (alarm_list->alarm_lib + i)->alarm_off_voice_alarm_id, ALARM_ID_LEN) == 0)
+            temp_point = i % alarm_list->alarm_number;
+            if (memcmp(sound_file->alarm_ID, (alarm_list->alarm_lib + temp_point)->alarm_off_voice_alarm_id, ALARM_ID_LEN) == 0)
             {
                 sound_log("FILE_OFID %s is usable", sound_file->alarm_ID);
                 goto exit;

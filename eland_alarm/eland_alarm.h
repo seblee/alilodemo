@@ -171,6 +171,7 @@ typedef struct
     /***********/
     __elsv_alarm_data_t *alarm_lib;
     uint8_t alarm_number;
+    uint8_t alarm_now_serial;
     __elsv_alarm_data_t *alarm_nearest;
     /************************/
 } _eland_alarm_list_t;

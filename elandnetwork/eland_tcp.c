@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_TCP_DEBUG
+#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define eland_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else
@@ -1127,6 +1127,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case AL02: //10 alarm info add Notification
     case AL03: //11 alarm info change Notification
     case AL04: //12 alarm info delete notification
+        eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         rc = TCP_Operate_ALXX((char *)(buff + sizeof(_TELEGRAM_t)), tep_cmd);
         SendElandStateQueue(TCP_AL00);
         break;
@@ -1351,6 +1352,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
@@ -1359,7 +1361,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         goto exit;
     }
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
-
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     if (telegram_cmd == AL01)
     {
         alarm_array = json_object_object_get(ReceivedJsonCache, "alarms");
@@ -1414,6 +1416,8 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         eland_tcp_log("alarm_number:%d", alarm_list.alarm_number);
     }
 exit:
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1724,6 +1728,7 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
     json_object *ReceivedJsonCache = NULL, *schedule_array = NULL, *schedule_json = NULL;
     uint8_t list_len, i;
     TCP_Error_t rc = TCP_SUCCESS;
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     if (*buf != '{')
     {
@@ -1739,6 +1744,7 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
         goto exit;
     }
 
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     schedule_array = json_object_object_get(ReceivedJsonCache, "schedules");
 
     if ((schedule_array == NULL) || ((json_object_get_object(schedule_array)->head) == NULL))
@@ -1759,6 +1765,7 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
     }
 
 exit:
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
     return rc;

@@ -28,7 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_CLIENT_DEBUG
+#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
@@ -512,7 +512,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             {
                 context->content = calloc(1501, sizeof(uint8_t));
                 sound_flash_pos = 0;
-                contentLen = (int32_t)inHeader->contentLength;
+                contentLen = (int32_t)inHeader->contentLength + sizeof(_sound_file_type_t) + strlen(ALARM_FILE_END_STRING);
                 if (get_flash_capacity() < contentLen)
                 {
                     client_log("flash capacity is insufficient");
