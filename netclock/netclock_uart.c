@@ -859,7 +859,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     {
         if (Key_Restain_Trg & KEY_Alarm) //alarm skip
         {
-            TCP_Push_MSG_queue(TCP_HT02_Sem);
+            set_alarm_state(ALARM_SKIP);
         }
         if (Key_Count_Trg & KEY_Snooze) //sound oid
         {

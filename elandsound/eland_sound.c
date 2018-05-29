@@ -596,33 +596,45 @@ OSStatus eland_play_oid_error_sound(void)
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
     uint32_t inPos = 0;
-    sound_log("error sound");
+    uint8_t oid_volume = 0, i;
+
+    for (i = 0; i < 33; i++)
+        audio_service_volume_up(&result, 1);
+    oid_volume = get_notification_volume();
+    for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
+    {
+        audio_service_volume_up(&result, 1);
+    }
+
+    audio_service_get_audio_status(&result, &audio_status);
+    sound_log("audio_status:%d", audio_status);
 
     fm_stream.type = AUDIO_STREAM_TYPE_MP3;
     fm_stream.stream_id = audio_service_system_generate_stream_id();
     fm_stream.total_len = sizeof(error_sound);
+
 start_start:
-    fm_stream.pdata = (const uint8_t *)error_sound + inPos;
-    if ((fm_stream.total_len - inPos) > 4000) //len
-        fm_stream.stream_len = 4000;
+    fm_stream.pdata = (const uint8_t *)(&error_sound[inPos]);
+    if ((fm_stream.total_len - inPos) > 1500) //len
+        fm_stream.stream_len = 1500;
     else
         fm_stream.stream_len = fm_stream.total_len - inPos;
     if ((++fm_test_cnt) >= 10)
     {
         fm_test_cnt = 0;
-        sound_log("fm_stream.type[%d],fm_stream.stream_id[%d],fm_stream.total_len[%d],fm_stream.stream_len[%d]",
+        sound_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d]",
                   (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
     }
 audio_transfer:
-    require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
     err = audio_service_stream_play(&result, &fm_stream);
     if (err != kNoErr)
     {
-        sound_log("audio_stream_play() error!!!!");
-        return false;
+        sound_log("audio_stream_play() error:%d,result:%d", err, result);
+        return err;
     }
     else
     {
+        require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
         if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
         {
             sound_log("new slave set pause!!!");

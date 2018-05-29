@@ -171,17 +171,13 @@ OSStatus usergethostbyname(const char *domain, uint8_t *addr, uint8_t addrLen)
     struct in_addr in_addr;
     char **pptr = NULL;
     char *ip_addr = NULL;
-    LinkStatusTypeDef link_status;
 
     if (addr == NULL || addrLen < 16)
     {
         return kGeneralErr;
     }
 
-    memset(&link_status, 0, sizeof(link_status));
-    micoWlanGetLinkStatus(&link_status);
-
-    if (link_status.is_connected == false)
+    if (get_wifi_status() == false)
     {
         return kGeneralErr;
     }
@@ -814,7 +810,10 @@ exit:
     mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
     client_log("unlock http_mutex");
     if (err != kNoErr)
+    {
         client_log("ERROR:%d", err);
+        eland_error(true, EL_HTTP_OTHER);
+    }
 
     return err;
 }
@@ -852,7 +851,6 @@ static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader, uint32_t inPo
                    (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
     }
 audio_transfer:
-    require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
     err = audio_service_stream_play(&result, &fm_stream);
     if (err != kNoErr)
     {
@@ -861,6 +859,7 @@ audio_transfer:
     }
     else
     {
+        require_action_string(get_alarm_stream_state() != STREAM_STOP, exit, err = kGeneralErr, "user set stoped!");
         if (MSCP_RST_PENDING == result || MSCP_RST_PENDING_LONG == result)
         {
             client_log("new slave set pause!!!");

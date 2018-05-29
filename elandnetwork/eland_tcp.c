@@ -94,11 +94,7 @@ static void eland_set_time(void);
 
 TCP_Error_t TCP_Physical_is_connected(Network_t *pNetwork)
 {
-    LinkStatusTypeDef link_status;
-    memset(&link_status, 0, sizeof(link_status));
-    micoWlanGetLinkStatus(&link_status);
-    eland_tcp_log("wifi link_status:%d", link_status.is_connected);
-    if (link_status.is_connected == true)
+    if (get_wifi_status() == true)
         return NETWORK_PHYSICAL_LAYER_CONNECTED;
     else
         return NETWORK_MANUALLY_DISCONNECTED;
@@ -489,6 +485,7 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
 
 #ifdef MICO_DISABLE_STDIO
+    mico_rtos_thread_msleep(1500);
 recheck_mode:
     eland_mode = get_eland_mode();
     switch (eland_mode)

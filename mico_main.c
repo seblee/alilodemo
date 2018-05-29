@@ -94,10 +94,6 @@ int application_start(void)
     err = check_default_sound();
     require_noerr(err, exit);
 
-    mico_rtos_thread_msleep(1500);
-    err = get_eland_mode();
-    app_netclock_log("eland_mode:%d", err);
-
     err = TCP_Service_Start();
     require_noerr(err, exit);
     err = kNoErr;

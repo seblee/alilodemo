@@ -196,6 +196,7 @@ extern mico_semaphore_t alarm_skip_sem;
 extern mico_queue_t http_queue;
 
 extern _alarm_off_history_t off_history;
+extern mico_queue_t history_queue;
 /* Private function prototypes -----------------------------------------------*/
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
