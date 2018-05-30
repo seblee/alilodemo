@@ -194,6 +194,7 @@ extern _alarm_stream_t alarm_stream;
 extern mico_semaphore_t alarm_update;
 extern mico_semaphore_t alarm_skip_sem;
 extern mico_queue_t http_queue;
+extern mico_mutex_t time_Mutex;
 
 extern _alarm_off_history_t off_history;
 extern mico_queue_t history_queue;
@@ -233,6 +234,8 @@ void eland_push_http_queue(_download_type_t msg);
 void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time);
 void set_alarm_stream_state(_stream_state_t state);
 _stream_state_t get_alarm_stream_state(void);
+
+uint32_t GET_current_second(void);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

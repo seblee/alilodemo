@@ -275,7 +275,7 @@ TCP_Error_t TCP_Write(Network_t *pNetwork,
         }
     }
     *written_len = written_so_far;
-    eland_tcp_log("socket write done");
+    // eland_tcp_log("socket write done");
     if (isError_flag)
     {
         return NETWORK_SSL_WRITE_ERROR;
@@ -324,7 +324,7 @@ startread:
             else
             {
                 ret = select(fd + 1, &readfds, NULL, NULL, &time);
-                eland_tcp_log("select ret %d fd %d", ret, fd);
+                // eland_tcp_log("select ret %d fd %d", ret, fd);
                 if (ret <= 0)
                 {
                     break;
@@ -588,7 +588,8 @@ RECONN:
 
 little_cycle_loop:
     MicoRtcGetTime(&cur_time);
-    eland_tcp_log("cur_time.sec:%d,CHUNKS:%d,memory:%d", cur_time.sec, MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    // eland_tcp_log("cur_time 20 %d.%02d.%02d %02d:%02d:%02d  %d", cur_time.year + 100, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec, cur_time.weekday);
+    // eland_tcp_log("cur_time.sec:%d,CHUNKS:%d,memory:%d", cur_time.sec, MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     if ((cur_time.sec == HC00_moment_sec) && (cur_time.min != HC00_moment_min))
     {
         tcp_HC_flag = true;
@@ -597,8 +598,14 @@ little_cycle_loop:
     if (tcp_HC_flag)
     {
         rc = TCP_health_check(&Eland_Client);
-        require_string(TCP_SUCCESS == rc, exit, "TCP_health_check Error");
-        tcp_HC_flag = false;
+        if (rc != TCP_SUCCESS)
+        {
+            eland_tcp_log("TCP_health_check rc= %d", rc);
+            if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc) || (NETWORK_SSL_WRITE_ERROR == rc) || (NETWORK_SSL_WRITE_TIMEOUT_ERROR == rc))
+                goto exit;
+        }
+        else
+            tcp_HC_flag = false;
     }
     timer.tv_sec = 1;
     timer.tv_usec = 0;
@@ -606,7 +613,7 @@ little_cycle_loop:
     if (TCP_SUCCESS != rc)
     {
         // eland_tcp_log("Connection Error rc = %d", rc);
-        if (rc == NETWORK_SSL_READ_ERROR)
+        if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc))
             goto exit; //reconnect
     }
 pop_queue:
@@ -654,15 +661,17 @@ pop_queue:
         else if (tcp_message == TCP_SD00_Sem)
         {
             rc = TCP_request_response(&Eland_Client, SD00, SD01);
-            require_string(TCP_SUCCESS == rc, exit, "TCP_request_response SD00, SD01 Error");
+            if (rc != TCP_SUCCESS)
+                eland_tcp_log("*****************schedule Error rc = %d", rc);
+            // require_string(TCP_SUCCESS == rc, exit, "TCP_request_response SD00, SD01 Error");
         }
 
         if (TCP_SUCCESS != rc)
         {
-            mico_thread_sleep(1);
+            //mico_thread_sleep(1);
             eland_tcp_log("Connection Error rc = %d", rc);
         }
-        goto pop_queue;
+        //  goto pop_queue;
     }
 #ifdef MICO_DISABLE_STDIO
     eland_mode = get_eland_mode();
@@ -748,7 +757,7 @@ static TCP_Error_t TCP_connection_request(_Client_t *pClient)
         return rc;
     eland_tcp_log("connection_request:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
-
+    eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
     if (strncmp(telegram->command, CommandTable[CN01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
@@ -757,7 +766,6 @@ static TCP_Error_t TCP_connection_request(_Client_t *pClient)
         clientState = eland_get_client_state(pClient);
         eland_set_client_state(pClient, clientState, CLIENT_STATE_CONNECTING);
     }
-
     return rc;
 }
 static TCP_Error_t TCP_update_elandinfo(_Client_t *pClient)
@@ -781,6 +789,7 @@ static TCP_Error_t TCP_update_elandinfo(_Client_t *pClient)
     if (rc != TCP_SUCCESS)
         return rc;
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+    eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
     if (strncmp(telegram->command, CommandTable[DV01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
 
@@ -808,6 +817,7 @@ static TCP_Error_t TCP_update_alarm(_Client_t *pClient)
         return rc;
     eland_tcp_log("update_alarm:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+    eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
 
@@ -836,6 +846,7 @@ static TCP_Error_t TCP_update_holiday(_Client_t *pClient)
         return rc;
     eland_tcp_log("update_holiday:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+    eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
     if (strncmp(telegram->command, CommandTable[HD01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
@@ -867,10 +878,11 @@ static TCP_Error_t TCP_health_check(_Client_t *pClient)
         eland_tcp_log("health_check err rc = %d", rc);
         return rc;
     }
-    eland_set_time();
+
     eland_tcp_log("health_check:OK");
     // eland_tcp_log("health_check:OK json:%s", pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+    eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
     if (strncmp(telegram->command, CommandTable[HC01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
     if (rc == TCP_SUCCESS)
@@ -898,8 +910,8 @@ static TCP_Error_t TCP_request_response(_Client_t *pClient, _TCP_CMD_t request, 
 
     if (rc != TCP_SUCCESS)
         return rc;
-    eland_tcp_log("eland_IF:OK");
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
+    eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
     if (strncmp(telegram->command, CommandTable[response], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
 
@@ -915,14 +927,6 @@ static TCP_Error_t TCP_upload(_Client_t *pClient, _TCP_CMD_t tcp_cmd)
     timer.tv_sec = 5;
     timer.tv_usec = 0;
     rc = TCP_send_packet(pClient, tcp_cmd, &timer);
-    if (rc != TCP_SUCCESS)
-        return rc;
-
-    eland_tcp_log("upload %c%c%c%c:OK",
-                  CommandTable[tcp_cmd][0],
-                  CommandTable[tcp_cmd][1],
-                  CommandTable[tcp_cmd][2],
-                  CommandTable[tcp_cmd][3]);
     return rc;
 }
 
@@ -946,6 +950,8 @@ static TCP_Error_t TCP_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _tim
                                      pClient->clientData.writeBuf,
                                      timer,
                                      &wrtied_len);
+    if (rc == TCP_SUCCESS)
+        eland_tcp_log("upload %c%c%c%c:OK", CommandTable[cmd_type][0], CommandTable[cmd_type][1], CommandTable[cmd_type][2], CommandTable[cmd_type][3]);
 #ifdef MICO_DISABLE_STDIO
 exit:
 #endif
@@ -1095,7 +1101,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
             break;
     }
     tep_cmd = (_TCP_CMD_t)i;
-    eland_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
+    // eland_tcp_log("command:%s,telegram:%s", telegram->command, (char *)(buff + sizeof(_TELEGRAM_t)));
     switch (tep_cmd)
     {
     case CN00: //00 Connection Request
@@ -1106,6 +1112,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
         break;
     case HC01: //03 health check response
         rc = TCP_Operate_HC01((char *)(buff + sizeof(_TELEGRAM_t)));
+        eland_set_time();
         break;
     case DV00: //04 eland info request
         break;
@@ -1124,7 +1131,6 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case AL02: //10 alarm info add Notification
     case AL03: //11 alarm info change Notification
     case AL04: //12 alarm info delete notification
-        eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         rc = TCP_Operate_ALXX((char *)(buff + sizeof(_TELEGRAM_t)), tep_cmd);
         SendElandStateQueue(TCP_AL00);
         break;
@@ -1133,7 +1139,6 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case HD01: //14 holiday data response
     case HD02: //15 holiday data change notice
         rc = TCP_Operate_HD0X((char *)(buff + sizeof(_TELEGRAM_t)), &holiday_list);
-        eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         break;
     case HT00: //16 alarm on notification
         break;
@@ -1349,7 +1354,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
-    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    // eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
     if (ReceivedJsonCache == NULL)
     {
@@ -1358,7 +1363,6 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         goto exit;
     }
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
-    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     if (telegram_cmd == AL01)
     {
         alarm_array = json_object_object_get(ReceivedJsonCache, "alarms");
@@ -1374,7 +1378,7 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         {
             alarm = json_object_array_get_idx(alarm_array, i);
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
-            eland_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
+            //eland_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
             elsv_alarm_data_sort_out(&alarm_data_cache);
             err = alarm_list_add(&alarm_list, &alarm_data_cache);
             if (err == kNoErr)
@@ -1413,7 +1417,6 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         eland_tcp_log("alarm_number:%d", alarm_list.alarm_number);
     }
 exit:
-    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
@@ -1523,7 +1526,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
     /***alarm_off_dates***/
     alarm_off_dates = json_object_object_get(alarm, "alarm_off_dates");
     list_len = json_object_array_length(alarm_off_dates);
-    eland_tcp_log("list_len:%d ", list_len);
+    // eland_tcp_log("list_len:%d ", list_len);
     memset(alarm_data->alarm_off_dates, 0, ALARM_ON_OFF_DATES_COUNT);
     for (i = 0; i < list_len; i++)
     {
@@ -1725,7 +1728,6 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
     json_object *ReceivedJsonCache = NULL, *schedule_array = NULL, *schedule_json = NULL;
     uint8_t list_len, i;
     TCP_Error_t rc = TCP_SUCCESS;
-    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     if (*buf != '{')
     {
@@ -1741,7 +1743,6 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
         goto exit;
     }
 
-    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     schedule_array = json_object_object_get(ReceivedJsonCache, "schedules");
 
     if ((schedule_array == NULL) || ((json_object_get_object(schedule_array)->head) == NULL))
@@ -1754,7 +1755,7 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     memset(&alarm_list.schedules, 0, sizeof(alarm_list.schedules));
     alarm_list.schedules_num = list_len;
-    eland_tcp_log("schedule_array list_len:%d", get_schedules_number());
+    // eland_tcp_log("schedule_array list_len:%d", get_schedules_number());
     for (i = 0; i < list_len; i++)
     {
         schedule_json = json_object_array_get_idx(schedule_array, i);
@@ -1762,7 +1763,6 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
     }
 
 exit:
-    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1808,10 +1808,10 @@ static void time_record(TIME_RECORD_T_t type, mico_utc_time_t *value)
     switch (type)
     {
     case SET_ELAND_SEND_TIME:
-        mico_time_get_utc_time(&eland_send_time);
+        eland_send_time = GET_current_second();
         break;
     case SET_ELAND_RECE_TIME:
-        mico_time_get_utc_time(&eland_receive_time);
+        eland_receive_time = GET_current_second();
         break;
     case SET_ELSV_SEND_TIME:
         elsv_send_time = *value;
@@ -1840,6 +1840,7 @@ static void eland_set_time(void)
     offset_time1 = offset_time - (Timezone_offset_elsv);
     offset_time = offset_time1 + (netclock_des_g->timezone_offset_sec);
 
+    mico_rtos_lock_mutex(&time_Mutex);
     mico_time_get_utc_time(&utc_time);
     utc_time += offset_time;
     eland_tcp_log("utc_time:%ld", utc_time);
@@ -1858,6 +1859,7 @@ static void eland_set_time(void)
     rtc_time.year = (currentTime->tm_year + 1900) % 100;
     MicoRtcSetTime(&rtc_time);
     mico_time_get_iso8601_time(&iso8601_time);
+    mico_rtos_unlock_mutex(&time_Mutex);
     eland_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
     /*send time to lcd*/
     eland_push_uart_send_queue(TIME_SET_03);

@@ -453,7 +453,7 @@ static void Eland_H03_Send(uint8_t *Cache)
     struct tm *currentTime;
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
-    mico_time_get_utc_time(&utc_time);
+    utc_time = GET_current_second();
     currentTime = localtime((const time_t *)&(utc_time));
 
     cur_time.sec = currentTime->tm_sec;
@@ -1035,8 +1035,10 @@ static void MODH_Opration_04H(uint8_t *usart_rec)
     date_time.iMsec = 0;
     current_utc = GetSecondTime(&date_time);
     current_utc *= 1000;
+    mico_rtos_lock_mutex(&time_Mutex);
     MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
     mico_time_set_utc_time_ms(&current_utc);
+    mico_rtos_unlock_mutex(&time_Mutex);
 }
 
 static void MODH_Opration_xxH(__msg_function_t funtype, uint8_t *usart_rec)

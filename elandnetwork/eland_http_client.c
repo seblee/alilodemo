@@ -28,7 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_CLIENT_DEBUG
+//#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else

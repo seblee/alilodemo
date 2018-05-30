@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ALARM_DEBUG
+//#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -37,6 +37,7 @@
 mico_semaphore_t alarm_update = NULL;
 mico_semaphore_t alarm_skip_sem = NULL;
 mico_queue_t http_queue = NULL;
+mico_mutex_t time_Mutex = NULL;
 
 _eland_alarm_list_t alarm_list;
 _elsv_holiday_t holiday_list;
@@ -45,14 +46,14 @@ mico_thread_t play_voice_thread = NULL;
 
 _alarm_off_history_t off_history;
 /* Private function prototypes -----------------------------------------------*/
-static uint32_t GET_current_second(void);
+
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list);
 void Alarm_Manager(uint32_t arg);
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD);
 
 static void play_voice(mico_thread_arg_t arg);
 static void alarm_operation(__elsv_alarm_data_t *alarm);
-static void get_alarm_utc_second(__elsv_alarm_data_t *alarm);
+static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *utc_time);
 static bool today_is_holiday(DATE_TIME_t *date, uint8_t offset);
 static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_alarm_data_t *alarm);
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest, _alarm_list_state_t state);
@@ -62,6 +63,9 @@ static OSStatus set_alarm_history_send_sem(void);
 OSStatus Start_Alarm_service(void)
 {
     OSStatus err;
+    /*Register user function for MiCO nitification: WiFi status changed*/
+    err = mico_rtos_init_mutex(&time_Mutex);
+    require_noerr(err, exit);
     /*init holiday list*/
     memset(&holiday_list, 0, sizeof(_elsv_holiday_t));
     err = mico_rtos_init_mutex(&holiday_list.holidaymutex);
@@ -102,6 +106,7 @@ void Alarm_Manager(uint32_t arg)
 {
     _alarm_list_state_t alarm_state;
     mico_utc_time_t utc_time = 0;
+    uint8_t count_temp = 0;
     OSStatus err;
     uint8_t i;
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
@@ -114,7 +119,7 @@ void Alarm_Manager(uint32_t arg)
 
     while (1)
     {
-        err = mico_rtos_get_semaphore(&alarm_update, 500);
+        err = mico_rtos_get_semaphore(&alarm_update, 50);
         alarm_state = get_alarm_state();
         if ((alarm_state == ALARM_ADD) ||
             (alarm_state == ALARM_MINUS) ||
@@ -126,8 +131,10 @@ void Alarm_Manager(uint32_t arg)
             (err == kNoErr))
             combing_alarm(&alarm_list, &(alarm_list.alarm_nearest), alarm_state);
         else if ((alarm_state == ALARM_IDEL) &&
-                 (alarm_list.alarm_nearest))
+                 (alarm_list.alarm_nearest) &&
+                 (count_temp++ > 10))
         {
+            count_temp = 0;
             utc_time = GET_current_second();
             if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < 300) &&
                 (alarm_list.alarm_nearest->skip_flag == 0) &&
@@ -226,16 +233,19 @@ _stream_state_t get_alarm_stream_state(void)
     return alarm_stream.state;
 }
 
-static mico_utc_time_t GET_current_second(void)
+mico_utc_time_t GET_current_second(void)
 {
     mico_utc_time_t utc_time;
+    mico_rtos_lock_mutex(&time_Mutex);
     mico_time_get_utc_time(&utc_time);
+    mico_rtos_unlock_mutex(&time_Mutex);
     return utc_time;
 }
 /**elsv alarm data init**/
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
 {
     _alarm_mcu_data_t *alarm_mcu_data = NULL;
+    mico_utc_time_t utc_time;
     int ho, mi, se;
     //  set_alarm_state(ALARM_SORT);
     if (elsv_alarm_data == NULL)
@@ -247,7 +257,10 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     alarm_mcu_data->moment_time.min = mi;
     alarm_mcu_data->moment_time.sec = se;
     if (elsv_alarm_data->alarm_repeat == 0)
-        get_alarm_utc_second(elsv_alarm_data);
+    {
+        utc_time = GET_current_second();
+        get_alarm_utc_second(elsv_alarm_data, &utc_time);
+    }
 
     alarm_mcu_data->alarm_color = elsv_alarm_data->alarm_color;
     alarm_mcu_data->snooze_enabled = elsv_alarm_data->snooze_enabled;
@@ -298,10 +311,11 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
         elsv_alarm_data = NULL;
         goto exit;
     }
+    utc_time = GET_current_second();
     for (i = 0; i < list->alarm_number; i++)
     {
         if ((list->alarm_lib + i)->alarm_repeat)
-            get_alarm_utc_second(list->alarm_lib + i);
+            get_alarm_utc_second(list->alarm_lib + i, &utc_time);
     }
     /*****Sequence*****/
     for (i = 0; i < list->alarm_number - 1; i++)
@@ -318,10 +332,9 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
         }
     }
 
-    utc_time = GET_current_second();
-    alarm_log("utc_time:%ld", utc_time);
     for (i = 0; i < list->alarm_number; i++)
     {
+        alarm_log("moment_second:%ld,utc:%ld", (list->alarm_lib + i)->alarm_data_for_eland.moment_second, utc_time);
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <= utc_time)
             continue;
         else
@@ -589,6 +602,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         alarm_list.state.alarm_stoped = true;
         mico_time_get_iso8601_time(&iso8601_time);
         alarm_off_history_record_time(ALARM_OFF_SKIP, &iso8601_time);
+        set_alarm_state(ALARM_STOP);
         goto exit;
     }
 
@@ -604,7 +618,10 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         current_state = get_alarm_state();
         utc_time = GET_current_second();
         if (utc_time < alarm->alarm_data_for_eland.moment_second)
+        {
+            set_alarm_state(ALARM_STOP);
             goto exit;
+        }
         switch (current_state)
         {
         case ALARM_ING:
@@ -995,16 +1012,14 @@ uint8_t get_schedules_number(void)
     return alarm_list.schedules_num;
 }
 
-static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
+static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *utc_time)
 {
     DATE_TIME_t date_time;
-    mico_utc_time_t utc_time = 0;
     struct tm *currentTime;
     uint8_t week_day;
     int8_t i;
 
-    utc_time = GET_current_second();
-    currentTime = localtime((const time_t *)&utc_time);
+    currentTime = localtime((const time_t *)utc_time);
 
     date_time.iYear = 1900 + currentTime->tm_year;
     date_time.iMon = (int16_t)(currentTime->tm_mon + 1);
@@ -1019,7 +1034,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
     {
     case 0: //只在新数据导入时候计算一次
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-        if (alarm->alarm_data_for_eland.moment_second < utc_time)
+        if (alarm->alarm_data_for_eland.moment_second < *utc_time)
             alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
         break;
     case 1:
@@ -1027,7 +1042,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         i = 0;
         do
         {
-            if ((alarm->alarm_data_for_eland.moment_second < utc_time) ||
+            if ((alarm->alarm_data_for_eland.moment_second < *utc_time) ||
                 today_is_alarm_off_day(&date_time, i, alarm))
             {
                 i++;
@@ -1046,7 +1061,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
                 (((week_day + i - 1) % 7) == 6) ||
                 today_is_holiday(&date_time, i) ||
                 today_is_alarm_off_day(&date_time, i, alarm) ||
-                (alarm->alarm_data_for_eland.moment_second < utc_time))
+                (alarm->alarm_data_for_eland.moment_second < *utc_time))
             {
                 i++;
                 alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
@@ -1054,7 +1069,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
             }
             break;
         } while (1);
-        alarm_log("utc_time:%ld", alarm->alarm_data_for_eland.moment_second);
+        alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);
         break;
     case 3:
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
@@ -1063,7 +1078,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         {
             if (((((week_day + i - 1) % 7) != 0) && (((week_day + i - 1) % 7) != 6)) ||
                 today_is_alarm_off_day(&date_time, i, alarm) ||
-                (alarm->alarm_data_for_eland.moment_second < utc_time))
+                (alarm->alarm_data_for_eland.moment_second < *utc_time))
             {
                 i++;
                 alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
@@ -1079,7 +1094,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         {
             if ((alarm->alarm_on_days_of_week[(week_day + i - 1) % 7] == '0') ||
                 today_is_alarm_off_day(&date_time, i, alarm) ||
-                (alarm->alarm_data_for_eland.moment_second < utc_time))
+                (alarm->alarm_data_for_eland.moment_second < *utc_time))
             {
                 i++;
                 alarm->alarm_data_for_eland.moment_second += SECOND_ONE_DAY;
@@ -1090,7 +1105,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
         } while (1);
         break;
     case 5: //do not check alarm_off_dates
-        alarm_log("utc_time:%ld", utc_time);
+        alarm_log("utc_time:%ld", *utc_time);
         for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
         {
             if (alarm->alarm_on_dates[i] == 0)
@@ -1102,7 +1117,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm)
             date_time.iDay = date_time.iDay % SIMULATE_DAYS_OF_MONTH;
 
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
-            if (alarm->alarm_data_for_eland.moment_second > utc_time)
+            if (alarm->alarm_data_for_eland.moment_second > *utc_time)
                 break;
             alarm_log("date:%d-%02d-%02d", date_time.iYear, date_time.iMon, date_time.iDay);
             alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);

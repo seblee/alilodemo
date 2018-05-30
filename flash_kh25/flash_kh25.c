@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_FLASH_DEBUG
+//#define CONFIG_FLASH_DEBUG
 #ifdef CONFIG_FLASH_DEBUG
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 #else

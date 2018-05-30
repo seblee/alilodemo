@@ -28,7 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_APPHTTPD_DEBUG
+//#define CONFIG_APPHTTPD_DEBUG
 #ifdef CONFIG_APPHTTPD_DEBUG
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
 #else
