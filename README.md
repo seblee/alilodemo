@@ -1,5 +1,14 @@
 # Netclock
 
+# v01.18
+2018年5月31日14:40:04
+## 
+    change scan alarm sound as 3
+    change alarm operation
+    change alarm skip
+    issue snooze_key notice not play err_sound
+    add time_Mutex
+    change some error not goto exit in tcp
 # v01.17
 2018年5月25日10:20:23
 ##    
@@ -32,7 +41,8 @@
     change stream_id to only one
     oid do net play in other mode but nc
     issue weather scan when ppattern ==2 ==3 do not download ofid
-    issue alarm play 61 seconde; add sound file remove operation
+    issue alarm play 61 seconde
+    add sound file remove operation
     issue sound file arrange delete other file
     change flash erase when writing
     issue is_sound_file_usable pattern ==3 sid return false bug

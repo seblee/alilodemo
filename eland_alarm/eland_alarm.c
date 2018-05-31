@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ALARM_DEBUG
+#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -258,6 +258,7 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     alarm_mcu_data->moment_time.sec = se;
     if (elsv_alarm_data->alarm_repeat == 0)
     {
+        alarm_log("alarm_time:%s", elsv_alarm_data->alarm_time);
         utc_time = GET_current_second();
         get_alarm_utc_second(elsv_alarm_data, &utc_time);
     }
@@ -1135,6 +1136,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     alarm->alarm_data_for_mcu.next_alarm = 1;
     // else
     //     alarm->alarm_data_for_mcu.next_alarm = 0;
+    // alarm_log("alarm_id:%s", alarm->alarm_time);
     // alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
     //           alarm->alarm_data_for_mcu.moment_time.year + 2000,
     //           alarm->alarm_data_for_mcu.moment_time.month,
@@ -1142,7 +1144,6 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     //           alarm->alarm_data_for_mcu.moment_time.hr,
     //           alarm->alarm_data_for_mcu.moment_time.min,
     //           alarm->alarm_data_for_mcu.moment_time.sec);
-    // alarm_log("alarm_id:%s", alarm->alarm_id);
 }
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
