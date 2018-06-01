@@ -957,7 +957,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                     cache = get_previous_alarm_serial(cache);
                 set_display_na_serial(cache);
             }
-            else if (Key_Restain_Trg & KEY_Set) //NA
+            if ((Key_Restain_Trg & KEY_Set) &&
+                ((Key_Count & KEY_Add) == 0) &&
+                ((Key_Count & KEY_Minus) == 0)) //NA
             {
                 set_eland_mode(ELAND_AP);
                 time_delay_counter = 0;
