@@ -94,8 +94,8 @@ int application_start(void)
     err = check_default_sound();
     require_noerr(err, exit);
 
-    err = TCP_Service_Start();
-    require_noerr(err, exit);
+    // err = TCP_Service_Start();
+    // require_noerr(err, exit);
     err = kNoErr;
 exit:
     if (err != kNoErr)

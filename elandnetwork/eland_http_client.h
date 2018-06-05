@@ -85,6 +85,7 @@ typedef struct _http_context_t
 {
     char *content;
     uint64_t content_length;
+    uint8_t continue_flag;
 } http_context_t;
 typedef enum __SOUND_DOWNLOAD_STATUS
 {

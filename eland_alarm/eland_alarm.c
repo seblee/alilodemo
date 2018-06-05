@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ALARM_DEBUG
+//#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -45,6 +45,9 @@ _alarm_stream_t alarm_stream;
 mico_thread_t play_voice_thread = NULL;
 
 _alarm_off_history_t off_history;
+
+mico_timer_t timer_1s;
+mico_utc_time_t eland_current_utc = 0;
 /* Private function prototypes -----------------------------------------------*/
 
 static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list);
@@ -59,6 +62,7 @@ static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_ala
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest, _alarm_list_state_t state);
 static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2);
 static OSStatus set_alarm_history_send_sem(void);
+static void timer_1s_handle(void *arg);
 /* Private functions ---------------------------------------------------------*/
 OSStatus Start_Alarm_service(void)
 {
@@ -98,6 +102,13 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "Alarm_Manager", Alarm_Manager, 0x800, 0);
+    require_noerr(err, exit);
+
+    /*configuration usart timer*/
+    err = mico_init_timer(&timer_1s, 1000, timer_1s_handle, NULL); //100ms 讀取一次
+    require_noerr(err, exit);
+    /*start key read timer*/
+    err = mico_start_timer(&timer_1s); //開始定時器
     require_noerr(err, exit);
 exit:
     return err;
@@ -156,32 +167,36 @@ void Alarm_Manager(uint32_t arg)
     }
     mico_rtos_delete_thread(NULL);
 }
+static void timer_1s_handle(void *arg)
+{
+    Eland_Status_type_t state;
+    static mico_utc_time_t eland_utc_cache = 0;
+    mico_rtos_lock_mutex(&time_Mutex);
+    mico_time_get_utc_time(&eland_current_utc);
+    mico_rtos_unlock_mutex(&time_Mutex);
+
+    state = get_eland_mode_state() & 0xff;
+    //   alarm_log("##### timer_1s_handle state:%d ######", state);
+
+    if ((eland_current_utc % 60) == (netclock_des_g->eland_id % 60) &&
+        (eland_utc_cache != eland_current_utc))
+    {
+        eland_utc_cache = eland_current_utc;
+        if (state >= CONNECTED_NET)
+            TCP_Push_MSG_queue(TCP_HC00_Sem);
+        else /*read mcu rtc time*/
+            eland_push_uart_send_queue(TIME_READ_04);
+    }
+}
 _alarm_list_state_t get_alarm_state(void)
 {
     return alarm_list.state.state;
 }
 void set_alarm_state(_alarm_list_state_t state)
 {
-    iso8601_time_t iso8601_time;
-    bool Alarm_refresh_flag = false;
-    if (state == ALARM_ING)
-    {
-        mico_time_get_iso8601_time(&iso8601_time);
-        alarm_off_history_record_time(ALARM_ON, &iso8601_time);
-    }
-    if ((alarm_list.state.state == ALARM_ING) ||
-        (alarm_list.state.state == ALARM_SNOOZ_STOP) ||
-        (state == ALARM_ING) ||
-        (state == ALARM_SNOOZ_STOP))
-    {
-        alarm_log("##%d# alarm state refreshed #%d##", alarm_list.state.state, state);
-        Alarm_refresh_flag = true;
-    }
     mico_rtos_lock_mutex(&alarm_list.state.AlarmStateMutex);
     alarm_list.state.state = state;
     mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
-    if (Alarm_refresh_flag)
-        eland_push_uart_send_queue(ALARM_SEND_0B);
 }
 static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
@@ -237,7 +252,7 @@ mico_utc_time_t GET_current_second(void)
 {
     mico_utc_time_t utc_time;
     mico_rtos_lock_mutex(&time_Mutex);
-    mico_time_get_utc_time(&utc_time);
+    utc_time = eland_current_utc;
     mico_rtos_unlock_mutex(&time_Mutex);
     return utc_time;
 }
@@ -638,7 +653,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
                 /**alarm on notice**/
                 TCP_Push_MSG_queue(TCP_HT00_Sem);
-                for (i = volume_value; i > 0; i--)
+                for (i = 0; i < 33; i++)
                     audio_service_volume_down(&result, 1);
                 volume_value = 0;
                 if (alarm->volume_stepup_enabled == 0)
@@ -649,6 +664,9 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                         volume_value++;
                     }
                 }
+                mico_time_get_iso8601_time(&iso8601_time);
+                alarm_off_history_record_time(ALARM_ON, &iso8601_time);
+                eland_push_uart_send_queue(ALARM_SEND_0B);
             }
             if ((alarm->volume_stepup_enabled) &&
                 (++volume_stepup_count > 10))
@@ -669,7 +687,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 set_alarm_state(ALARM_SNOOZ_STOP);
             }
             else
-                Alarm_Play_Control(alarm, 1); //play with delay
+                Alarm_Play_Control(alarm, AUDIO_PALY); //play with delay
             break;
         case ALARM_ADD:
         case ALARM_MINUS:
@@ -679,7 +697,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
         case ALARM_STOP:
             alarm_log("Alarm_Play_Control: ALARM_STOP");
-            Alarm_Play_Control(alarm, 0); //stop
+            Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             goto exit;
             break;
         case ALARM_SNOOZ_STOP:
@@ -690,7 +708,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     first_to_snooze = false;
                     first_to_alarming = true;
                     alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
-                    Alarm_Play_Control(alarm, 0); //stop
+                    Alarm_Play_Control(alarm, AUDIO_STOP); //stop
                     if (utc_time >= alarm_moment)
                     {
                         set_alarm_state(ALARM_ING);
@@ -702,6 +720,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     /**add json for tcp**/
                     set_alarm_history_send_sem();
                     alarm_log("Alarm_Play_Control: first_to_snooze");
+                    eland_push_uart_send_queue(ALARM_SEND_0B);
                 }
                 if (utc_time >= alarm_moment)
                 {
@@ -723,15 +742,15 @@ exit:
     set_alarm_history_send_sem();
 }
 /***CMD = 1 PALY   CMD = 0 STOP***/
-static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
+static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CMD)
 {
     mscp_result_t result;
     mscp_status_t audio_status;
     static bool isVoice = false;
-    static uint8_t CMD_bak = 0;
+    static uint8_t CMD_bak = AUDIO_NONE;
 
     audio_service_get_audio_status(&result, &audio_status);
-    if ((CMD == 1) && (get_alarm_stream_state() != STREAM_PLAY)) //play
+    if ((CMD == AUDIO_PALY) && (get_alarm_stream_state() != STREAM_PLAY)) //play
     {
         alarm_log("audio_status %d", audio_status);
         if (alarm->alarm_pattern == 1)
@@ -776,7 +795,16 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             isVoice = false;
         }
     }
-    else if ((CMD == 0) && (CMD_bak == 1)) //stop
+    else if (CMD == AUDIO_STOP) //stop
+    {
+        isVoice = false;
+        alarm_log("player_flash_thread");
+        if (get_alarm_stream_state() == STREAM_PLAY)
+            set_alarm_stream_state(STREAM_STOP);
+    }
+    else if ((CMD == AUDIO_STOP_PLAY) &&
+             (CMD_bak != AUDIO_STOP) &&
+             (CMD_bak != AUDIO_STOP_PLAY)) //stop
     {
         isVoice = false;
         alarm_log("player_flash_thread");
@@ -795,6 +823,7 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, uint8_t CMD)
             init_alarm_stream(alarm, SOUND_FILE_OFID);
             set_alarm_stream_state(STREAM_PLAY);
             alarm_log("start play ofid");
+            mico_rtos_thread_msleep(400);
             mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }
     }
