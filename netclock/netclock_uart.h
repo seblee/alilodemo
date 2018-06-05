@@ -145,6 +145,7 @@ typedef struct eland_data_2_mcu
 #define RSSI_STATE_STAGE4 (int16_t)(-65)
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
+extern mico_utc_time_t eland_current_utc;
 /* Private function prototypes -----------------------------------------------*/
 void set_eland_mode(_ELAND_MODE_t mode);
 uint16_t get_eland_mode_state(void);

@@ -255,7 +255,6 @@ TCP_Error_t TCP_Write(Network_t *pNetwork,
 
     gettimeofday(&current_temp, NULL);
     timeradd(&current_temp, timer, &timeforward);
-    time_record(SET_ELAND_SEND_TIME, NULL);
     for (written_so_far = 0, frags = 0; written_so_far < len && !has_timer_expired(&timeforward); written_so_far += ret, frags++)
     {
         while ((!has_timer_expired(&timeforward)) && ((ret = ssl_send(pNetwork->tlsDataParams.ssl, pMsg + written_so_far, len - written_so_far)) <= 0))
@@ -374,7 +373,6 @@ startread:
     if (len == 0)
     {
         *read_len = rxlen;
-        time_record(SET_ELAND_RECE_TIME, NULL);
         return TCP_SUCCESS;
     }
     if (rxlen == 0)
@@ -473,16 +471,13 @@ static void TCP_thread_main(mico_thread_arg_t arg)
     OSStatus err = kNoErr;
     TCP_Error_t rc = TCP_SUCCESS;
     _Client_t Eland_Client;
-    bool tcp_HC_flag = true;
-    uint8_t HC00_moment_sec = 61, HC00_moment_min = 61;
     ServerParams_t serverPara;
     _time_t timer;
-    mico_rtc_time_t cur_time = {0};
+
     _tcp_cmd_sem_t tcp_message;
 #ifdef MICO_DISABLE_STDIO
     _ELAND_MODE_t eland_mode;
 #endif
-    HC00_moment_sec = (netclock_des_g->eland_id) % 100 % 60;
 
 #ifdef MICO_DISABLE_STDIO
     mico_rtos_thread_msleep(1500);
@@ -545,7 +540,6 @@ GET_CONNECT_INFO:
     }
     rc = TCP_Client_Init(&Eland_Client, &serverPara);
     require_string(TCP_SUCCESS == rc, exit, "Shadow Connection Error");
-
 RECONN:
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
     if ((err == kNoErr) && (tcp_message = TCP_Stop_Sem))
@@ -587,26 +581,6 @@ RECONN:
     require_string(TCP_SUCCESS == rc, exit, "TCP_update_alarm Error");
 
 little_cycle_loop:
-    MicoRtcGetTime(&cur_time);
-    // eland_tcp_log("cur_time 20 %d.%02d.%02d %02d:%02d:%02d  %d", cur_time.year + 100, cur_time.month, cur_time.date, cur_time.hr, cur_time.min, cur_time.sec, cur_time.weekday);
-    // eland_tcp_log("cur_time.sec:%d,CHUNKS:%d,memory:%d", cur_time.sec, MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
-    if ((cur_time.sec == HC00_moment_sec) && (cur_time.min != HC00_moment_min))
-    {
-        tcp_HC_flag = true;
-        HC00_moment_min = cur_time.min;
-    }
-    if (tcp_HC_flag)
-    {
-        rc = TCP_health_check(&Eland_Client);
-        if (rc != TCP_SUCCESS)
-        {
-            eland_tcp_log("TCP_health_check rc= %d", rc);
-            if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc) || (NETWORK_SSL_WRITE_ERROR == rc) || (NETWORK_SSL_WRITE_TIMEOUT_ERROR == rc))
-                goto exit;
-        }
-        else
-            tcp_HC_flag = false;
-    }
     timer.tv_sec = 1;
     timer.tv_usec = 0;
     rc = TCP_receive_packet(&Eland_Client, &timer);
@@ -646,7 +620,8 @@ pop_queue:
         /*******health check***********/
         else if (tcp_message == TCP_HC00_Sem)
         {
-            tcp_HC_flag = true;
+            rc = TCP_health_check(&Eland_Client);
+            eland_tcp_log("TCP_HC00_Sem");
         }
         /*******OTA start***********/
         else if (tcp_message == TCP_FW01_Sem)
@@ -666,12 +641,13 @@ pop_queue:
             // require_string(TCP_SUCCESS == rc, exit, "TCP_request_response SD00, SD01 Error");
         }
 
-        if (TCP_SUCCESS != rc)
+        if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc) || (NETWORK_SSL_WRITE_ERROR == rc) || (NETWORK_SSL_WRITE_TIMEOUT_ERROR == rc))
         {
-            //mico_thread_sleep(1);
+            goto exit;
             eland_tcp_log("Connection Error rc = %d", rc);
         }
-        //  goto pop_queue;
+        if (TCP_SUCCESS == rc)
+            goto pop_queue;
     }
 #ifdef MICO_DISABLE_STDIO
     eland_mode = get_eland_mode();
@@ -865,6 +841,7 @@ static TCP_Error_t TCP_health_check(_Client_t *pClient)
     timer.tv_sec = 5;
     timer.tv_usec = 0;
 
+    time_record(SET_ELAND_SEND_TIME, NULL);
     rc = TCP_send_packet(pClient, HC00, &timer);
     if (rc != TCP_SUCCESS)
         return rc;
@@ -1111,8 +1088,10 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case HC00: //02 health check request
         break;
     case HC01: //03 health check response
+        time_record(SET_ELAND_RECE_TIME, NULL);
         rc = TCP_Operate_HC01((char *)(buff + sizeof(_TELEGRAM_t)));
         eland_set_time();
+        eland_push_uart_send_queue(TIME_SET_03);
         break;
     case DV00: //04 eland info request
         break;
@@ -1859,10 +1838,11 @@ static void eland_set_time(void)
     rtc_time.year = (currentTime->tm_year + 1900) % 100;
     MicoRtcSetTime(&rtc_time);
     mico_time_get_iso8601_time(&iso8601_time);
+    mico_time_get_utc_time(&eland_current_utc);
     mico_rtos_unlock_mutex(&time_Mutex);
     eland_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
     /*send time to lcd*/
-    eland_push_uart_send_queue(TIME_SET_03);
+
     if ((offset_time > 86400) || (offset_time < -86400))
         mico_rtos_set_semaphore(&alarm_update);
 }

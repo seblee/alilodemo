@@ -47,6 +47,13 @@ typedef enum
     ALARM_STOP,
     ALARM_SKIP,
 } _alarm_list_state_t;
+typedef enum
+{
+    AUDIO_NONE,
+    AUDIO_PALY,
+    AUDIO_STOP,
+    AUDIO_STOP_PLAY,
+} _alarm_play_tyep_t;
 typedef struct
 {
     mico_rtc_time_t moment_time;

@@ -27,7 +27,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_UART_DEBUG
+#define CONFIG_UART_DEBUG
 #ifdef CONFIG_UART_DEBUG
 #define Eland_uart_log(M, ...) custom_log("UART", M, ##__VA_ARGS__)
 #else
@@ -136,8 +136,7 @@ OSStatus start_uart_service(void)
 
     err = mico_rtos_deinit_semaphore(&Is_usart_complete_sem);
     require_noerr(err, exit);
-    /*read mcu rtc time*/
-    eland_push_uart_send_queue(TIME_READ_04);
+
     SendElandStateQueue(ElandBegin);
     Eland_uart_log("start usart timer");
     /*configuration usart timer*/
@@ -323,6 +322,7 @@ void SendElandStateQueue(Eland_Status_type_t value)
     if (mico_rtos_is_queue_full(&eland_state_queue)) //if full pick out data then update state
         mico_rtos_pop_from_queue(&eland_state_queue, &state, 0);
     state = value;
+
     mico_rtos_push_to_queue(&eland_state_queue, &state, 0);
     eland_push_uart_send_queue(ELAND_STATES_05);
 }
@@ -1075,9 +1075,9 @@ void set_eland_mode(_ELAND_MODE_t mode)
 }
 static void set_eland_state(Eland_Status_type_t state)
 {
-    if (eland_mode_state.state_mutex == NULL)
-        return;
-    mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
+    if (eland_mode_state.state_mutex != NULL)
+        mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
+    Eland_uart_log("*****************set_eland_state:%d", state);
     eland_mode_state.eland_status = state;
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
 }

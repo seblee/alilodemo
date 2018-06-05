@@ -24,6 +24,7 @@
 #include "netclock_uart.h"
 #include "audio_service.h"
 #include "netclock_ota.h"
+#include "url.h"
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -45,10 +46,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 static char *eland_http_requeset = NULL;
-
-uint32_t eland_sound_download_pos = 0;
-uint32_t eland_sound_download_len = 0;
-SOUND_DOWNLOAD_STATUS sound_download_status = SOUND_DOWNLOAD_IDLE;
 
 /*************certificate********************************/
 char *certificate =
@@ -161,6 +158,8 @@ void send_response_to_queue(ELAND_HTTP_RESPONSE_E status,
                             uint32_t http_id,
                             int32_t status_code,
                             const char *response_body);
+
+static OSStatus HTTP_REQUEST_BUILD(url_field_t *CONTINUED_URL, char *request, uint32_t http_req_len);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -382,11 +381,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
         /*parse header*/
         client_log("start read response");
         err = SocketReadHTTPSHeader(client_ssl, httpHeader);
-        if (sound_download_status == SOUND_DOWNLOAD_START)
-        {
-            eland_sound_download_len = httpHeader->contentLength;
-            sound_download_status = SOUND_DOWNLOAD_CONTINUE;
-        }
+
         switch (err)
         {
         case kNoErr:
@@ -586,7 +581,6 @@ static void onClearData(struct _HTTPHeader_t *inHeader, void *inUserContext)
         free(context->content);
         context->content = NULL;
     }
-    eland_sound_download_pos = 0;
 }
 
 //发送http请求 single mode
@@ -600,7 +594,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     uint32_t http_req_all_len;
     char ipstr[20] = {0};
     HTTPHeader_t *httpHeader = NULL;
-    http_context_t context = {NULL, 0};
+    http_context_t context = {NULL, 0, 0};
     struct sockaddr_in addr;
     int http_fd = -1;
     int ret = 0;
@@ -608,7 +602,12 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
     struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
+    char uri_temp[150];
+    const char *X_EL_CONTINUED_URL_STR;
+    size_t X_EL_CONTINUED_URL_LEN;
+    url_field_t *X_EL_CONTINUED_URL;
 
+    memcpy(uri_temp, request_uri, strlen(request_uri));
     err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     client_log("lock http_mutex");
     if (http_body)
@@ -631,11 +630,11 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     /******set request mode******/
     if (method == HTTP_POST)
     {
-        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, request_uri);
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, uri_temp);
     }
     else if (method == HTTP_GET)
     {
-        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, request_uri);
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, uri_temp);
     }
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", host_name); //增加hostname
     //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
@@ -707,8 +706,8 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     client_ssl = ssl_connect(http_fd, 0, NULL, &ssl_errno);
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
 
-    // ssl_set_using_nonblock(client_ssl, 1);
-
+// ssl_set_using_nonblock(client_ssl, 1);
+send_request:
     client_log("ssl_send request");
     /* Send HTTP Request */
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
@@ -770,11 +769,33 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
             //只有code正确才解析返回数据,错误情况下解析容易造成内存溢出
             if (httpHeader->statusCode == 200) //正常應答
             {
-                //PrintHTTPHeader(httpHeader);
+                // PrintHTTPHeader(httpHeader);
                 client_log("statusCode == 200");
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
                 client_log("data lenth = %ld", (uint32_t)context.content_length);
                 require_noerr(err, exit);
+                if (download_type == DOWNLOAD_OID)
+                {
+                    err = HTTPGetHeaderField(httpHeader->buf, httpHeader->len, "X-EL-CONTINUED-URL", NULL, NULL, &X_EL_CONTINUED_URL_STR, &X_EL_CONTINUED_URL_LEN, NULL);
+                    if (err == kNoErr)
+                    {
+                        memset(eland_http_requeset, 0, http_req_all_len);
+                        memcpy(eland_http_requeset, X_EL_CONTINUED_URL_STR, X_EL_CONTINUED_URL_LEN);
+                        X_EL_CONTINUED_URL = url_parse(eland_http_requeset);
+                        require_action(X_EL_CONTINUED_URL, exit, err = kParamErr);
+                        err = HTTP_REQUEST_BUILD(X_EL_CONTINUED_URL, eland_http_requeset, http_req_all_len);
+                        url_free(X_EL_CONTINUED_URL);
+                        //client_log("requeset:%s", eland_http_requeset);
+                        HTTPHeaderDestory(&httpHeader);
+                        httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData_oid, onClearData, &context);
+                        require_action(httpHeader, exit, err = kGeneralErr);
+                        context.continue_flag = 1;
+                        goto send_request;
+                        err = kNoErr;
+                    }
+                    else
+                        err = kNoErr;
+                }
             }
             break;
         }
@@ -838,8 +859,11 @@ static OSStatus onReceivedData_oid(struct _HTTPHeader_t *inHeader, uint32_t inPo
         context->content_length = inHeader->contentLength;
         fm_stream.type = AUDIO_STREAM_TYPE_MP3;
         fm_stream.stream_id = alarm_stream.stream_id;
-        fm_stream.total_len = context->content_length;
         fm_stream.pdata = (const uint8_t *)context->content;
+        if (context->continue_flag == 0)
+            fm_stream.total_len = context->content_length;
+        else
+            fm_stream.total_len += context->content_length;
     }
     memcpy(context->content, inData, inLen);
     fm_stream.stream_len = (uint16_t)(inLen & 0xFFFF); //len
@@ -897,5 +921,36 @@ static OSStatus onReceivedData_ota(struct _HTTPHeader_t *inHeader, uint32_t inPo
     err = eland_ota_data_write(inData, inLen);
     require_noerr(err, exit);
 exit:
+    return err;
+}
+
+static OSStatus HTTP_REQUEST_BUILD(url_field_t *CONTINUED_URL, char *request, uint32_t http_req_len)
+{
+    OSStatus err = kNoErr;
+    uint8_t i;
+    char uri[100];
+
+    memset(uri, 0, sizeof(uri));
+    memset(request, 0, http_req_len);
+
+    // client_log("host:%s", CONTINUED_URL->host);
+    // client_log("path:%s", CONTINUED_URL->path);
+    sprintf(uri + strlen(uri), "%s%s%s", "/", CONTINUED_URL->path, "?");
+    // client_log("query_num:%d", CONTINUED_URL->query_num);
+    for (i = 0; i < CONTINUED_URL->query_num; i++)
+    {
+        if (i != 0)
+            sprintf(uri + strlen(uri), "%s", "&");
+        sprintf(uri + strlen(uri), "%s=%s", (CONTINUED_URL->query + i)->name, (CONTINUED_URL->query + i)->value);
+        // client_log("query%d name:%s", i, (CONTINUED_URL->query + i)->name);
+        // client_log("query%d value:%s", i, (CONTINUED_URL->query + i)->value);
+    }
+    client_log("uri:%s", uri);
+
+    sprintf(request, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, uri);
+    sprintf(request + strlen(request), "Host: %s\r\n", CONTINUED_URL->host); //增加hostname
+    sprintf(request + strlen(request), "Connection: Keep-Alive\r\n");        //增加Connection设置
+    sprintf(request + strlen(request), "Content-Length: 0\r\n\r\n");         //增加Content-Length
+
     return err;
 }

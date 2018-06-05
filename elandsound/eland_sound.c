@@ -23,7 +23,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_SOUND_DEBUG
+#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -340,8 +340,9 @@ void file_download(void)
 {
     OSStatus err;
     _download_type_t download_type;
-    // eland_push_http_queue(DOWNLOAD_OID);
+    eland_push_http_queue(DOWNLOAD_OID);
 wait_for_queue:
+    sound_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
     require_noerr(err, exit);
     mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
@@ -363,7 +364,7 @@ operation_queue:
                 goto operation_queue;
             }
         }
-        // eland_push_http_queue(DOWNLOAD_OID);
+        eland_push_http_queue(DOWNLOAD_OID);
         break;
     case DOWNLOAD_OTA:
         eland_ota();
