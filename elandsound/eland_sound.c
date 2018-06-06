@@ -340,7 +340,7 @@ void file_download(void)
 {
     OSStatus err;
     _download_type_t download_type;
-    eland_push_http_queue(DOWNLOAD_OID);
+    // eland_push_http_queue(DOWNLOAD_OID);
 wait_for_queue:
     sound_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
@@ -364,7 +364,7 @@ operation_queue:
                 goto operation_queue;
             }
         }
-        eland_push_http_queue(DOWNLOAD_OID);
+        // eland_push_http_queue(DOWNLOAD_OID);
         break;
     case DOWNLOAD_OTA:
         eland_ota();
@@ -600,7 +600,7 @@ OSStatus eland_play_oid_error_sound(void)
     uint8_t oid_volume = 0, i;
 
     for (i = 0; i < 33; i++)
-        audio_service_volume_up(&result, 1);
+        audio_service_volume_down(&result, 1);
     oid_volume = get_notification_volume();
     for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
     {
