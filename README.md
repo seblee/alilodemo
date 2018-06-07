@@ -1,5 +1,18 @@
 # Netclock
 
+# v01.19
+2018年6月7日13:49:35
+## 
+    add over 24h led do not display
+    add dddddd sound download like weather
+    save ssid and key with out checkout
+    add 1s time read
+    issue alarm play volume err
+    add audio play stop stop_play
+    issue default err_sound volume max
+    issue display time set year problem;
+    issue when up down pressed ,ap can in
+
 # v01.18
 2018年5月31日14:40:04
 ## 
@@ -51,7 +64,8 @@
     change alarm ofid play bug
     change domain name
     issue week alarm bug
-    issue next alarm not display befor one day more; add Alarm clock schedule get when alarm refreshed
+    issue next alarm not display befor one day more
+    add Alarm clock schedule get when alarm refreshed
     issue odi just weather bug
     change AP mode function to function file_download
     issue des_recovery IsAlreadySet set 0 bug
