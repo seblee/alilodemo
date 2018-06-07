@@ -21,7 +21,7 @@
 #include "netclock_uart.h"
 #include "eland_http_client.h"
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ALARM_DEBUG
+#define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
 #define alarm_log(M, ...) custom_log("alarm", M, ##__VA_ARGS__)
 #else
@@ -118,6 +118,7 @@ void Alarm_Manager(uint32_t arg)
     _alarm_list_state_t alarm_state;
     mico_utc_time_t utc_time = 0;
     uint8_t count_temp = 0;
+    uint8_t led_check_flag = 0, weather_refreshed = 0;
     OSStatus err;
     uint8_t i;
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
@@ -140,18 +141,33 @@ void Alarm_Manager(uint32_t arg)
             (alarm_state == ALARM_STOP) ||
             (alarm_state == ALARM_SKIP) ||
             (err == kNoErr))
+        {
             combing_alarm(&alarm_list, &(alarm_list.alarm_nearest), alarm_state);
+            led_check_flag = 0;
+            weather_refreshed = 0;
+        }
         else if ((alarm_state == ALARM_IDEL) &&
                  (alarm_list.alarm_nearest) &&
                  (count_temp++ > 10))
         {
             count_temp = 0;
             utc_time = GET_current_second();
+            /**************check alarm_color*********************/
+            if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY) &&
+                (alarm_list.alarm_nearest->alarm_data_for_mcu.alarm_color == 0) &&
+                (led_check_flag == 0))
+            {
+                led_check_flag = 1;
+                alarm_list.alarm_nearest->alarm_data_for_mcu.alarm_color = alarm_list.alarm_nearest->alarm_color;
+                alarm_log("##### refresh alarm led ######");
+                eland_push_uart_send_queue(ALARM_SEND_0B);
+            }
+            /**************check weather*********************/
             if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < 300) &&
                 (alarm_list.alarm_nearest->skip_flag == 0) &&
-                alarm_list.weather_need_refreshed)
+                (weather_refreshed == 0))
             {
-                alarm_list.weather_need_refreshed = false;
+                weather_refreshed = 1;
                 alarm_log("##### DOWNLOAD_WEATHER ######");
                 eland_push_http_queue(DOWNLOAD_WEATHER);
             }
@@ -319,7 +335,6 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     __elsv_alarm_data_t elsv_alarm_data_temp;
     list->list_refreshed = false;
     list->state.alarm_stoped = false;
-    list->weather_need_refreshed = true;
     alarm_log("alarm_number = %d", list->alarm_number);
     list->alarm_now_serial = 0;
     if (list->alarm_number == 0)
@@ -420,6 +435,7 @@ OSStatus alarm_sound_scan(void)
             // alarm_log("alarm:%d,VID:%s", temp_point, (alarm_list.alarm_lib + temp_point)->voice_alarm_id);
             if (strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "ffffffff") ||
                 strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "eeeeeeee") ||
+                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "dddddddd") ||
                 strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "00000000"))
             {
             }
@@ -440,6 +456,7 @@ OSStatus alarm_sound_scan(void)
             // alarm_log("alarm:%d,OFID:%s", temp_point, (alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id);
             if (strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "ffffffff") ||
                 strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "eeeeeeee") ||
+                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "dddddddd") ||
                 strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "00000000"))
             {
             }
@@ -499,6 +516,8 @@ checkout_ofid:
             sound_type = SOUND_FILE_WEATHER_F;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "eeeeeeee"))
             sound_type = SOUND_FILE_WEATHER_E;
+        else if (strstr(nearest->alarm_off_voice_alarm_id, "dddddddd"))
+            sound_type = SOUND_FILE_WEATHER_D;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "00000000"))
             sound_type = SOUND_FILE_WEATHER_0;
         else
@@ -1159,12 +1178,13 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     }
     /*******Calculate date for mcu*********/
     UCT_Convert_Date(&(alarm->alarm_data_for_eland.moment_second), &(alarm->alarm_data_for_mcu.moment_time));
-    /*if alarm > one day then next alaarm disappeared*/
-    // if ((utc_time < alarm->alarm_data_for_eland.moment_second) &&
-    //     ((alarm->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY))
     alarm->alarm_data_for_mcu.next_alarm = 1;
-    // else
-    //     alarm->alarm_data_for_mcu.next_alarm = 0;
+    /*if alarm > one day then alarm LED disappeared*/
+    if ((*utc_time < alarm->alarm_data_for_eland.moment_second) &&
+        ((alarm->alarm_data_for_eland.moment_second - *utc_time) <= SECOND_ONE_DAY))
+        alarm->alarm_data_for_mcu.alarm_color = alarm->alarm_color;
+    else
+        alarm->alarm_data_for_mcu.alarm_color = 0;
     // alarm_log("alarm_id:%s", alarm->alarm_time);
     // alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
     //           alarm->alarm_data_for_mcu.moment_time.year + 2000,
