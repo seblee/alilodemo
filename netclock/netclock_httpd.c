@@ -28,7 +28,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_APPHTTPD_DEBUG
+#define CONFIG_APPHTTPD_DEBUG
 #ifdef CONFIG_APPHTTPD_DEBUG
 #define app_httpd_log(M, ...) custom_log("apphttpd", M, ##__VA_ARGS__)
 #else
@@ -48,6 +48,7 @@ mico_semaphore_t http_ssid_event_Sem = NULL;
 __http_ssids_list_t wifi_scan_list;
 /* Private function prototypes -----------------------------------------------*/
 static OSStatus eland_Setting_Json(char *InputJson);
+static void eland_wifi_parameter_save(void);
 /* Private functions ---------------------------------------------------------*/
 static void wifi_manager_scan_complete_cb(ScanResult_adv *pApList, void *arg)
 {
@@ -118,7 +119,7 @@ exit:
     free_json_obj(&Json);
     return err;
 }
-static void eland_check_ssid(void)
+void eland_check_ssid(void)
 {
     msg_wify_queue received;
     mico_Context_t *context = NULL;
@@ -135,32 +136,7 @@ static void eland_check_ssid(void)
     Start_wifi_Station_SoftSP_Thread(Station);
     mico_rtos_pop_from_queue(&wifistate_queue, &received, MICO_WAIT_FOREVER);
     if (received.value == Wify_Station_Connect_Successed)
-    {
-        app_httpd_log("Wifi parameter is correct");
-        device_state->IsActivate = true;
-        app_httpd_log("save wifi para,update flash"); //save
-        strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
-        strncpy(context->micoSystemConfig.key, netclock_des_g->WifiKey, ElandKey_Len);
-        strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
-        context->micoSystemConfig.keyLength = strlen(context->micoSystemConfig.key);
-        context->micoSystemConfig.user_keyLength = strlen(context->micoSystemConfig.key);
-        context->micoSystemConfig.channel = 0;
-        memset(context->micoSystemConfig.bssid, 0x0, 6);
-        context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
-        if (netclock_des_g->dhcp_enabled == 1)
-            context->micoSystemConfig.dhcpEnable = DHCP_Client; /* Fetch Ip address from DHCP server */
-        else if (netclock_des_g->dhcp_enabled == 0)
-        {
-            context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
-            memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
-            memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
-            memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
-            memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->primary_dns, 16);
-        }
-        context->micoSystemConfig.configured = allConfigured;
-        mico_system_context_update(context);
-        mico_rtos_thread_msleep(400);
-    }
+        eland_wifi_parameter_save();
     else
     {
         SendElandStateQueue(WifyConnectedFailed);
@@ -231,8 +207,10 @@ static int web_send_Post_Request(httpd_request_t *req)
         mico_thread_sleep(1); //等待傳輸完成
         if (ProcessPostJson(buf) == kNoErr)
         {
+            eland_wifi_parameter_save();
+            mico_system_power_perform(mico_system_context_get(), eState_Software_Reset);
             app_httpd_log("Json useful");
-            eland_check_ssid();
+            //    eland_check_ssid();
         }
         else
         {
@@ -534,4 +512,33 @@ static OSStatus eland_Setting_Json(char *InputJson)
 exit:
     free_json_obj(&ReceivedJsonCache);
     return kGeneralErr;
+}
+
+static void eland_wifi_parameter_save(void)
+{
+    mico_Context_t *context = NULL;
+    context = mico_system_context_get();
+    device_state->IsActivate = true;
+    app_httpd_log("save wifi para,update flash"); //save
+    strncpy(context->micoSystemConfig.ssid, netclock_des_g->Wifissid, ElandSsid_Len);
+    strncpy(context->micoSystemConfig.key, netclock_des_g->WifiKey, ElandKey_Len);
+    strncpy(context->micoSystemConfig.user_key, netclock_des_g->WifiKey, ElandKey_Len);
+    context->micoSystemConfig.keyLength = strlen(context->micoSystemConfig.key);
+    context->micoSystemConfig.user_keyLength = strlen(context->micoSystemConfig.key);
+    context->micoSystemConfig.channel = 0;
+    memset(context->micoSystemConfig.bssid, 0x0, 6);
+    context->micoSystemConfig.security = SECURITY_TYPE_AUTO;
+    if (netclock_des_g->dhcp_enabled == 1)
+        context->micoSystemConfig.dhcpEnable = DHCP_Client; /* Fetch Ip address from DHCP server */
+    else if (netclock_des_g->dhcp_enabled == 0)
+    {
+        context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
+        memcpy(context->micoSystemConfig.localIp, netclock_des_g->ip_address, 16);
+        memcpy(context->micoSystemConfig.netMask, netclock_des_g->subnet_mask, 16);
+        memcpy(context->micoSystemConfig.gateWay, netclock_des_g->default_gateway, 16);
+        memcpy(context->micoSystemConfig.dnsServer, netclock_des_g->primary_dns, 16);
+    }
+    context->micoSystemConfig.configured = allConfigured;
+    mico_system_context_update(context);
+    mico_rtos_thread_msleep(400);
 }

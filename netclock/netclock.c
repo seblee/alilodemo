@@ -569,6 +569,16 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
             goto exit;
         Eland_log("00000000:%s", alarm_id_temp);
     }
+    else if (sound_type == SOUND_FILE_WEATHER_D)
+    {
+        if (strstr(alarm->voice_alarm_id, "dddddddd"))
+            memcpy(alarm_id_temp, alarm->voice_alarm_id, strlen(alarm->voice_alarm_id));
+        else if (strstr(alarm->alarm_off_voice_alarm_id, "dddddddd"))
+            memcpy(alarm_id_temp, alarm->alarm_off_voice_alarm_id, strlen(alarm->alarm_off_voice_alarm_id));
+        else
+            goto exit;
+        Eland_log("dddddddd:%s", alarm_id_temp);
+    }
     else if (sound_type == SOUND_FILE_WEATHER_E)
     {
         if (strstr(alarm->alarm_off_voice_alarm_id, "eeeeeeee"))
@@ -612,6 +622,8 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
     else if (sound_type == SOUND_FILE_WEATHER_0)
         sprintf(uri_str, ELAND_WEATHER_0_URI, netclock_des_g->eland_id);
+    else if (sound_type == SOUND_FILE_WEATHER_D)
+        sprintf(uri_str, ELAND_WEATHER_D_URI, netclock_des_g->eland_id);
     else if (sound_type == SOUND_FILE_WEATHER_E)
         sprintf(uri_str, ELAND_WEATHER_E_URI, netclock_des_g->eland_id);
     else if (sound_type == SOUND_FILE_WEATHER_F)

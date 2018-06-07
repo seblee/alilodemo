@@ -165,7 +165,6 @@ typedef struct ALARM_SCHEDULES //闹钟显示列表
 typedef struct
 {
     bool list_refreshed;
-    bool weather_need_refreshed;
     _alarm_state_t state;
     /*******************/
     uint8_t na_display_serial;

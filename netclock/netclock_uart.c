@@ -1077,7 +1077,7 @@ static void set_eland_state(Eland_Status_type_t state)
 {
     if (eland_mode_state.state_mutex != NULL)
         mico_rtos_lock_mutex(&eland_mode_state.state_mutex);
-    Eland_uart_log("*****************set_eland_state:%d", state);
+    Eland_uart_log("####set_eland_state:%d############", state);
     eland_mode_state.eland_status = state;
     mico_rtos_unlock_mutex(&eland_mode_state.state_mutex);
 }
