@@ -45,6 +45,7 @@ _alarm_stream_t alarm_stream;
 mico_thread_t play_voice_thread = NULL;
 
 _alarm_off_history_t off_history;
+mico_queue_t history_queue = NULL;
 
 mico_timer_t timer_1s;
 mico_utc_time_t eland_current_utc = 0;
@@ -94,6 +95,8 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     //eland_state_queue
     err = mico_rtos_init_queue(&http_queue, "http_queue", sizeof(_download_type_t), 5); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
+    err = mico_rtos_init_queue(&history_queue, "history_queue", sizeof(AlarmOffHistoryData_t *), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
 
     err = mico_rtos_init_semaphore(&alarm_skip_sem, 1);
@@ -909,7 +912,7 @@ falsh_read_start:
     if (err != kNoErr)
     {
         alarm_log("sound_file_read error!!!!");
-        require_noerr_action(err, exit, eland_error(true, EL_FLASH_READ));
+        require_noerr_action(err, exit, eland_error(EL_RAM_WRITE, EL_FLASH_READ));
     }
     if (data_pos == 0)
     {
@@ -923,7 +926,7 @@ audio_transfer:
         if (err != kNoErr)
         {
             alarm_log("audio_stream_play() error!!!!");
-            require_noerr_action(err, exit, eland_error(true, EL_AUDIO_PLAY));
+            require_noerr_action(err, exit, eland_error(EL_RAM_WRITE, EL_AUDIO_PLAY));
         }
         else
         {
@@ -1198,8 +1201,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
 {
     __elsv_alarm_data_t *nearestAlarm;
-    if (get_alarm_history_data_state() == WAIT_UPLOAD)
-        return;
+
     mico_rtos_lock_mutex(&off_history.off_Mutex);
     switch (type)
     {
@@ -1209,14 +1211,13 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
         require_quiet(nearestAlarm, exit);
         memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
-        off_history.state = IDEL_UPLOAD;
         break;
     case ALARM_OFF_SNOOZE:
     case ALARM_OFF_ALARMOFF:
     case ALARM_OFF_AUTOOFF:
         memcpy(&off_history.HistoryData.alarm_off_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
-        off_history.state = READY_UPLOAD;
+
         break;
     case ALARM_OFF_SKIP:
         memset(&off_history.HistoryData, 0, sizeof(AlarmOffHistoryData_t));
@@ -1225,7 +1226,7 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
         memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
-        off_history.state = READY_UPLOAD;
+
         break;
     case ALARM_SNOOZE:
         memcpy(&off_history.HistoryData.snooze_datetime, iso8601_time, 19);
@@ -1269,20 +1270,7 @@ exit:
     free_json_obj(&AlarmOffHistoryData);
     return err;
 }
-HistoryDatastate_t get_alarm_history_data_state(void)
-{
-    return off_history.state;
-}
-void set_alarm_history_data_state(HistoryDatastate_t value)
-{
-    mico_rtos_lock_mutex(&off_history.off_Mutex);
-    off_history.state = value;
-    mico_rtos_unlock_mutex(&off_history.off_Mutex);
-}
-AlarmOffHistoryData_t *get_alarm_history_data(void)
-{
-    return &off_history.HistoryData;
-}
+
 /**
  ****************************************************************************
  * @Function : RTC_Weekday_TypeDef CaculateWeekDay(int y, int m, int d)
@@ -1551,11 +1539,15 @@ exit:
 static OSStatus set_alarm_history_send_sem(void)
 {
     OSStatus err = kNoErr;
-    if (get_alarm_history_data_state() == READY_UPLOAD)
-    {
-        set_alarm_history_data_state(WAIT_UPLOAD);
-        TCP_Push_MSG_queue(TCP_HT01_Sem);
-    }
+    AlarmOffHistoryData_t *history_P = NULL;
+
+    history_P = malloc(sizeof(AlarmOffHistoryData_t));
+    memcpy(history_P, &(off_history.HistoryData), sizeof(AlarmOffHistoryData_t));
+    memset(&(off_history.HistoryData), 0, sizeof(AlarmOffHistoryData_t));
+    err = mico_rtos_push_to_queue(&history_queue, &history_P, 10);
+    require_noerr_action(err, exit, alarm_log("[error]history_queue err"));
+
+exit:
     return err;
 }
 OSStatus check_default_sound(void)

@@ -67,6 +67,12 @@ typedef enum
 
 typedef enum
 {
+    EL_RAM_READ = 0x00, /*READ RAM*/
+    EL_RAM_WRITE,       /*WRITE RAM*/
+} _eland_ram_rw_t;
+
+typedef enum
+{
     KEY_FUN_NONE = 0x00, /* 空命令*/
     SEND_ELAND_ERR_01,   /* SEND ELAND ERROR CODE*/
     KEY_READ_02,         /* READ MCU KEY STATE*/
@@ -91,7 +97,7 @@ typedef enum
     REFRESH_ALARM,
     REFRESH_ELAND_DATA,
     REFRESH_MAX,
-} MCU_Refresh_type_t;
+} MCU_code_type_t;
 typedef enum
 {
     LEVEL0 = (uint8_t)0x00,
@@ -111,6 +117,7 @@ typedef enum _eland_mode
     ELAND_NA,
     ELAND_AP,
     ELAND_OTA,
+    ELAND_TEST,
     ELAND_MODE_MAX,
 } _ELAND_MODE_t;
 
@@ -143,6 +150,9 @@ typedef struct eland_data_2_mcu
 #define RSSI_STATE_STAGE2 (int16_t)(-75)
 #define RSSI_STATE_STAGE3 (int16_t)(-70)
 #define RSSI_STATE_STAGE4 (int16_t)(-65)
+
+#define ELAND_KEY_COUNT 10
+#define ELAND_CHECKOUT_SPEED 20
 /* Private macro -------------------------------------------------------------*/
 extern mico_queue_t eland_uart_CMD_queue; //eland usart
 extern mico_utc_time_t eland_current_utc;

@@ -133,13 +133,7 @@ typedef enum
     ALARM_OFF_SKIP = (uint8_t)4,
     ALARM_SNOOZE = (uint8_t)5,
 } alarm_off_history_record_t;
-typedef enum
-{
-    IDEL_UPLOAD = 0,
-    READY_UPLOAD,
-    WAIT_UPLOAD,
-    DONE_UPLOAD,
-} HistoryDatastate_t;
+
 typedef struct _AlarmOffHistoryData //闹钟履历结构体
 {
     char alarm_id[ALARM_ID_LEN + 1];             //闹钟唯一识别的ID ELSV是闹钟设定时自动取号
@@ -152,7 +146,6 @@ typedef struct
 {
     mico_mutex_t off_Mutex;
     AlarmOffHistoryData_t HistoryData;
-    HistoryDatastate_t state;
 } _alarm_off_history_t;
 
 typedef struct ALARM_SCHEDULES //闹钟显示列表
@@ -226,9 +219,6 @@ uint8_t get_alarm_number(void);
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time);
 
-AlarmOffHistoryData_t *get_alarm_history_data(void);
-HistoryDatastate_t get_alarm_history_data_state(void);
-void set_alarm_history_data_state(HistoryDatastate_t value);
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
 OSStatus alarm_sound_scan(void);
 OSStatus alarm_sound_oid(void);

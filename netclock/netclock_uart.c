@@ -370,7 +370,7 @@ static void Eland_H01_Send(uint8_t *Cache)
     __msg_function_t received_cmd = KEY_FUN_NONE;
     uint8_t sended_times = USART_RESEND_MAX_TIMES;
     __eland_error_t el_error;
-    el_error = eland_error(false, EL_ERROR_NONE);
+    el_error = eland_error(EL_RAM_READ, EL_ERROR_NONE);
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = SEND_ELAND_ERR_01;
     *(Cache + 2) = 1;
@@ -816,13 +816,13 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
 
     Key_Restain_Trg = Key_Restain & (Key_Restain ^ Key_Restain_count);
     Key_Restain_count = Key_Restain;
+    /*alarm control*/
+    alarm_status = get_alarm_state();
+    eland_mode = get_eland_mode();
 
     if (Key_Restain_Trg & KEY_Reset)
         reset_eland_flash_para(ELAND_RESET_0D);
 
-    /*alarm control*/
-    alarm_status = get_alarm_state();
-    eland_mode = get_eland_mode();
     if (alarm_status == ALARM_ING)
     {
         if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
@@ -861,8 +861,11 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         {
             set_alarm_state(ALARM_SKIP);
         }
-        if (Key_Count_Trg & KEY_Snooze) //sound oid
-        {
+        if ((Key_Count_Trg & KEY_Snooze) &&
+            (eland_mode != ELAND_CLOCK_MON) &&
+            (eland_mode != ELAND_CLOCK_ALARM) &&
+            (eland_mode != ELAND_NA))
+        { //sound oid
             if (get_alarm_stream_state() == STREAM_PLAY)
                 set_alarm_stream_state(STREAM_STOP);
             else
@@ -872,7 +875,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/
     if ((Key_Count & KEY_MON) | (Key_Count & KEY_AlarmMode))
     {
-        switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
+        switch ((MCU_code_type_t)(*(usart_rec + 7)))
         {
         case REFRESH_TIME:
             eland_push_uart_send_queue(TIME_READ_04);
@@ -928,7 +931,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     }
     else if (Key_Count & KEY_Wifi) //eland net clock mode
     {
-        switch ((MCU_Refresh_type_t)(*(usart_rec + 7)))
+        switch ((MCU_code_type_t)(*(usart_rec + 7)))
         {
         case REFRESH_TIME:
             eland_push_uart_send_queue(TIME_READ_04);
@@ -1105,13 +1108,63 @@ void eland_push_uart_send_queue(__msg_function_t cmd)
     mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
 }
 
-__eland_error_t eland_error(bool write_error, __eland_error_t error)
+__eland_error_t eland_error(_eland_ram_rw_t write_error, __eland_error_t error)
 {
     static __eland_error_t error_ram = EL_ERROR_NONE;
-    if (write_error)
+    if (write_error == EL_RAM_WRITE)
     {
         error_ram = error;
         eland_push_uart_send_queue(SEND_ELAND_ERR_01);
     }
     return error_ram;
+}
+
+void eland_test(uint16_t Count, uint16_t Count_Trg,
+                uint16_t Restain, uint16_t Restain_Trg)
+{
+    static uint8_t key_count = 0;
+    static uint16_t check_count = 0;
+    static _ELAND_MODE_t eland_mode = ELAND_MODE_NONE;
+
+    if (key_count < ELAND_KEY_COUNT)
+    {
+        if (Count_Trg & KEY_Reset)
+        {
+            key_count++;
+            check_count = 0;
+        }
+        else
+        {
+            if (check_count < ELAND_CHECKOUT_SPEED)
+                check_count++;
+            else
+                key_count = 0;
+        }
+    }
+
+    if ((key_count == ELAND_KEY_COUNT) && (eland_mode != ELAND_TEST))
+    {
+        key_count++;
+        set_eland_mode(ELAND_TEST);
+        eland_mode = ELAND_TEST;
+    }
+
+    if (eland_mode != ELAND_TEST)
+        return;
+
+    /*****wifi clock**********/
+    if (Count & KEY_Wifi)
+    {
+    }
+    /*****simple clock**********/
+    else if (Count & KEY_MON)
+    {
+    }
+    /*****alarm clock**********/
+    else if (Count & KEY_AlarmMode)
+    {
+    }
+    else
+    {
+    }
 }

@@ -75,6 +75,7 @@ static TCP_Error_t TCP_update_elandinfo(_Client_t *pClient);   /*need back funct
 static TCP_Error_t TCP_update_alarm(_Client_t *pClient);       /*need back function*/
 static TCP_Error_t TCP_update_holiday(_Client_t *pClient);     /*need back function*/
 static TCP_Error_t TCP_health_check(_Client_t *pClient);       /*need back function*/
+static TCP_Error_t TCP_upload_history(_Client_t *pClient);
 static TCP_Error_t TCP_request_response(_Client_t *pClient, _TCP_CMD_t request, _TCP_CMD_t response);
 static TCP_Error_t TCP_upload(_Client_t *pClient, _TCP_CMD_t tcp_cmd);
 static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type);
@@ -592,6 +593,8 @@ little_cycle_loop:
     }
 pop_queue:
     /*pop queue*/
+    /*******upload alarm history********/
+    TCP_upload_history(&Eland_Client);
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
     if (err == kNoErr)
     {
@@ -867,6 +870,49 @@ static TCP_Error_t TCP_health_check(_Client_t *pClient)
 
     return rc;
 }
+static TCP_Error_t TCP_upload_history(_Client_t *pClient)
+{
+    _time_t timer;
+    OSStatus err = kNoErr;
+    TCP_Error_t rc = TCP_SUCCESS;
+    AlarmOffHistoryData_t *history_P = NULL;
+    char *telegram_data = (char *)(pClient->clientData.writeBuf + sizeof(_TELEGRAM_t));
+    eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+
+pop_queue:
+    err = mico_rtos_pop_from_queue(&history_queue, &history_P, 0);
+    if (err != kNoErr)
+        return TCP_SUCCESS;
+
+    require_action(NULL != pClient, exit, rc = NULL_VALUE_ERROR);
+    require_action(NULL != history_P, exit, rc = NULL_VALUE_ERROR);
+
+    memset(telegram_data, 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
+    err = alarm_off_history_json_data_build(history_P, (char *)telegram_data);
+    require_noerr_action(err, exit, rc = NULL_VALUE_ERROR);
+
+    timer.tv_sec = 2;
+    timer.tv_usec = 0;
+
+    rc = TCP_send_packet(pClient, HT01, &timer);
+    if (rc == TCP_SUCCESS)
+    {
+        eland_tcp_log("history:OK");
+        free(history_P);
+        history_P = NULL;
+        goto pop_queue;
+    }
+
+exit:
+    if (history_P)
+    {
+        free(history_P);
+        history_P = NULL;
+    }
+    eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+
+    return rc;
+}
 static TCP_Error_t TCP_request_response(_Client_t *pClient, _TCP_CMD_t request, _TCP_CMD_t response)
 {
     TCP_Error_t rc = TCP_SUCCESS;
@@ -939,10 +985,7 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
 {
     _TELEGRAM_t *telegram = (_TELEGRAM_t *)pMsg;
     char *telegram_data = NULL;
-    AlarmOffHistoryData_t *history_data_p = NULL;
     static uint16_t telegram_squence_num = 0;
-
-    memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
 
     memcpy(telegram->head, TELEGRAMHEADER, strlen(TELEGRAMHEADER));
     telegram->squence_num = telegram_squence_num++;
@@ -954,33 +997,33 @@ static void HandleRequeseCallbacks(uint8_t *pMsg, _TCP_CMD_t cmd_type)
     {
     case CN00:
         /*build eland json data*/
+        memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
         InitUpLoadData(telegram_data);
         telegram->lenth = strlen(telegram_data);
         eland_tcp_log("CN00 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case HT00:
         /*build alarm json data*/
+        memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
         Alarm_build_JSON(telegram_data);
         telegram->lenth = strlen(telegram_data);
         eland_tcp_log("HT00 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case HT01:
-        history_data_p = get_alarm_history_data();
-        if (history_data_p)
-            alarm_off_history_json_data_build(history_data_p, (char *)telegram_data);
         telegram->lenth = strlen(telegram_data);
         eland_tcp_log("HT01 len:%ld,json:%s", telegram->lenth, telegram_data);
-        set_alarm_history_data_state(DONE_UPLOAD);
+
         break;
     case HT02:
         /*build alarm json data*/
+        memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
         Alarm_build_JSON(telegram_data);
         telegram->lenth = strlen(telegram_data);
         eland_tcp_log("HT02 len:%ld,json:%s", telegram->lenth, telegram_data);
         break;
     case FW01:
-        break;
     case SD00:
+        memset(pMsg + sizeof(_TELEGRAM_t), 0, MQTT_TX_BUF_LEN - sizeof(_TELEGRAM_t));
         break;
     default:
         break;

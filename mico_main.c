@@ -103,7 +103,7 @@ exit:
         MicoSystemReboot();
     }
     file_download();
-    eland_error(true, EL_MAIN_THREAD);
+    eland_error(EL_RAM_WRITE, EL_MAIN_THREAD);
     mico_rtos_delete_thread(NULL);
     return err;
 }
