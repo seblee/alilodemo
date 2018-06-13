@@ -825,7 +825,6 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
             set_alarm_stream_state(STREAM_STOP);
     }
     else if ((CMD == AUDIO_STOP_PLAY) &&
-             (CMD_bak != AUDIO_STOP) &&
              (CMD_bak != AUDIO_STOP_PLAY)) //stop
     {
         isVoice = false;

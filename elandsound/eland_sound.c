@@ -209,7 +209,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
             sound_log("write sound file info address:%ld", sound_list->sector_end);
             sector_count = (alarm_w_r_temp->total_len + alarm_w_r_temp->file_address + strlen(ALARM_FILE_END_STRING)) / KH25L8006_SECTOR_SIZE;
             sector_count += (((alarm_w_r_temp->total_len + alarm_w_r_temp->file_address + strlen(ALARM_FILE_END_STRING)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
-            if (sector_count >= KH25_FLASH_FILE_COUNT)
+            if (sector_count > KH25_FLASH_FILE_COUNT)
             {
                 err = kGeneralErr;
                 sound_log("flash full");

@@ -1195,7 +1195,4 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
             eland_play_rom_sound(SOUND_ROM_DEFAULT);
         }
     }
-    else
-    {
-    }
 }
