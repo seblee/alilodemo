@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-01-27 16:43:34
+ * @Last Modified time:2018-06-13 10:34:01
  * @brief   :
  ****************************************************************************
 **/
@@ -42,15 +42,16 @@ typedef enum
 } Eland_Status_type_t;
 typedef enum
 {
-    KEY_Set = (uint16_t)0x0001,       /*!< 時刻設置 */
-    KEY_Reset = (uint16_t)0x0002,     /*!< 軟件復位 */
-    KEY_Add = (uint16_t)0x0004,       /*!< 時間＋   */
-    KEY_Minus = (uint16_t)0x0008,     /*!< 時間－   */
-    KEY_MON = (uint16_t)0x0010,       /*!< mon時間  */
-    KEY_AlarmMode = (uint16_t)0x0020, /*!< 鬧鐘模式 */
-    KEY_Wifi = (uint16_t)0x0040,      /*!< wifi模式 */
-    KEY_Snooze = (uint16_t)0x0080,    /*!< 貪睡     */
-    KEY_Alarm = (uint16_t)0x0100,     /*!< 鬧鐘     */
+    KEY_Set = (uint16_t)0x0001,       /*!< SET */
+    KEY_Reset = (uint16_t)0x0002,     /*!< RESET */
+    KEY_Add = (uint16_t)0x0004,       /*!< UP   */
+    KEY_Minus = (uint16_t)0x0008,     /*!< DOWN  */
+    KEY_MON = (uint16_t)0x0010,       /*!< offline clock alarm off*/
+    KEY_AlarmMode = (uint16_t)0x0020, /*!< offline alarm on*/
+    KEY_Wifi = (uint16_t)0x0040,      /*!< ON line*/
+    KEY_Snooze = (uint16_t)0x0080,    /*!< SNOOZE     */
+    KEY_Alarm = (uint16_t)0x0100,     /*!< ALARM_OFF   */
+    KEY_TEST = (uint16_t)0x0200,      /*!< TEST    */
 } KEY_State_TypeDef;
 
 typedef enum

@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-04 10:31:50
+ * @Last Modified time:2018-06-13 11:11:06
  * @brief   :
  ****************************************************************************
 **/
@@ -822,12 +822,13 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     alarm_status = get_alarm_state();
     eland_mode = get_eland_mode();
 
-    if (Key_Restain_Trg & KEY_Reset)
-        reset_eland_flash_para(ELAND_RESET_0D);
-
     eland_test(Key_Count, Key_Count_Trg, Key_Restain, Key_Restain_Trg);
     if (eland_mode == ELAND_TEST)
         return;
+
+    if (Key_Restain_Trg & KEY_Reset)
+        reset_eland_flash_para(ELAND_RESET_0D);
+
     if (alarm_status == ALARM_ING)
     {
         if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
@@ -969,7 +970,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             break;
         }
     }
-    else if ((Key_Count & KEY_MON) | (Key_Count & KEY_AlarmMode))
+    else
     {
         switch ((MCU_code_type_t)(*(usart_rec + 7)))
         {
@@ -986,7 +987,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         switch (eland_mode)
         {
         case ELAND_CLOCK_MON:
-            if (Key_Count & KEY_AlarmMode)
+            if (!((Key_Count & KEY_MON) | (Key_Count & KEY_Wifi)))
             {
                 set_eland_mode(ELAND_CLOCK_ALARM);
                 eland_push_uart_send_queue(ALARM_READ_0A);
@@ -1008,7 +1009,7 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
                 alarm_list_clear(&alarm_list);
                 set_eland_mode(ELAND_CLOCK_MON);
             } /****alarm mode**********/
-            else if (Key_Count & KEY_AlarmMode)
+            else
             {
                 set_eland_mode(ELAND_CLOCK_ALARM);
                 eland_push_uart_send_queue(ALARM_READ_0A);
@@ -1129,7 +1130,7 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
 {
     static uint8_t key_count = 0;
     static uint16_t check_count = 0;
-    static _ELAND_MODE_t eland_mode = ELAND_MODE_NONE;
+    _ELAND_MODE_t eland_mode = get_eland_mode();
 
     if (key_count < ELAND_KEY_COUNT)
     {
@@ -1147,7 +1148,7 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
         }
     }
 
-    if ((key_count == ELAND_KEY_COUNT) && (eland_mode != ELAND_TEST))
+    if (((key_count == ELAND_KEY_COUNT) || (Count & KEY_TEST)) && (eland_mode != ELAND_TEST))
     {
         key_count++;
         set_eland_mode(ELAND_TEST);
@@ -1187,8 +1188,12 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
         }
     }
     /*****alarm clock**********/
-    else if (Count & KEY_AlarmMode)
+    else
     {
+        if (Count_Trg & KEY_Snooze)
+        {
+            eland_play_rom_sound(SOUND_ROM_DEFAULT);
+        }
     }
     else
     {

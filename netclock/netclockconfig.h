@@ -1,14 +1,23 @@
-/*
- * netclockconfig.h
- *
- *  Created on: 2017å¹´7æœˆ7æ—¥
- *      Author: ceeu
- */
-
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-06-13 09:34:44
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-06-13 10:57:45
+ * @brief   :
+ ****************************************************************************
+**/
 #ifndef NETCLOCK_NETCLOCKCONFIG_H_
 #define NETCLOCK_NETCLOCKCONFIG_H_
+
+/* Private include -----------------------------------------------------------*/
 #include "mico.h"
 
+/* Private define ------------------------------------------------------------*/
 #define Timezone_offset_sec_Min ((int32_t)-43200) //时区offset最小值
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
 #define Timezone_offset_elsv ((int32_t)32400)     //elsv time zone
@@ -40,6 +49,18 @@
 #define URL_Len 128             //URL长度
 #define hash_Len 33             //URL长度
 
+#define DEFAULT_BRIGHTNESS_NORMAL 80
+#define DEFAULT_BRIGHTNESS_NIGHT 20
+#define DEFAULT_LED_NORMAL 80
+#define DEFAULT_LED_NIGHT 20
+#define DEFAULT_VOLUME_NORMAL 50
+#define DEFAULT_VOLUME_NIGHT 50
+#define DEFAULT_NIGHT_MODE_ENABLE 0
+
+#define DEFAULT_NIGHT_BEGIN ("22:00:00")
+#define DEFAULT_NIGHT_END ("06:00:00")
+
+/* Private typedef -----------------------------------------------------------*/
 typedef struct _TIME_FORMAT_
 {
     char hour[2];
@@ -114,5 +135,13 @@ typedef struct _ELAND_DEVICE //设备状态结构
 
     int8_t reserve[1024];
 } _ELAND_DEVICE_t;
+
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
+
+/* Private function prototypes -----------------------------------------------*/
+
+/* Private functions ---------------------------------------------------------*/
 
 #endif /* NETCLOCK_NETCLOCKCONFIG_H_ */

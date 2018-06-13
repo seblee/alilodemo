@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-03-22 11:01:44
+ * @Last Modified time:2018-06-13 09:40:51
  * @brief   :
  ****************************************************************************
 **/
@@ -185,15 +185,15 @@ start_Check:
     memcpy(netclock_des_g->primary_dns, device_state->primary_dns, ip_address_Len);
     /***initialization to default value***/
     netclock_des_g->time_display_format = 1;
-    netclock_des_g->brightness_normal = 80;
-    netclock_des_g->brightness_night = 20;
-    netclock_des_g->led_normal = 80;
-    netclock_des_g->led_night = 20;
-    netclock_des_g->notification_volume_normal = 40;
-    netclock_des_g->notification_volume_night = 10;
-    netclock_des_g->night_mode_enabled = 0;
-    strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
-    strncpy(netclock_des_g->night_mode_end_time, "06:00:00", Time_Format_Len);
+    netclock_des_g->brightness_normal = DEFAULT_BRIGHTNESS_NORMAL;
+    netclock_des_g->brightness_night = DEFAULT_BRIGHTNESS_NIGHT;
+    netclock_des_g->led_normal = DEFAULT_LED_NORMAL;
+    netclock_des_g->led_night = DEFAULT_LED_NIGHT;
+    netclock_des_g->notification_volume_normal = DEFAULT_VOLUME_NORMAL;
+    netclock_des_g->notification_volume_night = DEFAULT_VOLUME_NIGHT;
+    netclock_des_g->night_mode_enabled = DEFAULT_NIGHT_MODE_ENABLE;
+    strncpy(netclock_des_g->night_mode_begin_time, DEFAULT_NIGHT_BEGIN, strlen(DEFAULT_NIGHT_BEGIN));
+    strncpy(netclock_des_g->night_mode_end_time, DEFAULT_NIGHT_END, strlen(DEFAULT_NIGHT_END));
     /*start init eland SPI*/
     err = start_eland_flash_service();
     if (err == kNoErr)

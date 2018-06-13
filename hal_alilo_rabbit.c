@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-04 10:31:39
+ * @Last Modified time:2018-06-13 09:54:09
  * @brief   :
  ****************************************************************************
 **/
@@ -145,7 +145,7 @@ OSStatus hal_alilo_rabbit_init(void)
     for (i = 0; i < 35; i++)
         audio_service_volume_up(&result, 1);
     // err = user_key_init();
-    mico_rtos_thread_sleep(5);
+
     // audio_service_sound_remind_start(&result, 1);  //我的小夥伴，快來和我玩耍吧
     // audio_service_sound_remind_start(&result, 2);  //請先幫我配置網絡吧
     // audio_service_sound_remind_start(&result, 3);  //正在連接無線網絡

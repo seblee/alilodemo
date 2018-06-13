@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-16 16:11:14
+ * @Last Modified time:2018-06-13 10:18:58
  * @brief   :
  ****************************************************************************
 **/
@@ -341,7 +341,8 @@ void file_download(void)
 {
     OSStatus err;
     _download_type_t download_type;
-    // eland_push_http_queue(DOWNLOAD_OID);
+    mico_rtos_thread_sleep(3);
+    //eland_push_http_queue(DOWNLOAD_OID);
 wait_for_queue:
     sound_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);
@@ -601,12 +602,14 @@ OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
     uint32_t inPos = 0;
-    uint8_t oid_volume = 0, i;
-   // uint8_t default_sound[10];
+    uint8_t oid_volume, i;
 
     for (i = 0; i < 33; i++)
         audio_service_volume_down(&result, 1);
-    oid_volume = get_notification_volume();
+    if (get_eland_mode() == ELAND_TEST)
+        oid_volume = 100;
+    else
+        oid_volume = get_notification_volume();
     for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
     {
         audio_service_volume_up(&result, 1);
@@ -618,14 +621,19 @@ OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
     fm_stream.type = AUDIO_STREAM_TYPE_MP3;
     fm_stream.stream_id = audio_service_system_generate_stream_id();
     if (SOUND == SOUND_ROM_ERROR)
+    {
+        fm_stream.pdata = (uint8_t *)error_sound;
         fm_stream.total_len = sizeof(error_sound);
-    else if (SOUND == SOUND_ROM_ERROR)
+    }
+    else if (SOUND == SOUND_ROM_DEFAULT)
+    {
+        fm_stream.pdata = (uint8_t *)default_sound;
         fm_stream.total_len = sizeof(default_sound);
+    }
     else
         goto exit;
 
 start_start:
-    fm_stream.pdata += inPos;
     if ((fm_stream.total_len - inPos) > 1500) //len
         fm_stream.stream_len = 1500;
     else
@@ -633,8 +641,8 @@ start_start:
     if ((++fm_test_cnt) >= 10)
     {
         fm_test_cnt = 0;
-        sound_log("type[%d],stream_id[%d],total_len[%d],stream_len[%d]",
-                  (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len);
+        sound_log("type:%d,id:%d,total_len:%d,len:%d,pos:%ld",
+                  (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len, inPos);
     }
 audio_transfer:
     err = audio_service_stream_play(&result, &fm_stream);
@@ -657,6 +665,7 @@ audio_transfer:
             err = kNoErr;
         }
     }
+    fm_stream.pdata += fm_stream.stream_len;
     inPos += fm_stream.stream_len;
     if (inPos < fm_stream.total_len)
         goto start_start;
