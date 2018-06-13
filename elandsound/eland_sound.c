@@ -20,6 +20,7 @@
 #include "netclock_wifi.h"
 #include "audio_service.h"
 #include "error_bin.h"
+#include "default_bin.h"
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
@@ -376,6 +377,9 @@ operation_queue:
         Start_wifi_Station_SoftSP_Thread(Soft_AP);
         goto out;
         break;
+    case GO_OUT:
+        goto out;
+        break;
     default:
         break;
     }
@@ -589,7 +593,7 @@ exit:
     return err;
 }
 
-OSStatus eland_play_oid_error_sound(void)
+OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
 {
     OSStatus err = kNoErr;
     uint8_t fm_test_cnt = 0;
@@ -598,6 +602,7 @@ OSStatus eland_play_oid_error_sound(void)
     mscp_status_t audio_status;
     uint32_t inPos = 0;
     uint8_t oid_volume = 0, i;
+   // uint8_t default_sound[10];
 
     for (i = 0; i < 33; i++)
         audio_service_volume_down(&result, 1);
@@ -612,10 +617,15 @@ OSStatus eland_play_oid_error_sound(void)
 
     fm_stream.type = AUDIO_STREAM_TYPE_MP3;
     fm_stream.stream_id = audio_service_system_generate_stream_id();
-    fm_stream.total_len = sizeof(error_sound);
+    if (SOUND == SOUND_ROM_ERROR)
+        fm_stream.total_len = sizeof(error_sound);
+    else if (SOUND == SOUND_ROM_ERROR)
+        fm_stream.total_len = sizeof(default_sound);
+    else
+        goto exit;
 
 start_start:
-    fm_stream.pdata = (const uint8_t *)(&error_sound[inPos]);
+    fm_stream.pdata += inPos;
     if ((fm_stream.total_len - inPos) > 1500) //len
         fm_stream.stream_len = 1500;
     else

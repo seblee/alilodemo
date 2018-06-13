@@ -497,6 +497,7 @@ recheck_mode:
         break;
     case ELAND_AP:
     case ELAND_OTA:
+    case ELAND_TEST:
         mico_rtos_delete_thread(NULL);
         break;
     default:

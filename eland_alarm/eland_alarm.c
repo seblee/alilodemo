@@ -1528,7 +1528,7 @@ exit:
         audio_service_stream_stop(&result, alarm_stream.stream_id);
     }
     if ((get_alarm_stream_state() != STREAM_STOP) && (err != kNoErr))
-        err = eland_play_oid_error_sound();
+        err = eland_play_rom_sound(SOUND_ROM_ERROR);
 
     set_alarm_stream_state(STREAM_IDEL);
     alarm_log("play stopped err:%d", err);

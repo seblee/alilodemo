@@ -63,6 +63,8 @@ typedef enum
     EL_FLASH_READ,        /*flash read error*/
     EL_AUDIO_PLAY,        /*audio play error*/
     EL_MAIN_THREAD,       /*file download  error*/
+    EL_FLASH_OK,          /*file download  error*/
+    EL_FLASH_ERR,         /*file download  error*/
 } __eland_error_t;
 
 typedef enum
@@ -166,7 +168,7 @@ int uart_get_one_packet(uint8_t *inBuf, int inBufLen);
 void SendElandStateQueue(Eland_Status_type_t value);
 void reset_eland_flash_para(__msg_function_t msg);
 void eland_push_uart_send_queue(__msg_function_t cmd);
-__eland_error_t eland_error(bool write_error, __eland_error_t error);
+__eland_error_t eland_error(_eland_ram_rw_t write_error, __eland_error_t error);
 /* Private functions ---------------------------------------------------------*/
 
 #endif /* _NETCLOCK_NETCLOCKUART_H_ */

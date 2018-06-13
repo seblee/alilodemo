@@ -61,10 +61,6 @@ int application_start(void)
     err = netclock_desInit();
     require_noerr(err, exit);
 
-    /*start init eland SPI*/
-    err = start_eland_flash_service();
-    require_noerr(err, exit);
-
     err = hal_alilo_rabbit_init();
     require_noerr(err, exit);
 
@@ -75,7 +71,9 @@ int application_start(void)
 #ifdef MICO_DISABLE_STDIO
     start_uart_service();
 #endif
-
+    /*flash check*/
+    if (netclock_des_g->flash_check == 0)
+        mico_rtos_delete_thread(NULL);
     /*start Soft_AP mode*/
     // Start_wifi_Station_SoftSP_Thread(Soft_AP);
     // mico_rtos_delete_thread(NULL);

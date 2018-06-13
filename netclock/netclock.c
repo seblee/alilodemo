@@ -194,6 +194,12 @@ start_Check:
     netclock_des_g->night_mode_enabled = 0;
     strncpy(netclock_des_g->night_mode_begin_time, "22:00:00", Time_Format_Len);
     strncpy(netclock_des_g->night_mode_end_time, "06:00:00", Time_Format_Len);
+    /*start init eland SPI*/
+    err = start_eland_flash_service();
+    if (err == kNoErr)
+        netclock_des_g->flash_check = 1;
+    else
+        netclock_des_g->flash_check = 0;
 
     return kNoErr;
 exit:

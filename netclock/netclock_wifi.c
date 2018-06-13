@@ -46,18 +46,20 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 {
     msg_wify_queue my_message;
     __msg_function_t eland_cmd = SEND_LINK_STATE_08;
-
+    mscp_result_t result;
     switch (status)
     {
     case NOTIFY_STATION_UP:
         WifiSet_log("Wi-Fi STATION connected.");
         mico_rtos_set_semaphore(&wifi_netclock);
         recorde_IPStatus(Station);
+        /*send cmd to lcd*/
         mico_rtos_push_to_queue(&eland_uart_CMD_queue, &eland_cmd, 20);
         /*Send wifi state station*/
         my_message.value = Wify_Station_Connect_Successed;
         mico_rtos_push_to_queue(&wifistate_queue, &my_message, 20);
-        /*send cmd to lcd*/
+        if (get_eland_mode() == ELAND_TEST)
+            audio_service_sound_remind_start(&result, 12);
         break;
     case NOTIFY_STATION_DOWN:
         WifiSet_log("Wi-Fi STATION disconnected.");
@@ -78,6 +80,7 @@ void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext)
 }
 void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
 {
+    mscp_result_t result;
     msg_wify_queue my_message;
     WifiSet_log("Wi-Fi STATION connecte failed");
     my_message.value = Wify_Station_Connect_Failed;
@@ -88,6 +91,8 @@ void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg)
         my_message.value = Wify_Station_Connect_Failed;
         mico_rtos_push_to_queue(&wifistate_queue, &my_message, 20);
     }
+    if (get_eland_mode() == ELAND_TEST)
+        audio_service_sound_remind_start(&result, 7);
 }
 static void recorde_IPStatus(wlanInterfaceTypedef type)
 {

@@ -93,6 +93,11 @@ typedef enum
     GET_FILE_END,        //找到文件結尾
     FILE_SCAN_END,       //文件掃描結束
 } SOUND_FILE_SCAN_STATUS;
+typedef enum SOUND_ROM_T
+{
+    SOUND_ROM_ERROR,   //ERROR SOUND
+    SOUND_ROM_DEFAULT, //DEFAULT SOUND
+} _sound_rom_t;
 
 /* Private macro -------------------------------------------------------------*/
 
@@ -111,7 +116,7 @@ OSStatus SOUND_FILE_CLEAR(void);
 void file_download(void);
 int32_t get_flash_capacity(void);
 OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list);
-OSStatus eland_play_oid_error_sound(void);
+OSStatus eland_play_rom_sound(_sound_rom_t SOUND);
 /*************************/
 
 #endif

@@ -183,6 +183,7 @@ typedef enum
     DOWNLOAD_OTA,
     DOWNLOAD_WEATHER,
     GO_INTO_AP_MODE,
+    GO_OUT,
 } _download_type_t;
 /* Private macro -------------------------------------------------------------*/
 

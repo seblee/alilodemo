@@ -23,6 +23,9 @@
 #define ELAND_AP_DNS_SERVER ("192.168.0.1") //本體 DNS
 #define ELAND_AP_NET_MASK ("255.255.255.0") //本體IP
 
+#define ELAND_TEST_SSID ("TP-LINK_eland") //eland test ap
+#define ELAND_TEST_KEY ("eland1234")      //eland test ap
+
 #define user_id_len 37          //Eland name
 #define eland_name_Len 151      //Eland名称，用户输入
 #define serial_number_len 12    //Eland的串口番号。
@@ -73,6 +76,9 @@ typedef struct _ELAND_DES_S //设备状态结构
     char night_mode_begin_time[Time_Format_Len]; //设定背光的亮度调节的开始时刻
     char night_mode_end_time[Time_Format_Len];   //设定背光的亮度调节的結束时刻
     int16_t area_code;                           //天气预报的地域代码
+
+    /*******************/
+    uint8_t flash_check;
     /*****************/
     char Wifissid[ElandSsid_Len]; //wifi 賬號
     char WifiKey[ElandKey_Len];   //wifi 密碼

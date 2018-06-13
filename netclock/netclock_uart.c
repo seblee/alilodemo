@@ -74,6 +74,8 @@ static OSStatus elandUsartSendData(uint8_t *data, uint32_t lenth);
 static void Opration_Packet(uint8_t *data);
 
 static void set_eland_state(Eland_Status_type_t state);
+
+static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uint16_t Restain_Trg);
 /* Private functions ---------------------------------------------------------*/
 
 OSStatus start_uart_service(void)
@@ -823,6 +825,9 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     if (Key_Restain_Trg & KEY_Reset)
         reset_eland_flash_para(ELAND_RESET_0D);
 
+    eland_test(Key_Count, Key_Count_Trg, Key_Restain, Key_Restain_Trg);
+    if (eland_mode == ELAND_TEST)
+        return;
     if (alarm_status == ALARM_ING)
     {
         if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
@@ -873,63 +878,8 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
         }
     }
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/
-    if ((Key_Count & KEY_MON) | (Key_Count & KEY_AlarmMode))
-    {
-        switch ((MCU_code_type_t)(*(usart_rec + 7)))
-        {
-        case REFRESH_TIME:
-            eland_push_uart_send_queue(TIME_READ_04);
-            break;
-        case REFRESH_ALARM:
-            eland_push_uart_send_queue(ALARM_READ_0A);
-            break;
-        default:
-            break;
-        }
-        /********mode operation************/
-        switch (eland_mode)
-        {
-        case ELAND_CLOCK_MON:
-            if (Key_Count & KEY_AlarmMode)
-            {
-                set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_uart_send_queue(ALARM_READ_0A);
-            }
-            break;
-        case ELAND_CLOCK_ALARM:
-            if (Key_Count & KEY_MON)
-            {
-                alarm_list_clear(&alarm_list);
-                set_eland_mode(ELAND_CLOCK_MON);
-            }
-            break;
-        case ELAND_NC:
-        case ELAND_NA:
-            /**stop tcp communication**/
-            set_eland_state(ElandBegin);
-            if (Key_Count & KEY_MON)
-            {
-                alarm_list_clear(&alarm_list);
-                set_eland_mode(ELAND_CLOCK_MON);
-            } /****alarm mode**********/
-            else if (Key_Count & KEY_AlarmMode)
-            {
-                set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_uart_send_queue(ALARM_READ_0A);
-            }
-            break;
-        case ELAND_AP:
-            /**stop tcp communication**/
-            MicoSystemReboot();
-            break;
-        case ELAND_OTA:
-            break;
-        default:
-            set_eland_mode(ELAND_CLOCK_MON);
-            break;
-        }
-    }
-    else if (Key_Count & KEY_Wifi) //eland net clock mode
+
+    if (Key_Count & KEY_Wifi) //eland net clock mode
     {
         switch ((MCU_code_type_t)(*(usart_rec + 7)))
         {
@@ -1016,6 +966,62 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
             break;
         default:
             set_eland_mode(ELAND_NC);
+            break;
+        }
+    }
+    else if ((Key_Count & KEY_MON) | (Key_Count & KEY_AlarmMode))
+    {
+        switch ((MCU_code_type_t)(*(usart_rec + 7)))
+        {
+        case REFRESH_TIME:
+            eland_push_uart_send_queue(TIME_READ_04);
+            break;
+        case REFRESH_ALARM:
+            eland_push_uart_send_queue(ALARM_READ_0A);
+            break;
+        default:
+            break;
+        }
+        /********mode operation************/
+        switch (eland_mode)
+        {
+        case ELAND_CLOCK_MON:
+            if (Key_Count & KEY_AlarmMode)
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_push_uart_send_queue(ALARM_READ_0A);
+            }
+            break;
+        case ELAND_CLOCK_ALARM:
+            if (Key_Count & KEY_MON)
+            {
+                alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            }
+            break;
+        case ELAND_NC:
+        case ELAND_NA:
+            /**stop tcp communication**/
+            set_eland_state(ElandBegin);
+            if (Key_Count & KEY_MON)
+            {
+                alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            } /****alarm mode**********/
+            else if (Key_Count & KEY_AlarmMode)
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_push_uart_send_queue(ALARM_READ_0A);
+            }
+            break;
+        case ELAND_AP:
+            /**stop tcp communication**/
+            MicoSystemReboot();
+            break;
+        case ELAND_OTA:
+            break;
+        default:
+            set_eland_mode(ELAND_CLOCK_MON);
             break;
         }
     }
@@ -1119,8 +1125,7 @@ __eland_error_t eland_error(_eland_ram_rw_t write_error, __eland_error_t error)
     return error_ram;
 }
 
-void eland_test(uint16_t Count, uint16_t Count_Trg,
-                uint16_t Restain, uint16_t Restain_Trg)
+static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uint16_t Restain_Trg)
 {
     static uint8_t key_count = 0;
     static uint16_t check_count = 0;
@@ -1146,7 +1151,21 @@ void eland_test(uint16_t Count, uint16_t Count_Trg,
     {
         key_count++;
         set_eland_mode(ELAND_TEST);
+        /**stop tcp communication**/
+        TCP_Push_MSG_queue(TCP_Stop_Sem);
+        /**main task stop**/
+        eland_push_http_queue(GO_OUT);
+        /**alarm task stop**/
+        alarm_list_clear(&alarm_list);
         eland_mode = ELAND_TEST;
+        mico_rtos_lock_mutex(&netclock_des_g->des_mutex);
+        memset(netclock_des_g->Wifissid, 0, ElandSsid_Len);
+        memset(netclock_des_g->WifiKey, 0, ElandKey_Len);
+        strncpy(netclock_des_g->Wifissid, ELAND_TEST_SSID, strlen(ELAND_TEST_SSID));
+        strncpy(netclock_des_g->WifiKey, ELAND_TEST_KEY, strlen(ELAND_TEST_KEY));
+        netclock_des_g->dhcp_enabled = 1;
+        mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
+        Start_wifi_Station_SoftSP_Thread(Station);
     }
 
     if (eland_mode != ELAND_TEST)
@@ -1159,6 +1178,13 @@ void eland_test(uint16_t Count, uint16_t Count_Trg,
     /*****simple clock**********/
     else if (Count & KEY_MON)
     {
+        if (Count_Trg & KEY_Snooze)
+        {
+            if (netclock_des_g->flash_check)
+                eland_error(EL_RAM_WRITE, EL_FLASH_OK);
+            else
+                eland_error(EL_RAM_WRITE, EL_FLASH_ERR);
+        }
     }
     /*****alarm clock**********/
     else if (Count & KEY_AlarmMode)
