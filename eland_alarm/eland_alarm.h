@@ -233,6 +233,10 @@ void set_alarm_stream_state(_stream_state_t state);
 _stream_state_t get_alarm_stream_state(void);
 
 uint32_t GET_current_second(void);
+
+void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
+                         uint16_t Restain, uint16_t Restain_Trg,
+                         _ELAND_MODE_t eland_mode);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

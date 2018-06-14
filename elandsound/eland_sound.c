@@ -375,7 +375,6 @@ operation_queue:
         weather_sound_scan();
         break;
     case GO_INTO_AP_MODE:
-        Start_wifi_Station_SoftSP_Thread(Soft_AP);
         goto out;
         break;
     case GO_OUT:
@@ -634,8 +633,8 @@ OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
         goto exit;
 
 start_start:
-    if ((fm_stream.total_len - inPos) > 1500) //len
-        fm_stream.stream_len = 1500;
+    if ((fm_stream.total_len - inPos) > SOUND_STREAM_DEFAULT_LENGTH) //len
+        fm_stream.stream_len = SOUND_STREAM_DEFAULT_LENGTH;
     else
         fm_stream.stream_len = fm_stream.total_len - inPos;
     if ((++fm_test_cnt) >= 10)

@@ -518,14 +518,14 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
         if (is_sound_data)
         {
-            //  client_log("sound data");
+            client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
                 goto exit;
             HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
-            memcpy(context->content, inData, inLen);
+            //  memcpy(context->content, inData, inLen);
             HTTP_W_R_struct.alarm_w_r_queue->len = inLen;
             HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
-            HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
+            HTTP_W_R_struct.alarm_w_r_queue->sound_data = inData;
             HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
             err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
             if (sound_flash_pos == 0)
@@ -535,7 +535,6 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
             if (sound_flash_pos == inHeader->contentLength) //写入文件尾标志
             {
                 HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
-                memcpy(context->content, inData, inLen);
                 HTTP_W_R_struct.alarm_w_r_queue->len = strlen(ALARM_FILE_END_STRING);
                 HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
                 memset(context->content, 0, 1501);

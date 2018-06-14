@@ -75,6 +75,7 @@ int application_start(void)
     if (netclock_des_g->flash_check == 0)
         mico_rtos_delete_thread(NULL);
     /*start Soft_AP mode*/
+    // mico_rtos_thread_sleep(10);
     // Start_wifi_Station_SoftSP_Thread(Soft_AP);
     // mico_rtos_delete_thread(NULL);
 

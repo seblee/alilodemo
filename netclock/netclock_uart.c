@@ -76,6 +76,10 @@ static void Opration_Packet(uint8_t *data);
 static void set_eland_state(Eland_Status_type_t state);
 
 static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uint16_t Restain_Trg);
+static void eland_mode_operation(uint16_t Count, uint16_t Count_Trg,
+                                 uint16_t Restain, uint16_t Restain_Trg,
+                                 _ELAND_MODE_t eland_mode,
+                                 MCU_code_type_t mcu_code);
 /* Private functions ---------------------------------------------------------*/
 
 OSStatus start_uart_service(void)
@@ -126,9 +130,9 @@ OSStatus start_uart_service(void)
     Eland_uart_log("start thread");
 
     /*UART receive thread*/
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "UART Recv", uart_recv_thread_DDE, STACK_SIZE_UART_RECV_THREAD, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "UART Recv", uart_recv_thread_DDE, 0x500, 0);
     require_noerr(err, exit);
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_thread_DDE", uart_thread_DDE, 0x1000, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_thread_DDE", uart_thread_DDE, 0x500, 0);
     require_noerr(err, exit);
     /*Register queue receive thread*/
     err = mico_rtos_get_semaphore(&Is_usart_complete_sem, MICO_WAIT_FOREVER); //two threads
@@ -804,11 +808,8 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     static uint16_t Key_Count = 0, Key_Restain = 0;
     static uint16_t Key_Count_Trg = 0, Key_Restain_Trg = 0;
     static uint16_t Key_Count_count = 0, Key_Restain_count = 0;
-    iso8601_time_t iso8601_time;
-    uint8_t cache = 0;
-    static uint16_t time_delay_counter;
-    _alarm_list_state_t alarm_status;
-    _ELAND_MODE_t eland_mode;
+    MCU_code_type_t mcu_code = (MCU_code_type_t)(*(usart_rec + 7));
+    _ELAND_MODE_t eland_mode = get_eland_mode();
 
     Key_Count = (uint16_t)((*(usart_rec + 3)) << 8) | *(usart_rec + 4);
     Key_Restain = (uint16_t)((*(usart_rec + 5)) << 8) | *(usart_rec + 6);
@@ -819,8 +820,6 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
     Key_Restain_Trg = Key_Restain & (Key_Restain ^ Key_Restain_count);
     Key_Restain_count = Key_Restain;
     /*alarm control*/
-    alarm_status = get_alarm_state();
-    eland_mode = get_eland_mode();
 
     eland_test(Key_Count, Key_Count_Trg, Key_Restain, Key_Restain_Trg);
     if (eland_mode == ELAND_TEST)
@@ -828,204 +827,11 @@ static void MODH_Opration_02H(uint8_t *usart_rec)
 
     if (Key_Restain_Trg & KEY_Reset)
         reset_eland_flash_para(ELAND_RESET_0D);
+    /***********alarm control******************/
+    eland_alarm_control(Key_Count, Key_Count_Trg, Key_Restain, Key_Restain_Trg, eland_mode);
 
-    if (alarm_status == ALARM_ING)
-    {
-        if ((Key_Count_Trg & KEY_Snooze) || (Key_Count_Trg & KEY_Alarm))
-        {
-            mico_time_get_iso8601_time(&iso8601_time);
-            if (Key_Count_Trg & KEY_Snooze)
-            {
-                set_alarm_state(ALARM_SNOOZ_STOP);
-                alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
-            }
-            else if (Key_Count_Trg & KEY_Alarm)
-            {
-                set_alarm_state(ALARM_STOP);
-                alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
-            }
-        }
-    }
-    else if (alarm_status == ALARM_SNOOZ_STOP)
-    {
-        if (Key_Count_Trg & KEY_Alarm)
-            set_alarm_state(ALARM_STOP);
-        if ((Key_Count_Trg & KEY_Snooze) &&
-            (eland_mode != ELAND_CLOCK_MON) &&
-            (eland_mode != ELAND_CLOCK_ALARM) &&
-            (eland_mode != ELAND_NA))
-        { //sound oid
-            if (get_alarm_stream_state() == STREAM_PLAY)
-                set_alarm_stream_state(STREAM_STOP);
-            else
-                eland_push_http_queue(DOWNLOAD_OID);
-        }
-    }
-    else
-    {
-        if (Key_Restain_Trg & KEY_Alarm) //alarm skip
-        {
-            set_alarm_state(ALARM_SKIP);
-        }
-        if ((Key_Count_Trg & KEY_Snooze) &&
-            (eland_mode != ELAND_CLOCK_MON) &&
-            (eland_mode != ELAND_CLOCK_ALARM) &&
-            (eland_mode != ELAND_NA))
-        { //sound oid
-            if (get_alarm_stream_state() == STREAM_PLAY)
-                set_alarm_stream_state(STREAM_STOP);
-            else
-                eland_push_http_queue(DOWNLOAD_OID);
-        }
-    }
     /*ELAND_CLOCK_MON or ELAND_CLOCK_ALARM*/
-
-    if (Key_Count & KEY_Wifi) //eland net clock mode
-    {
-        switch ((MCU_code_type_t)(*(usart_rec + 7)))
-        {
-        case REFRESH_TIME:
-            eland_push_uart_send_queue(TIME_READ_04);
-            break;
-        case REFRESH_ALARM:
-            eland_push_uart_send_queue(ALARM_SEND_0B);
-            break;
-        case REFRESH_ELAND_DATA:
-            eland_push_uart_send_queue(ELAND_DATA_0C);
-            break;
-        default:
-            break;
-        }
-        /********mode operation************/
-        switch (eland_mode)
-        {
-        case ELAND_NC:
-            if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
-            {
-                set_eland_mode(ELAND_NA);
-                time_delay_counter = 0;
-                cache = 0;
-                if (Key_Count_Trg & KEY_Add)
-                    cache = get_next_alarm_serial(cache);
-                else
-                    cache = get_previous_alarm_serial(cache);
-                set_display_na_serial(cache);
-            }
-            if ((Key_Restain_Trg & KEY_Set) &&
-                ((Key_Count & KEY_Add) == 0) &&
-                ((Key_Count & KEY_Minus) == 0)) //NA
-            {
-                set_eland_mode(ELAND_AP);
-                time_delay_counter = 0;
-                eland_push_http_queue(GO_INTO_AP_MODE);
-                if (!get_wifi_status())
-                    Start_wifi_Station_SoftSP_Thread(Soft_AP);
-            }
-            break;
-        case ELAND_NA:
-            if ((Key_Count_Trg & KEY_Add) || (Key_Count_Trg & KEY_Minus))
-            {
-                time_delay_counter = 0;
-                cache = get_display_na_serial();
-                if (Key_Count_Trg & KEY_Add)
-                    cache = get_next_alarm_serial(cache);
-                else
-                    cache = get_previous_alarm_serial(cache);
-                set_display_na_serial(cache);
-            }
-            if ((Key_Count_Trg & KEY_Snooze) ||
-                (Key_Count_Trg & KEY_Alarm) ||
-                (time_delay_counter++ > 50))
-            {
-                /******back to nc********/
-                set_eland_mode(ELAND_NC);
-                set_display_na_serial(SCHEDULE_MAX);
-                time_delay_counter = 0;
-            }
-            break;
-        case ELAND_AP:
-            if ((Key_Count_Trg & KEY_Add) ||
-                (Key_Count_Trg & KEY_Minus) ||
-                (Key_Count_Trg & KEY_Set) ||
-                (Key_Count_Trg & KEY_Alarm) ||
-                (Key_Count_Trg & KEY_Snooze) ||
-                (time_delay_counter++ > 6000))
-            {
-                /******back to nc********/
-                set_eland_mode(ELAND_NC);
-                mico_rtos_thread_msleep(300);
-                MicoSystemReboot();
-            }
-            break;
-        case ELAND_OTA:
-            break;
-        case ELAND_CLOCK_ALARM:
-            alarm_list_clear(&alarm_list);
-        case ELAND_CLOCK_MON:
-            set_eland_mode(ELAND_NC);
-            // MicoSystemReboot();
-            break;
-        default:
-            set_eland_mode(ELAND_NC);
-            break;
-        }
-    }
-    else
-    {
-        switch ((MCU_code_type_t)(*(usart_rec + 7)))
-        {
-        case REFRESH_TIME:
-            eland_push_uart_send_queue(TIME_READ_04);
-            break;
-        case REFRESH_ALARM:
-            eland_push_uart_send_queue(ALARM_READ_0A);
-            break;
-        default:
-            break;
-        }
-        /********mode operation************/
-        switch (eland_mode)
-        {
-        case ELAND_CLOCK_MON:
-            if (!((Key_Count & KEY_MON) | (Key_Count & KEY_Wifi)))
-            {
-                set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_uart_send_queue(ALARM_READ_0A);
-            }
-            break;
-        case ELAND_CLOCK_ALARM:
-            if (Key_Count & KEY_MON)
-            {
-                alarm_list_clear(&alarm_list);
-                set_eland_mode(ELAND_CLOCK_MON);
-            }
-            break;
-        case ELAND_NC:
-        case ELAND_NA:
-            /**stop tcp communication**/
-            set_eland_state(ElandBegin);
-            if (Key_Count & KEY_MON)
-            {
-                alarm_list_clear(&alarm_list);
-                set_eland_mode(ELAND_CLOCK_MON);
-            } /****alarm mode**********/
-            else
-            {
-                set_eland_mode(ELAND_CLOCK_ALARM);
-                eland_push_uart_send_queue(ALARM_READ_0A);
-            }
-            break;
-        case ELAND_AP:
-            /**stop tcp communication**/
-            MicoSystemReboot();
-            break;
-        case ELAND_OTA:
-            break;
-        default:
-            set_eland_mode(ELAND_CLOCK_MON);
-            break;
-        }
-    }
+    eland_mode_operation(Key_Count, Key_Count_Trg, Key_Restain, Key_Restain_Trg, eland_mode, mcu_code);
 }
 
 static void MODH_Opration_04H(uint8_t *usart_rec)
@@ -1193,6 +999,160 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
         if (Count_Trg & KEY_Snooze)
         {
             eland_play_rom_sound(SOUND_ROM_DEFAULT);
+        }
+    }
+}
+
+static void eland_mode_operation(uint16_t Count, uint16_t Count_Trg,
+                                 uint16_t Restain, uint16_t Restain_Trg,
+                                 _ELAND_MODE_t eland_mode,
+                                 MCU_code_type_t mcu_code)
+{
+    static uint16_t time_delay_counter;
+    uint8_t cache = 0;
+    if (Count & KEY_Wifi) //eland net clock mode
+    {
+        switch (mcu_code)
+        {
+        case REFRESH_TIME:
+            eland_push_uart_send_queue(TIME_READ_04);
+            break;
+        case REFRESH_ALARM:
+            eland_push_uart_send_queue(ALARM_SEND_0B);
+            break;
+        case REFRESH_ELAND_DATA:
+            eland_push_uart_send_queue(ELAND_DATA_0C);
+            break;
+        default:
+            break;
+        }
+        /********mode operation************/
+        switch (eland_mode)
+        {
+        case ELAND_NC:
+            if ((Count_Trg & KEY_Add) || (Count_Trg & KEY_Minus))
+            {
+                set_eland_mode(ELAND_NA);
+                time_delay_counter = 0;
+                cache = 0;
+                if (Count_Trg & KEY_Add)
+                    cache = get_next_alarm_serial(cache);
+                else
+                    cache = get_previous_alarm_serial(cache);
+                set_display_na_serial(cache);
+            }
+            if ((Restain_Trg & KEY_Set) &&
+                ((Count & KEY_Add) == 0) &&
+                ((Count & KEY_Minus) == 0)) //NA
+            {
+                set_eland_mode(ELAND_AP);
+                time_delay_counter = 0;
+                eland_push_http_queue(GO_INTO_AP_MODE);
+                Start_wifi_Station_SoftSP_Thread(Soft_AP);
+            }
+            break;
+        case ELAND_NA:
+            if ((Count_Trg & KEY_Add) || (Count_Trg & KEY_Minus))
+            {
+                time_delay_counter = 0;
+                cache = get_display_na_serial();
+                if (Count_Trg & KEY_Add)
+                    cache = get_next_alarm_serial(cache);
+                else
+                    cache = get_previous_alarm_serial(cache);
+                set_display_na_serial(cache);
+            }
+            if ((Count_Trg & KEY_Snooze) ||
+                (Count_Trg & KEY_Alarm) ||
+                (time_delay_counter++ > 50))
+            {
+                /******back to nc********/
+                set_eland_mode(ELAND_NC);
+                set_display_na_serial(SCHEDULE_MAX);
+                time_delay_counter = 0;
+            }
+            break;
+        case ELAND_AP:
+            if ((Count_Trg & KEY_Add) ||
+                (Count_Trg & KEY_Minus) ||
+                (Count_Trg & KEY_Set) ||
+                (Count_Trg & KEY_Alarm) ||
+                (Count_Trg & KEY_Snooze) ||
+                (time_delay_counter++ > 6000))
+            {
+                /******back to nc********/
+                set_eland_mode(ELAND_NC);
+                mico_rtos_thread_msleep(300);
+                MicoSystemReboot();
+            }
+            break;
+        case ELAND_OTA:
+            break;
+        case ELAND_CLOCK_ALARM:
+            alarm_list_clear(&alarm_list);
+        case ELAND_CLOCK_MON:
+            set_eland_mode(ELAND_NC);
+            // MicoSystemReboot();
+            break;
+        default:
+            set_eland_mode(ELAND_NC);
+            break;
+        }
+    }
+    else
+    {
+        switch (mcu_code)
+        {
+        case REFRESH_TIME:
+            eland_push_uart_send_queue(TIME_READ_04);
+            break;
+        case REFRESH_ALARM:
+            eland_push_uart_send_queue(ALARM_READ_0A);
+            break;
+        default:
+            break;
+        }
+        /********mode operation************/
+        switch (eland_mode)
+        {
+        case ELAND_CLOCK_MON:
+            if (!((Count & KEY_MON) | (Count & KEY_Wifi)))
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_push_uart_send_queue(ALARM_READ_0A);
+            }
+            break;
+        case ELAND_CLOCK_ALARM:
+            if (Count & KEY_MON)
+            {
+                alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            }
+            break;
+        case ELAND_NC:
+        case ELAND_NA:
+            /**stop tcp communication**/
+            set_eland_state(ElandBegin);
+            if (Count & KEY_MON)
+            {
+                alarm_list_clear(&alarm_list);
+                set_eland_mode(ELAND_CLOCK_MON);
+            } /****alarm mode**********/
+            else
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_push_uart_send_queue(ALARM_READ_0A);
+            }
+            break;
+        case ELAND_AP:
+            /**stop tcp communication**/
+            MicoSystemReboot();
+            break;
+        case ELAND_OTA:
+            break;
+        default:
+            set_eland_mode(ELAND_CLOCK_MON);
+            break;
         }
     }
 }

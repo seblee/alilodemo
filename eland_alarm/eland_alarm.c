@@ -715,10 +715,9 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_MINUS:
         case ALARM_SORT:
         case ALARM_SKIP:
-            mico_time_get_iso8601_time(&iso8601_time);
-            alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
         case ALARM_STOP:
-            alarm_log("Alarm_Play_Control: ALARM_STOP");
+            mico_time_get_iso8601_time(&iso8601_time);
+            alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time); 
             Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             goto exit;
             break;
@@ -1214,6 +1213,9 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
     case ALARM_OFF_SNOOZE:
     case ALARM_OFF_ALARMOFF:
     case ALARM_OFF_AUTOOFF:
+        nearestAlarm = get_nearest_alarm();
+        require_quiet(nearestAlarm, exit);
+        memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_off_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
 
@@ -1539,12 +1541,14 @@ static OSStatus set_alarm_history_send_sem(void)
 {
     OSStatus err = kNoErr;
     AlarmOffHistoryData_t *history_P = NULL;
-
-    history_P = malloc(sizeof(AlarmOffHistoryData_t));
-    memcpy(history_P, &(off_history.HistoryData), sizeof(AlarmOffHistoryData_t));
-    memset(&(off_history.HistoryData), 0, sizeof(AlarmOffHistoryData_t));
-    err = mico_rtos_push_to_queue(&history_queue, &history_P, 10);
-    require_noerr_action(err, exit, alarm_log("[error]history_queue err"));
+    if (strlen(off_history.HistoryData.alarm_id) > 10)
+    {
+        history_P = malloc(sizeof(AlarmOffHistoryData_t));
+        memcpy(history_P, &(off_history.HistoryData), sizeof(AlarmOffHistoryData_t));
+        memset(&(off_history.HistoryData), 0, sizeof(AlarmOffHistoryData_t));
+        err = mico_rtos_push_to_queue(&history_queue, &history_P, 10);
+        require_noerr_action(err, exit, alarm_log("[error]history_queue err"));
+    }
 
 exit:
     return err;
@@ -1689,4 +1693,61 @@ static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t
         return false;
     }
     return true;
+}
+
+void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
+                         uint16_t Restain, uint16_t Restain_Trg,
+                         _ELAND_MODE_t eland_mode)
+{
+    iso8601_time_t iso8601_time;
+    _alarm_list_state_t alarm_status = get_alarm_state();
+    if (alarm_status == ALARM_ING)
+    {
+        if ((Count_Trg & KEY_Snooze) || (Count_Trg & KEY_Alarm))
+        {
+            mico_time_get_iso8601_time(&iso8601_time);
+            if (Count_Trg & KEY_Snooze)
+            {
+                set_alarm_state(ALARM_SNOOZ_STOP);
+                alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
+            }
+            else if (Count_Trg & KEY_Alarm)
+            {
+                set_alarm_state(ALARM_STOP);
+                // alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
+            }
+        }
+    }
+    else if (alarm_status == ALARM_SNOOZ_STOP)
+    {
+        if (Count_Trg & KEY_Alarm)
+            set_alarm_state(ALARM_STOP);
+        if ((Count_Trg & KEY_Snooze) &&
+            (eland_mode != ELAND_CLOCK_MON) &&
+            (eland_mode != ELAND_CLOCK_ALARM) &&
+            (eland_mode != ELAND_NA))
+        { //sound oid
+            if (get_alarm_stream_state() == STREAM_PLAY)
+                set_alarm_stream_state(STREAM_STOP);
+            else
+                eland_push_http_queue(DOWNLOAD_OID);
+        }
+    }
+    else
+    {
+        if (Restain_Trg & KEY_Alarm) //alarm skip
+        {
+            set_alarm_state(ALARM_SKIP);
+        }
+        if ((Count_Trg & KEY_Snooze) &&
+            (eland_mode != ELAND_CLOCK_MON) &&
+            (eland_mode != ELAND_CLOCK_ALARM) &&
+            (eland_mode != ELAND_NA))
+        { //sound oid
+            if (get_alarm_stream_state() == STREAM_PLAY)
+                set_alarm_stream_state(STREAM_STOP);
+            else
+                eland_push_http_queue(DOWNLOAD_OID);
+        }
+    }
 }
