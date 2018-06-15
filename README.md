@@ -1,5 +1,25 @@
 # Netclock
 
+# v01.20
+2018年6月15日13:48:49
+## 
+    add function RGBLED_FlashRainBow_Color
+    add test operation
+    add single signal check in lcd check
+## 
+    set version v01.20
+    change history to history queue
+    add eland_test functory
+    add flash check flag
+    eland_test wifi play voice     
+    change default volume 50
+    issue sound bug
+    when alarm off pressed in snoozing paly ofid
+    ALARM_STOP push history
+    change AP start functory
+    Opration_02H with operation function;
+    change uart task size
+
 # v01.19
 2018年6月7日13:49:35
 ## 
