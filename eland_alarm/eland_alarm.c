@@ -281,7 +281,6 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     _alarm_mcu_data_t *alarm_mcu_data = NULL;
     mico_utc_time_t utc_time;
     int ho, mi, se;
-    //  set_alarm_state(ALARM_SORT);
     if (elsv_alarm_data == NULL)
         return;
     alarm_mcu_data = &(elsv_alarm_data->alarm_data_for_mcu);
@@ -305,11 +304,12 @@ OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
 {
     OSStatus err = kGeneralErr;
     __elsv_alarm_data_t alarm_data_cache;
+
     if (alarm_mcu_data == NULL)
         goto exit;
     memset(&alarm_data_cache, 0, sizeof(__elsv_alarm_data_t));
     memcpy(&alarm_data_cache.alarm_data_for_mcu, alarm_mcu_data, sizeof(_alarm_mcu_data_t));
-    strcpy(alarm_data_cache.alarm_id, ALARM_ID_OF_DEFAULT_CLOCK);
+    strncpy(alarm_data_cache.alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
     alarm_data_cache.alarm_color = 0;
     sprintf(alarm_data_cache.alarm_time, "%02d:%02d:%02d", alarm_mcu_data->moment_time.hr, alarm_mcu_data->moment_time.min, alarm_mcu_data->moment_time.sec);
     alarm_data_cache.snooze_enabled = 1;
@@ -323,9 +323,12 @@ OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
     elsv_alarm_data_sort_out(&alarm_data_cache);
     err = alarm_list_clear(&alarm_list);
     require_noerr(err, exit);
-    alarm_list_add(&alarm_list, &alarm_data_cache);
-    alarm_list.list_refreshed = true;
-    set_alarm_state(ALARM_ADD);
+    err = alarm_list_add(&alarm_list, &alarm_data_cache);
+    if (err == kNoErr)
+    {
+        alarm_list.list_refreshed = true;
+        set_alarm_state(ALARM_ADD);
+    }
 exit:
     return err;
 }
@@ -717,7 +720,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_SKIP:
         case ALARM_STOP:
             mico_time_get_iso8601_time(&iso8601_time);
-            alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time); 
+            alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             goto exit;
             break;

@@ -910,7 +910,6 @@ exit:
         free(history_P);
         history_P = NULL;
     }
-    eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
     return rc;
 }
@@ -1377,8 +1376,9 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         rc = JSON_PARSE_ERROR;
         goto exit;
     }
-    // eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     ReceivedJsonCache = json_tokener_parse((const char *)(buf));
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     if (ReceivedJsonCache == NULL)
     {
         eland_tcp_log("json_tokener_parse error");
@@ -1401,11 +1401,12 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         {
             alarm = json_object_array_get_idx(alarm_array, i);
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
-            //eland_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
+            eland_tcp_log("moment_second:%ld", alarm_data_cache.alarm_data_for_eland.moment_second);
             elsv_alarm_data_sort_out(&alarm_data_cache);
             err = alarm_list_add(&alarm_list, &alarm_data_cache);
             if (err == kNoErr)
                 alarm_add_flag = true;
+            free_json_obj(&alarm);
         }
         if (alarm_add_flag)
         {
@@ -1440,15 +1441,16 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd)
         eland_tcp_log("alarm_number:%d", alarm_list.alarm_number);
     }
 exit:
-
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     return rc;
 }
 void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
 {
     char alarm_dates_buffer[ALARM_DATES_LEN + 1]; //鬧鐘日期排列
-    json_object *alarm_on_dates = NULL, *alarm_off_dates = NULL;
+    json_object *alarm_on_dates = NULL, *alarm_off_dates = NULL, *dates = NULL;
     uint8_t list_len = 0, i, j;
     uint16_t Cache;
     int year, month, day;
@@ -1551,17 +1553,19 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
     list_len = json_object_array_length(alarm_off_dates);
     // eland_tcp_log("list_len:%d ", list_len);
     memset(alarm_data->alarm_off_dates, 0, ALARM_ON_OFF_DATES_COUNT);
+    eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     for (i = 0; i < list_len; i++)
     {
         if (i < ALARM_ON_OFF_DATES_COUNT)
         {
+            dates = json_object_array_get_idx(alarm_off_dates, i);
             memset(alarm_dates_buffer, 0, ALARM_DATES_LEN + 1);
-            sprintf(alarm_dates_buffer, "%s",
-                    json_object_get_string(json_object_array_get_idx(alarm_off_dates, i)));
+            sprintf(alarm_dates_buffer, "%s", json_object_get_string(dates));
             sscanf((const char *)alarm_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
             alarm_data->alarm_off_dates[i] = (year % 100) * SIMULATE_DAYS_OF_YEAR +
                                              month * SIMULATE_DAYS_OF_MONTH + day;
             eland_tcp_log("alarm_off_dates%d:%d", i, alarm_data->alarm_off_dates[i]);
+            free_json_obj(&dates);
         }
         else
             break;
@@ -1593,13 +1597,14 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
         {
             if (i < ALARM_ON_OFF_DATES_COUNT)
             {
+                dates = json_object_array_get_idx(alarm_on_dates, i);
                 memset(alarm_dates_buffer, 0, ALARM_DATES_LEN + 1);
-                sprintf(alarm_dates_buffer, "%s",
-                        json_object_get_string(json_object_array_get_idx(alarm_on_dates, i)));
+                sprintf(alarm_dates_buffer, "%s", json_object_get_string(dates));
                 sscanf((const char *)alarm_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
                 alarm_data->alarm_on_dates[i] = (year % 100) * SIMULATE_DAYS_OF_YEAR +
                                                 month * SIMULATE_DAYS_OF_MONTH + day;
                 eland_tcp_log("alarm_on_dates%d:%d", i, alarm_data->alarm_on_dates[i]);
+                free_json_obj(&dates);
             }
             else
                 break;
@@ -1622,7 +1627,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
 }
 static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
 {
-    json_object *ReceivedJsonCache = NULL, *holiday_array = NULL;
+    json_object *ReceivedJsonCache = NULL, *holiday_array = NULL, *holiday_date = NULL;
     char holiday_dates_buffer[ALARM_DATES_LEN + 1]; //holiday buf
     int year, month, day;
     TCP_Error_t rc = TCP_SUCCESS;
@@ -1659,12 +1664,13 @@ static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
     eland_tcp_log("holiday_array list_len:%d", list_len);
     for (i = 0; i < list_len; i++)
     {
+        holiday_date = json_object_array_get_idx(holiday_array, i);
         memset(holiday_dates_buffer, 0, ALARM_DATES_LEN + 1);
-        sprintf(holiday_dates_buffer, "%s",
-                json_object_get_string(json_object_array_get_idx(holiday_array, i)));
+        sprintf(holiday_dates_buffer, "%s", json_object_get_string(holiday_date));
         sscanf((const char *)holiday_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
         *(list->list + i) = (year % 100) * SIMULATE_DAYS_OF_YEAR +
                             month * SIMULATE_DAYS_OF_MONTH + day;
+        free_json_obj(&holiday_date);
         //  eland_tcp_log("holiday%d:%04d-%02d-%02d", i, year, month, day);
     }
     list->number = list_len;
@@ -1783,8 +1789,8 @@ static TCP_Error_t TCP_Operate_SD01(char *buf)
     {
         schedule_json = json_object_array_get_idx(schedule_array, i);
         TCP_Operate_Schedule_json(schedule_json, alarm_list.schedules + i);
+        free_json_obj(&schedule_json);
     }
-
 exit:
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&ReceivedJsonCache);

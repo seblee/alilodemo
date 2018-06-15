@@ -130,7 +130,7 @@ OSStatus start_uart_service(void)
     Eland_uart_log("start thread");
 
     /*UART receive thread*/
-    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "UART Recv", uart_recv_thread_DDE, 0x500, 0);
+    err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "UART Recv", uart_recv_thread_DDE, 0x700, 0);
     require_noerr(err, exit);
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "uart_thread_DDE", uart_thread_DDE, 0x500, 0);
     require_noerr(err, exit);
@@ -1151,7 +1151,15 @@ static void eland_mode_operation(uint16_t Count, uint16_t Count_Trg,
         case ELAND_OTA:
             break;
         default:
-            set_eland_mode(ELAND_CLOCK_MON);
+            if (Count & KEY_MON)
+                set_eland_mode(ELAND_CLOCK_MON);
+            /****alarm mode**********/
+            else
+            {
+                set_eland_mode(ELAND_CLOCK_ALARM);
+                eland_push_uart_send_queue(ALARM_READ_0A);
+            }
+
             break;
         }
     }
