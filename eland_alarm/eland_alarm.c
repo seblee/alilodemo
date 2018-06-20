@@ -1071,6 +1071,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     struct tm *currentTime;
     uint8_t week_day;
     int8_t i;
+    int year, month, day;
 
     currentTime = localtime((const time_t *)utc_time);
 
@@ -1159,21 +1160,20 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
         break;
     case 5: //do not check alarm_off_dates
         alarm_log("utc_time:%ld", *utc_time);
+        alarm->alarm_data_for_eland.moment_second = 0;
         for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
         {
             if (alarm->alarm_on_dates[i] == 0)
                 break;
-            alarm_log("alarm_on_dates%d:%d", i, alarm->alarm_on_dates[i]);
-            date_time.iYear = 2000 + alarm->alarm_on_dates[i] / SIMULATE_DAYS_OF_YEAR;
-            date_time.iDay = alarm->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR;
-            date_time.iMon = date_time.iDay / SIMULATE_DAYS_OF_MONTH;
-            date_time.iDay = date_time.iDay % SIMULATE_DAYS_OF_MONTH;
-
+            alarm_log("date:%d-%02d-%02d", date_time.iYear, date_time.iMon, date_time.iDay);
+            alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);
+            get_d_withdays(&year, &month, &day, alarm->alarm_on_dates[i]);
+            date_time.iYear = year;
+            date_time.iMon = month;
+            date_time.iDay = day;
             alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
             if (alarm->alarm_data_for_eland.moment_second > *utc_time)
                 break;
-            alarm_log("date:%d-%02d-%02d", date_time.iYear, date_time.iMon, date_time.iDay);
-            alarm_log("moment_second:%ld", alarm->alarm_data_for_eland.moment_second);
         }
         break;
     default:
@@ -1190,13 +1190,13 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     else
         alarm->alarm_data_for_mcu.alarm_color = 0;
     // alarm_log("alarm_id:%s", alarm->alarm_time);
-    // alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
-    //           alarm->alarm_data_for_mcu.moment_time.year + 2000,
-    //           alarm->alarm_data_for_mcu.moment_time.month,
-    //           alarm->alarm_data_for_mcu.moment_time.date,
-    //           alarm->alarm_data_for_mcu.moment_time.hr,
-    //           alarm->alarm_data_for_mcu.moment_time.min,
-    //           alarm->alarm_data_for_mcu.moment_time.sec);
+    alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
+              alarm->alarm_data_for_mcu.moment_time.year + 2000,
+              alarm->alarm_data_for_mcu.moment_time.month,
+              alarm->alarm_data_for_mcu.moment_time.date,
+              alarm->alarm_data_for_mcu.moment_time.hr,
+              alarm->alarm_data_for_mcu.moment_time.min,
+              alarm->alarm_data_for_mcu.moment_time.sec);
 }
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
@@ -1316,6 +1316,7 @@ OSStatus Alarm_build_JSON(char *json_str)
     uint32_t generate_data_len = 0;
     uint8_t i;
     char stringbuf[20];
+    int year, mon, day;
 
     Json = json_object_new_object();
     alarm_now = get_nearest_alarm();
@@ -1337,10 +1338,8 @@ OSStatus Alarm_build_JSON(char *json_str)
         if (alarm_now->alarm_off_dates[i] == 0)
             break;
         memset(stringbuf, 0, 20);
-        sprintf(stringbuf, "%d-%02d-%02d",
-                alarm_now->alarm_off_dates[i] / SIMULATE_DAYS_OF_YEAR + 2000,
-                alarm_now->alarm_off_dates[i] % SIMULATE_DAYS_OF_YEAR / SIMULATE_DAYS_OF_MONTH,
-                alarm_now->alarm_off_dates[i] % SIMULATE_DAYS_OF_YEAR % SIMULATE_DAYS_OF_MONTH);
+        get_d_withdays(&year, &mon, &day, alarm_now->alarm_off_dates[i]);
+        sprintf(stringbuf, "%d-%02d-%02d", year, mon, day);
         json_object_array_add(AlarmOffDaysJson, json_object_new_string(stringbuf));
     }
     json_object_object_add(AlarmJson, "alarm_off_dates", AlarmOffDaysJson);
@@ -1362,10 +1361,8 @@ OSStatus Alarm_build_JSON(char *json_str)
         if (alarm_now->alarm_on_dates[i] == 0)
             break;
         memset(stringbuf, 0, 20);
-        sprintf(stringbuf, "%d-%02d-%02d",
-                alarm_now->alarm_on_dates[i] / SIMULATE_DAYS_OF_YEAR + 2000,
-                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR / SIMULATE_DAYS_OF_MONTH,
-                alarm_now->alarm_on_dates[i] % SIMULATE_DAYS_OF_YEAR % SIMULATE_DAYS_OF_MONTH);
+        get_d_withdays(&year, &mon, &day, alarm_now->alarm_on_dates[i]);
+        sprintf(stringbuf, "%d-%02d-%02d", year, mon, day);
         json_object_array_add(AlarmOnDaysJson, json_object_new_string(stringbuf));
     }
     json_object_object_add(AlarmJson, "alarm_on_dates", AlarmOnDaysJson);
@@ -1397,10 +1394,8 @@ static bool today_is_holiday(DATE_TIME_t *date, uint8_t offset)
 {
     uint16_t Cache = 0;
     uint8_t i;
-    Cache = (date->iYear % 100) * SIMULATE_DAYS_OF_YEAR +
-            date->iMon * SIMULATE_DAYS_OF_MONTH +
-            date->iDay +
-            offset;
+    Cache = get_g_alldays(date->iYear, date->iMon, date->iDay) + offset;
+
     for (i = 0; i < holiday_list.number; i++)
     {
         if (Cache == *(holiday_list.list + i))
@@ -1422,10 +1417,8 @@ static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_ala
 {
     uint16_t Cache = 0;
     uint8_t i;
-    Cache = (date->iYear % 100) * SIMULATE_DAYS_OF_YEAR +
-            date->iMon * SIMULATE_DAYS_OF_MONTH +
-            date->iDay +
-            offset;
+    Cache = get_g_alldays(date->iYear, date->iMon, date->iDay) + offset;
+    alarm_log("today_is_alarm_off_day:%d", Cache);
     for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
     {
         if (alarm->alarm_off_dates[i] == 0)
@@ -1434,6 +1427,68 @@ static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_ala
             return true;
     }
     return false;
+}
+/*获取公历年的天数*/
+int year_alldays(int year)
+{
+    if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)
+        return 366;
+    else
+        return 365;
+}
+
+/*获取公历年初至某整月的天数*/
+int year_sumday(int year, int month)
+{
+    int sum = 0;
+    int rui[12] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int ping[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    int ruiflag = 0;
+    if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)
+        ruiflag = 1;
+    for (int index = 0; index < month - 1; index++)
+    {
+        if (ruiflag == 1)
+            sum += rui[index];
+        else
+            sum += ping[index];
+    }
+    return sum;
+}
+/*获取从公历1999年1月25日至当前日期的总天数*/
+int get_g_alldays(int year, int month, int day)
+{
+    int i = 1999, days = -25;
+    while (i < year)
+    {
+        days += year_alldays(i);
+        i++;
+    }
+    int days2 = year_sumday(year, month);
+    return days + days2 + day;
+}
+/*获取从公历1999年1月25日至过偏移n天后的日期*/
+void get_d_withdays(int *year, int *mon, int *day, int days)
+{
+    int month[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    *year = 1999;
+    *mon = 1;
+    *day = 25;
+    month[1] = (*year % 4 == 0 && *year % 100 != 0) || (*year % 400 == 0) ? 29 : 28;
+
+    while (days > month[(*mon) - 1] - *day)
+    {
+        days -= month[*mon - 1] - *day;
+        *day = 0;
+        *mon += 1;
+        if (*mon == 13)
+        {
+            *year += 1;
+            *mon = 1;
+            month[1] = (*year % 4 == 0 && *year % 100 != 0) || (*year % 400 == 0) ? 29 : 28;
+        }
+    }
+    *day += days;
 }
 
 void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time)
@@ -1605,7 +1660,7 @@ static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t
         alarm_log("alarm_time:%s", alarm2->alarm_time);
         return false;
     }
-    if (memcmp(alarm1->alarm_off_dates, alarm2->alarm_off_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint8_t)))
+    if (memcmp(alarm1->alarm_off_dates, alarm2->alarm_off_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint16_t)))
     {
         alarm_log("alarm_off_dates ");
         alarm_log("alarm_off_dates ");

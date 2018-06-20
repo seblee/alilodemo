@@ -30,9 +30,6 @@
 #define SECOND_ONE_HOUR 3600
 #define SECOND_ONE_MINUTE 60
 
-#define SIMULATE_DAYS_OF_YEAR 410
-#define SIMULATE_DAYS_OF_MONTH 32
-
 #define SCHEDULE_MAX 50
 /* Private typedef -----------------------------------------------------------*/
 
@@ -228,6 +225,9 @@ OSStatus check_default_sound(void);
 
 OSStatus Alarm_build_JSON(char *json_str);
 void eland_push_http_queue(_download_type_t msg);
+
+int get_g_alldays(int year, int month, int day);
+void get_d_withdays(int *year, int *mon, int *day, int days);
 void UCT_Convert_Date(uint32_t *utc, mico_rtc_time_t *time);
 void set_alarm_stream_state(_stream_state_t state);
 _stream_state_t get_alarm_stream_state(void);

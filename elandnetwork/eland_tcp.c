@@ -592,6 +592,8 @@ little_cycle_loop:
         if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc))
             goto exit; //reconnect
     }
+    else if (TCP_SUCCESS == rc)
+        goto little_cycle_loop;
 pop_queue:
     /*pop queue*/
     /*******upload alarm history********/
@@ -1551,7 +1553,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
     /***alarm_off_dates***/
     alarm_off_dates = json_object_object_get(alarm, "alarm_off_dates");
     list_len = json_object_array_length(alarm_off_dates);
-    // eland_tcp_log("list_len:%d ", list_len);
+    eland_tcp_log("list_len:%d ", list_len);
     memset(alarm_data->alarm_off_dates, 0, ALARM_ON_OFF_DATES_COUNT);
     eland_tcp_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     for (i = 0; i < list_len; i++)
@@ -1562,9 +1564,8 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
             memset(alarm_dates_buffer, 0, ALARM_DATES_LEN + 1);
             sprintf(alarm_dates_buffer, "%s", json_object_get_string(dates));
             sscanf((const char *)alarm_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
-            alarm_data->alarm_off_dates[i] = (year % 100) * SIMULATE_DAYS_OF_YEAR +
-                                             month * SIMULATE_DAYS_OF_MONTH + day;
-            eland_tcp_log("alarm_off_dates%d:%d", i, alarm_data->alarm_off_dates[i]);
+            alarm_data->alarm_off_dates[i] = get_g_alldays(year, month, day);
+            eland_tcp_log("alarm_off_dates%02d:%d", i, alarm_data->alarm_off_dates[i]);
             free_json_obj(&dates);
         }
         else
@@ -1601,8 +1602,7 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
                 memset(alarm_dates_buffer, 0, ALARM_DATES_LEN + 1);
                 sprintf(alarm_dates_buffer, "%s", json_object_get_string(dates));
                 sscanf((const char *)alarm_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
-                alarm_data->alarm_on_dates[i] = (year % 100) * SIMULATE_DAYS_OF_YEAR +
-                                                month * SIMULATE_DAYS_OF_MONTH + day;
+                alarm_data->alarm_on_dates[i] = get_g_alldays(year, month, day);
                 eland_tcp_log("alarm_on_dates%d:%d", i, alarm_data->alarm_on_dates[i]);
                 free_json_obj(&dates);
             }
@@ -1668,10 +1668,9 @@ static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list)
         memset(holiday_dates_buffer, 0, ALARM_DATES_LEN + 1);
         sprintf(holiday_dates_buffer, "%s", json_object_get_string(holiday_date));
         sscanf((const char *)holiday_dates_buffer, "%04d-%02d-%02d", &year, &month, &day);
-        *(list->list + i) = (year % 100) * SIMULATE_DAYS_OF_YEAR +
-                            month * SIMULATE_DAYS_OF_MONTH + day;
+        *(list->list + i) = get_g_alldays(year, month, day);
         free_json_obj(&holiday_date);
-        //  eland_tcp_log("holiday%d:%04d-%02d-%02d", i, year, month, day);
+        eland_tcp_log("holiday%d:%04d-%02d-%02d", i, year, month, day);
     }
     list->number = list_len;
     mico_rtos_unlock_mutex(&list->holidaymutex);
@@ -1949,8 +1948,4 @@ void TCP_Operate_Schedule_json(json_object *json, _alarm_schedules_t *schedule)
         }
     }
     // eland_tcp_log("%04d-%02d-%02d %02d:%02d:%02d---utc:%ld", date_time.iYear, date_time.iMon, date_time.iDay, date_time.iHour, date_time.iMin, date_time.iSec, schedule->utc_second);
-}
-
-void TCP_eland_mode_check_wait(void)
-{
 }
