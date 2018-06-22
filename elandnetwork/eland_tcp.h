@@ -278,7 +278,7 @@ struct _Eland_Network
  *
  */
 // MQTT pub and sub buff len
-#define MQTT_TX_BUF_LEN (1024 + 200) //
+#define MQTT_TX_BUF_LEN (2048 + 200) //
 #define MQTT_RX_BUF_LEN (2048 + 200) //
 
 typedef struct _ClientData
