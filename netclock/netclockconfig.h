@@ -22,7 +22,6 @@
 #define Timezone_offset_sec_Max ((int32_t)50400)  //时区offset最大值
 #define Timezone_offset_elsv ((int32_t)32400)     //elsv time zone
 #define DEFAULT_TIMEZONE ((int32_t)32400)
-#define DEFAULT_AREACODE ((int16_t)43)
 
 #define DEVICE_MAC_LEN (17) //MAC地址长度
 
@@ -49,6 +48,7 @@
 #define URL_Len 128             //URL长度
 #define hash_Len 33             //URL长度
 
+#define DEFAULT_TIME_FORMAT 1
 #define DEFAULT_BRIGHTNESS_NORMAL 80
 #define DEFAULT_BRIGHTNESS_NIGHT 20
 #define DEFAULT_LED_NORMAL 80
@@ -56,6 +56,7 @@
 #define DEFAULT_VOLUME_NORMAL 50
 #define DEFAULT_VOLUME_NIGHT 50
 #define DEFAULT_NIGHT_MODE_ENABLE 0
+#define DEFAULT_AREA_CODE 43
 
 #define DEFAULT_NIGHT_BEGIN ("22:00:00")
 #define DEFAULT_NIGHT_END ("06:00:00")

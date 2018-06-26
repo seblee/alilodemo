@@ -281,6 +281,8 @@ struct _Eland_Network
 #define MQTT_TX_BUF_LEN (2048 + 200) //
 #define MQTT_RX_BUF_LEN (2048 + 200) //
 
+#define TCP_RX_MAX_LEN 4096
+
 typedef struct _ClientData
 {
     uint16_t nextPacketId;
@@ -358,6 +360,7 @@ typedef enum TIME_RECORD_T
 
 typedef enum TCP_CMD_SEM
 {
+    TCP_CMD_NONE,
     TCP_Stop_Sem, //stop tcp thread
     TCP_HT00_Sem, //alarm on notice
     TCP_HT01_Sem, //alarm off notice

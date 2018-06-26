@@ -28,7 +28,8 @@
 #define alarm_log(...)
 #endif /* ! CONFIG_ALARM_DEBUG */
 /*********/
-#define ALARM_DATA_SIZE (uint16_t)(sizeof(__elsv_alarm_data_t) * 50 + 1)
+#define ALARM_DATA_MAX_LEN 50
+#define ALARM_DATA_SIZE (uint16_t)(sizeof(__elsv_alarm_data_t) * ALARM_DATA_MAX_LEN)
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
@@ -564,21 +565,28 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
                     err = kGeneralErr;
                     goto exit_nothing_done;
                 }
-                alarm_log("alarm change");
                 memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, i * sizeof(__elsv_alarm_data_t));
                 memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
                 goto exit;
             }
         }
-        /**a new alarm**/
-        alarm_log("alarm_id add");
-        memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
-        memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
-        AlarmList->alarm_number++;
+        if (AlarmList->alarm_number < ALARM_DATA_MAX_LEN)
+        {
+            /**a new alarm**/
+            memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
+            memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
+            AlarmList->alarm_number++;
+        }
+        else
+        {
+            alarm_log("alarm full!");
+            err = kGeneralErr;
+            goto exit_nothing_done;
+        }
     }
+
 exit:
     alarm_log("alarm_add success!");
-
 exit_nothing_done:
     return err;
 }
@@ -596,14 +604,14 @@ OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *i
                     AlarmList->alarm_lib + i + 1,
                     (AlarmList->alarm_number - 1 - i) * sizeof(__elsv_alarm_data_t));
             AlarmList->alarm_number--;
+            if (AlarmList->alarm_number == 0)
+                memset((uint8_t *)(AlarmList->alarm_lib), 0, ALARM_DATA_SIZE);
             AlarmList->list_refreshed = true;
+            set_alarm_state(ALARM_MINUS);
             break;
         }
     }
-    if (AlarmList->alarm_number == 0)
-        memset((uint8_t *)(AlarmList->alarm_lib), 0, ALARM_DATA_SIZE);
 
-    set_alarm_state(ALARM_MINUS);
     return err;
 }
 OSStatus alarm_list_clear(_eland_alarm_list_t *AlarmList)
@@ -644,7 +652,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         mico_time_get_iso8601_time(&iso8601_time);
         alarm_off_history_record_time(ALARM_OFF_SKIP, &iso8601_time);
         set_alarm_state(ALARM_STOP);
-        goto exit;
+        return;
     }
 
     if (alarm->snooze_enabled)
@@ -654,14 +662,14 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     alarm_moment += (uint32_t)alarm->alarm_continue_min * 60;
     set_alarm_state(ALARM_ING);
 
-    do
+    while (1)
     {
         current_state = get_alarm_state();
         utc_time = GET_current_second();
         if (utc_time < alarm->alarm_data_for_eland.moment_second)
         {
             set_alarm_state(ALARM_STOP);
-            goto exit;
+            return;
         }
         switch (current_state)
         {
@@ -710,6 +718,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 mico_time_get_iso8601_time(&iso8601_time);
                 alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
                 set_alarm_state(ALARM_SNOOZ_STOP);
+                if (snooze_count == 0)
+                {
+                    set_alarm_history_send_sem();
+                    Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
+                    return;
+                }
             }
             else
                 Alarm_Play_Control(alarm, AUDIO_PALY); //play with delay
@@ -722,7 +736,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             mico_time_get_iso8601_time(&iso8601_time);
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
-            goto exit;
+            set_alarm_history_send_sem();
+            return;
             break;
         case ALARM_SNOOZ_STOP:
             if (snooze_count)
@@ -757,13 +772,11 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 set_alarm_state(ALARM_STOP);
             break;
         default:
-            goto exit;
+            return;
             break;
         }
         mico_rtos_thread_msleep(50);
-    } while (1);
-exit:
-    set_alarm_history_send_sem();
+    }
 }
 /***CMD = 1 PALY   CMD = 0 STOP***/
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CMD)
@@ -1190,13 +1203,13 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     else
         alarm->alarm_data_for_mcu.alarm_color = 0;
     // alarm_log("alarm_id:%s", alarm->alarm_time);
-    alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
-              alarm->alarm_data_for_mcu.moment_time.year + 2000,
-              alarm->alarm_data_for_mcu.moment_time.month,
-              alarm->alarm_data_for_mcu.moment_time.date,
-              alarm->alarm_data_for_mcu.moment_time.hr,
-              alarm->alarm_data_for_mcu.moment_time.min,
-              alarm->alarm_data_for_mcu.moment_time.sec);
+    // alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
+    //           alarm->alarm_data_for_mcu.moment_time.year + 2000,
+    //           alarm->alarm_data_for_mcu.moment_time.month,
+    //           alarm->alarm_data_for_mcu.moment_time.date,
+    //           alarm->alarm_data_for_mcu.moment_time.hr,
+    //           alarm->alarm_data_for_mcu.moment_time.min,
+    //           alarm->alarm_data_for_mcu.moment_time.sec);
 }
 
 void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time_t *iso8601_time)
@@ -1418,7 +1431,7 @@ static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_ala
     uint16_t Cache = 0;
     uint8_t i;
     Cache = get_g_alldays(date->iYear, date->iMon, date->iDay) + offset;
-    alarm_log("today_is_alarm_off_day:%d", Cache);
+    // alarm_log("today_is_alarm_off_day:%d", Cache);
     for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
     {
         if (alarm->alarm_off_dates[i] == 0)
@@ -1662,8 +1675,7 @@ static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t
     }
     if (memcmp(alarm1->alarm_off_dates, alarm2->alarm_off_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint16_t)))
     {
-        alarm_log("alarm_off_dates ");
-        alarm_log("alarm_off_dates ");
+        alarm_log("alarm1 alarm2 alarm_off_dates");
         return false;
     }
     if (alarm1->snooze_enabled != alarm2->snooze_enabled)
@@ -1734,7 +1746,6 @@ static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t
     }
     if (memcmp(alarm1->alarm_on_dates, alarm2->alarm_on_dates, ALARM_ON_OFF_DATES_COUNT * sizeof(uint8_t)))
     {
-        alarm_log("alarm_on_dates");
         alarm_log("alarm_on_dates");
         return false;
     }

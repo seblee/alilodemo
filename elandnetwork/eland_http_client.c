@@ -29,7 +29,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_CLIENT_DEBUG
+//#define CONFIG_CLIENT_DEBUG
 #ifdef CONFIG_CLIENT_DEBUG
 #define client_log(M, ...) custom_log("Client", M, ##__VA_ARGS__)
 #else
@@ -518,7 +518,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
         if (is_sound_data)
         {
-            client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+            //    client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
                 goto exit;
             HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;

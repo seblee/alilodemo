@@ -174,7 +174,7 @@ start_Check:
     netclock_des_g->timezone_offset_sec = device_state->timezone_offset_sec;
 
     if ((device_state->area_code > 142) || (device_state->area_code == 0))
-        netclock_des_g->area_code = 43;
+        netclock_des_g->area_code = DEFAULT_AREA_CODE;
     else
         netclock_des_g->area_code = device_state->area_code;
     memcpy(netclock_des_g->firmware_version, FIRMWARE_REVISION, strlen(FIRMWARE_REVISION)); //设置设备软件版本号
@@ -184,7 +184,7 @@ start_Check:
     memcpy(netclock_des_g->default_gateway, device_state->default_gateway, ip_address_Len);
     memcpy(netclock_des_g->primary_dns, device_state->primary_dns, ip_address_Len);
     /***initialization to default value***/
-    netclock_des_g->time_display_format = 1;
+    netclock_des_g->time_display_format = DEFAULT_TIME_FORMAT;
     netclock_des_g->brightness_normal = DEFAULT_BRIGHTNESS_NORMAL;
     netclock_des_g->brightness_night = DEFAULT_BRIGHTNESS_NIGHT;
     netclock_des_g->led_normal = DEFAULT_LED_NORMAL;
@@ -232,7 +232,7 @@ OSStatus Netclock_des_recovery(void)
     memcpy(device_state->serial_number, device_temp.serial_number, serial_number_len);
     device_state->dhcp_enabled = 1;
     device_state->timezone_offset_sec = DEFAULT_TIMEZONE;
-    device_state->area_code = DEFAULT_AREACODE;
+    device_state->area_code = DEFAULT_AREA_CODE;
 
     context = mico_system_context_get();
     /***clear wifi para***/

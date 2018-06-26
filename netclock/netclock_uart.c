@@ -27,7 +27,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_UART_DEBUG
+//#define CONFIG_UART_DEBUG
 #ifdef CONFIG_UART_DEBUG
 #define Eland_uart_log(M, ...) custom_log("UART", M, ##__VA_ARGS__)
 #else
