@@ -222,6 +222,7 @@ OSStatus alarm_sound_scan(void);
 OSStatus alarm_sound_oid(void);
 OSStatus weather_sound_scan(void);
 OSStatus check_default_sound(void);
+uint8_t eland_oid_status(bool style, uint8_t value);
 
 OSStatus Alarm_build_JSON(char *json_str);
 void eland_push_http_queue(_download_type_t msg);
@@ -237,6 +238,7 @@ uint32_t GET_current_second(void);
 void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
                          uint16_t Restain, uint16_t Restain_Trg,
                          _ELAND_MODE_t eland_mode);
+
 /* Private functions ---------------------------------------------------------*/
 
 #endif

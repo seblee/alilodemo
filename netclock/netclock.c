@@ -653,6 +653,38 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     else if (user_http_res.status_code == 204)
     {
         Eland_log("<===== alarm_sound_download end 204<======");
+        if (get_flash_capacity() < (sizeof(_sound_file_type_t) + strlen(ALARM_FILE_END_STRING)))
+        {
+            Eland_log("flash capacity is insufficient");
+            eland_sound_file_arrange(&sound_file_list);
+        }
+        // Eland_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        Eland_log("alarmID:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+
+        HTTP_W_R_struct.alarm_w_r_queue->total_len = 1;
+        HTTP_W_R_struct.alarm_w_r_queue->len = 1;
+        HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
+        HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)uri_str;
+        HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
+        err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+        Eland_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
+        require_noerr(err, remove_file);
+
+        HTTP_W_R_struct.alarm_w_r_queue->len = strlen(ALARM_FILE_END_STRING);
+        HTTP_W_R_struct.alarm_w_r_queue->pos = 1;
+        strncpy(uri_str, ALARM_FILE_END_STRING, strlen(ALARM_FILE_END_STRING));
+        HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)uri_str;
+        HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
+        err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+        require_noerr(err, remove_file);
+
+        if (err != kNoErr)
+        {
+        remove_file:
+            HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_REMOVE;
+            sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+            err = kGeneralErr;
+        }
         eland_error(true, EL_HTTP_204);
     }
     else if (user_http_res.status_code == 400)

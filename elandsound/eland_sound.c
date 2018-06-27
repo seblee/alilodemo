@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_SOUND_DEBUG
+//#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else

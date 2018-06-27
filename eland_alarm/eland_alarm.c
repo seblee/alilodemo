@@ -679,6 +679,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 snooze_count--;
                 first_to_alarming = false;
                 first_to_snooze = true;
+
                 if (utc_time >= alarm_moment)
                 {
                     set_alarm_state(ALARM_SNOOZ_STOP);
@@ -686,23 +687,28 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
                 /**alarm on notice**/
                 TCP_Push_MSG_queue(TCP_HT00_Sem);
-                for (i = 0; i < 33; i++)
-                    audio_service_volume_down(&result, 1);
-                volume_value = 0;
-                if (alarm->volume_stepup_enabled == 0)
-                {
-                    for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
-                    {
-                        audio_service_volume_up(&result, 1);
-                        volume_value++;
-                    }
-                }
+                /** record_time **/
                 mico_time_get_iso8601_time(&iso8601_time);
                 alarm_off_history_record_time(ALARM_ON, &iso8601_time);
                 eland_push_uart_send_queue(ALARM_SEND_0B);
+                if (eland_oid_status(false, 0) == 0)
+                {
+                    for (i = 0; i < 33; i++)
+                        audio_service_volume_down(&result, 1);
+                    volume_value = 0;
+                    if (alarm->volume_stepup_enabled == 0)
+                    {
+                        for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+                        {
+                            audio_service_volume_up(&result, 1);
+                            volume_value++;
+                        }
+                    }
+                }
             }
             if ((alarm->volume_stepup_enabled) &&
-                (++volume_stepup_count > 10))
+                (++volume_stepup_count > 10) &&
+                (eland_oid_status(false, 0) == 0))
             {
                 volume_stepup_count = 0;
                 if ((volume_change_counter++ > 1) &&
@@ -713,10 +719,13 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     audio_service_volume_up(&result, 1);
                 }
             }
-            if (utc_time >= alarm_moment)
+            if ((utc_time >= alarm_moment) || (eland_oid_status(false, 0) > 0))
             {
                 mico_time_get_iso8601_time(&iso8601_time);
-                alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
+                if (eland_oid_status(false, 0) > 0)
+                    alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
+                else
+                    alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
                 set_alarm_state(ALARM_SNOOZ_STOP);
                 if (snooze_count == 0)
                 {
@@ -747,7 +756,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     first_to_snooze = false;
                     first_to_alarming = true;
                     alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
-                    Alarm_Play_Control(alarm, AUDIO_STOP); //stop
+                    if (eland_oid_status(false, 0) == 0)
+                        Alarm_Play_Control(alarm, AUDIO_STOP); //stop
                     if (utc_time >= alarm_moment)
                     {
                         set_alarm_state(ALARM_ING);
@@ -930,6 +940,8 @@ falsh_read_start:
     }
     if (data_pos == 0)
     {
+        if (HTTP_W_R_struct.alarm_w_r_queue->total_len == 1)
+            goto exit;
         flash_read_stream.total_len = HTTP_W_R_struct.alarm_w_r_queue->total_len;
     }
     flash_read_stream.stream_len = HTTP_W_R_struct.alarm_w_r_queue->len;
@@ -1566,6 +1578,7 @@ OSStatus alarm_sound_oid(void)
 #ifdef MICO_DISABLE_STDIO
     require_string(get_eland_mode() == ELAND_NC, exit, "mode err");
 #endif
+    eland_oid_status(true, 1);
     set_alarm_stream_state(STREAM_PLAY);
     for (i = 0; i < 32; i++)
         audio_service_volume_down(&result, 1);
@@ -1601,7 +1614,7 @@ exit:
     }
     if ((get_alarm_stream_state() != STREAM_STOP) && (err != kNoErr))
         err = eland_play_rom_sound(SOUND_ROM_ERROR);
-
+    eland_oid_status(true, 0);
     set_alarm_stream_state(STREAM_IDEL);
     alarm_log("play stopped err:%d", err);
 
@@ -1819,4 +1832,12 @@ void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
                 eland_push_http_queue(DOWNLOAD_OID);
         }
     }
+}
+
+uint8_t eland_oid_status(bool style, uint8_t value)
+{
+    static uint8_t oid_status = 0;
+    if (style)
+        oid_status = value;
+    return oid_status;
 }

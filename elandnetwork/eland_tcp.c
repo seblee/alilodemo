@@ -587,7 +587,7 @@ little_cycle_loop:
     rc = TCP_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
-        // eland_tcp_log("Connection Error rc = %d", rc);
+        eland_tcp_log("Connection Error rc = %d", rc);
         if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc))
             goto exit; //reconnect
     }
@@ -889,7 +889,7 @@ static TCP_Error_t TCP_upload_history(_Client_t *pClient)
     TCP_Error_t rc = TCP_SUCCESS;
     AlarmOffHistoryData_t *history_P = NULL;
     char *telegram_data = (char *)(pClient->clientData.writeBuf + sizeof(_TELEGRAM_t));
-    eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    // eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
 pop_queue:
     err = mico_rtos_pop_from_queue(&history_queue, &history_P, 0);
