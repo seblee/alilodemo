@@ -29,7 +29,7 @@
 #include "eland_tcp.h"
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_ELAND_DEBUG
+#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -658,7 +658,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
             Eland_log("flash capacity is insufficient");
             eland_sound_file_arrange(&sound_file_list);
         }
-        // Eland_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+        Eland_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         Eland_log("alarmID:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
 
         HTTP_W_R_struct.alarm_w_r_queue->total_len = 1;
@@ -666,6 +666,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         HTTP_W_R_struct.alarm_w_r_queue->pos = 0;
         HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)uri_str;
         HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
+        HTTP_W_R_struct.alarm_w_r_queue->write_state = WRITE_ING;
         err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
         Eland_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
         require_noerr(err, remove_file);
@@ -674,6 +675,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         HTTP_W_R_struct.alarm_w_r_queue->pos = 1;
         strncpy(uri_str, ALARM_FILE_END_STRING, strlen(ALARM_FILE_END_STRING));
         HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)uri_str;
+        HTTP_W_R_struct.alarm_w_r_queue->write_state = WRITE_END;
         HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
         err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
         require_noerr(err, remove_file);

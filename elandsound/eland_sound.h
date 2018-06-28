@@ -60,10 +60,17 @@ typedef enum _FILE_OPERATION_MODE_
     FILE_WRITE,  /**write file**/
     FILE_REMOVE, /**remove file**/
 } _file_operation_t;
+
+typedef enum _FILE_WRITE_STATE
+{
+    WRITE_ING, /**writing file**/
+    WRITE_END, /**the latest file data**/
+} __file_write_state_t;
 typedef struct __SOUND_READ_WRITE_TYPE_
 {
     char alarm_ID[ALARM_ID_LEN + 1];
     uint8_t sound_type;
+    __file_write_state_t write_state;
     _file_operation_t operation_mode;
     uint32_t total_len;
     uint32_t file_address;

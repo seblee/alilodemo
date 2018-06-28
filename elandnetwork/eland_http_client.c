@@ -256,6 +256,9 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
     struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
+    const char *X_EL_CONTINUED_URL_STR;
+    size_t X_EL_CONTINUED_URL_LEN;
+    url_field_t *X_EL_CONTINUED_URL;
 
     err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     client_log("lock http_mutex");
@@ -355,6 +358,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     require_action(client_ssl != NULL, exit, {err = kGeneralErr; client_log("https ssl_connnect error, errno = %d", ssl_errno); });
     client_log("ssl_send request");
     /* Send HTTP Request */
+send_request:
     ret = ssl_send(client_ssl, eland_http_requeset, strlen((const char *)eland_http_requeset));
     if (ret > 0)
     {
@@ -416,19 +420,41 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
             if (httpHeader->statusCode == 200) //正常應答
             {
                 //PrintHTTPHeader(httpHeader);
+                err = HTTPGetHeaderField(httpHeader->buf, httpHeader->len, "X-EL-CONTINUED-URL", NULL, NULL, &X_EL_CONTINUED_URL_STR, &X_EL_CONTINUED_URL_LEN, NULL);
+
+                context.with_continue_flag = (err == kNoErr) ? 1 : 0;
                 err = SocketReadHTTPSBody(client_ssl, httpHeader); /*get body data*/
+
                 client_log("data lenth = %ld", (uint32_t)context.content_length);
                 require_noerr(err, exit);
+                /*********option next download***************/
 #if (HTTP_REQ_LOG == 1)
                 client_log("Content %s0x%08x:[%ld]",
                            context.content, context.content, context.content_length); /*get data and print*/
 #endif
                 user_http_response->send_status = HTTP_RESPONSE_SUCCESS;
                 user_http_response->status_code = httpHeader->statusCode;
-                if (context.content_length < 1501)
+                if (context.content_length < 1500)
                 {
                     user_http_response->eland_response_body = calloc(context.content_length, sizeof(uint8_t));
                     memcpy(user_http_response->eland_response_body, context.content, context.content_length);
+                }
+
+                if (context.with_continue_flag == 1)
+                {
+                    memset(eland_http_requeset, 0, http_req_all_len);
+                    memcpy(eland_http_requeset, X_EL_CONTINUED_URL_STR, X_EL_CONTINUED_URL_LEN);
+                    HTTPHeaderDestory(&httpHeader);
+                    X_EL_CONTINUED_URL = url_parse(eland_http_requeset);
+                    require_action(X_EL_CONTINUED_URL, exit, err = kParamErr);
+                    err = HTTP_REQUEST_BUILD(X_EL_CONTINUED_URL, eland_http_requeset, http_req_all_len);
+                    url_free(X_EL_CONTINUED_URL);
+                    client_log("requeset:%s", eland_http_requeset);
+                    httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData, onClearData, &context);
+                    require_action(httpHeader, exit, err = kGeneralErr);
+                    context.continue_flag = 1;
+                    err = kNoErr;
+                    goto send_request;
                 }
             }
             if (httpHeader->statusCode == 204) //正常應答
@@ -498,11 +524,18 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
                 is_sound_data = true;
             else
                 is_sound_data = false;
-
+            context->content_length = inHeader->contentLength;
             if (is_sound_data)
             {
                 context->content = calloc(1501, sizeof(uint8_t));
-                sound_flash_pos = 0;
+                if (context->continue_flag == 0)
+                {
+                    sound_flash_pos = 0;
+                    HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
+                }
+                else
+                    HTTP_W_R_struct.alarm_w_r_queue->total_len += inHeader->contentLength;
+
                 contentLen = (int32_t)inHeader->contentLength + sizeof(_sound_file_type_t) + strlen(ALARM_FILE_END_STRING);
                 if (get_flash_capacity() < contentLen)
                 {
@@ -514,29 +547,29 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
                 context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
 
             require_action(context->content, exit, err = kNoMemoryErr);
-            context->content_length = inHeader->contentLength;
         }
         if (is_sound_data)
         {
-            //    client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+            //client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
                 goto exit;
-            HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
-            //  memcpy(context->content, inData, inLen);
             HTTP_W_R_struct.alarm_w_r_queue->len = inLen;
             HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
             HTTP_W_R_struct.alarm_w_r_queue->sound_data = inData;
             HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
+            HTTP_W_R_struct.alarm_w_r_queue->write_state = WRITE_ING;
             err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+
             if (sound_flash_pos == 0)
                 client_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
             require_noerr(err, exit);
             sound_flash_pos += inLen;
-            if (sound_flash_pos == inHeader->contentLength) //写入文件尾标志
+            if ((sound_flash_pos == HTTP_W_R_struct.alarm_w_r_queue->total_len) && (context->with_continue_flag == 0)) //写入文件尾标志
             {
-                HTTP_W_R_struct.alarm_w_r_queue->total_len = inHeader->contentLength;
+                //eland_error(true, EL_FLASH_ERR);
                 HTTP_W_R_struct.alarm_w_r_queue->len = strlen(ALARM_FILE_END_STRING);
                 HTTP_W_R_struct.alarm_w_r_queue->pos = sound_flash_pos;
+                HTTP_W_R_struct.alarm_w_r_queue->write_state = WRITE_END;
                 memset(context->content, 0, 1501);
                 strncpy(context->content, ALARM_FILE_END_STRING, strlen(ALARM_FILE_END_STRING));
                 HTTP_W_R_struct.alarm_w_r_queue->sound_data = (uint8_t *)context->content;
@@ -790,7 +823,6 @@ send_request:
                         require_action(httpHeader, exit, err = kGeneralErr);
                         context.continue_flag = 1;
                         goto send_request;
-                        err = kNoErr;
                     }
                     else
                         err = kNoErr;

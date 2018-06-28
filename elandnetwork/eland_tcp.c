@@ -461,7 +461,7 @@ OSStatus TCP_Service_Start(void)
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
-                                  0x2800, (mico_thread_arg_t)NULL);
+                                  0x3000, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
     eland_tcp_log("TCP_Service_Start err = %d", err);
@@ -587,7 +587,7 @@ little_cycle_loop:
     rc = TCP_receive_packet(&Eland_Client, &timer);
     if (TCP_SUCCESS != rc)
     {
-        eland_tcp_log("Connection Error rc = %d", rc);
+        // eland_tcp_log("Connection Error rc = %d", rc);
         if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc))
             goto exit; //reconnect
     }
@@ -889,7 +889,7 @@ static TCP_Error_t TCP_upload_history(_Client_t *pClient)
     TCP_Error_t rc = TCP_SUCCESS;
     AlarmOffHistoryData_t *history_P = NULL;
     char *telegram_data = (char *)(pClient->clientData.writeBuf + sizeof(_TELEGRAM_t));
-    // eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+    eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
 
 pop_queue:
     err = mico_rtos_pop_from_queue(&history_queue, &history_P, 0);
@@ -1133,7 +1133,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
             break;
     }
     tep_cmd = (_TCP_CMD_t)i; // TCPCMD_MAX 23
-    eland_tcp_log("cmd:%.4s,lenth:%ld,i:%d,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, i, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
+    eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
     switch (tep_cmd)
     {
     case CN00: //00 Connection Request

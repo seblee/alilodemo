@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_SOUND_DEBUG
+#define CONFIG_SOUND_DEBUG
 #ifdef CONFIG_SOUND_DEBUG
 #define sound_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -202,19 +202,16 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
             memcpy((char *)(alarm_file_cache.alarm_ID), alarm_w_r_temp->alarm_ID, ALARM_ID_LEN);
 
             alarm_file_cache.sound_type = alarm_w_r_temp->sound_type;
-            alarm_file_cache.file_len = alarm_w_r_temp->total_len;
+            if (alarm_w_r_temp->write_state == WRITE_ING)
+                alarm_file_cache.file_len = (uint32_t)0xffffffff;
+            else if (alarm_w_r_temp->write_state == WRITE_END)
+                alarm_file_cache.file_len = alarm_w_r_temp->total_len;
+
             alarm_file_cache.file_address = sound_list->sector_end + sizeof(_sound_file_type_t);
             alarm_w_r_temp->file_address = alarm_file_cache.file_address;
 
             sound_log("write sound file info address:%ld", sound_list->sector_end);
-            sector_count = (alarm_w_r_temp->total_len + alarm_w_r_temp->file_address + strlen(ALARM_FILE_END_STRING)) / KH25L8006_SECTOR_SIZE;
-            sector_count += (((alarm_w_r_temp->total_len + alarm_w_r_temp->file_address + strlen(ALARM_FILE_END_STRING)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
-            if (sector_count > KH25_FLASH_FILE_COUNT)
-            {
-                err = kGeneralErr;
-                sound_log("flash full");
-                goto exit;
-            }
+
             if (sound_list->file_number == 0)
             {
                 sound_list->lib = (_sound_file_type_t *)calloc(1, sizeof(_sound_file_type_t));
@@ -227,12 +224,33 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
             }
             memcpy(sound_list->lib + sound_list->file_number - 1, &alarm_file_cache, sizeof(_sound_file_type_t));
             flash_kh25_write_page((uint8_t *)(&alarm_file_cache), sound_list->sector_end, sizeof(_sound_file_type_t)); //寫入文件信息
-            sound_list->sector_end = KH25L8006_SECTOR_SIZE * sector_count;
         }
+
+        sector_count = (alarm_w_r_temp->total_len + alarm_w_r_temp->file_address + strlen(ALARM_FILE_END_STRING)) / KH25L8006_SECTOR_SIZE;
+        sector_count += (((alarm_w_r_temp->total_len + alarm_w_r_temp->file_address + strlen(ALARM_FILE_END_STRING)) % KH25L8006_SECTOR_SIZE) == 0) ? 0 : 1;
+        if (sector_count > KH25_FLASH_FILE_COUNT)
+        {
+            err = kGeneralErr;
+            sound_log("flash full");
+            goto exit;
+        }
+
         //  sound_log("write sound file data address :%ld", (alarm_w_r_temp->file_address + alarm_w_r_temp->pos));
         flash_kh25_write_page((uint8_t *)alarm_w_r_temp->sound_data,
                               (alarm_w_r_temp->file_address + alarm_w_r_temp->pos),
                               alarm_w_r_temp->len);
+
+        if (alarm_w_r_temp->write_state == WRITE_END)
+        {
+            alarm_file_cache.file_len = alarm_w_r_temp->total_len;
+            (sound_list->lib + sound_list->file_number - 1)->file_len = alarm_w_r_temp->total_len;
+            /*********write file len********/
+            flash_kh25_write_page((uint8_t *)(&alarm_file_cache) + sizeof(alarm_file_cache.flag) + sizeof(alarm_file_cache.alarm_ID) + sizeof(alarm_file_cache.sound_type),
+                                  sound_list->sector_end + sizeof(alarm_file_cache.flag) + sizeof(alarm_file_cache.alarm_ID) + sizeof(alarm_file_cache.sound_type),
+                                  sizeof(uint32_t));
+
+            sound_list->sector_end = KH25L8006_SECTOR_SIZE * sector_count;
+        }
     }
     else if (alarm_w_r_temp->operation_mode == FILE_REMOVE) //file remove
     {

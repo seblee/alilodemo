@@ -211,7 +211,7 @@ void flash_kh25_block_erase(uint32_t address)
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
     //the sector erase
-    *spireadbuffer = (uint8_t)ElandFlash_SECTOR_ERASE;
+    *spireadbuffer = (uint8_t)ElandFlash_BLOCK_ERASE_LARGE;
     *(spireadbuffer + 1) = (uint8_t)((address >> 16) & 0xff);
     *(spireadbuffer + 2) = (uint8_t)((address >> 8) & 0xff);
     *(spireadbuffer + 3) = (uint8_t)(address & 0xff);
