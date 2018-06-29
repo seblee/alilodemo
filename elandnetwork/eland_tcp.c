@@ -461,7 +461,7 @@ OSStatus TCP_Service_Start(void)
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
-                                  0x3000, (mico_thread_arg_t)NULL);
+                                  0x2500, (mico_thread_arg_t)NULL);
     require_noerr(err, exit);
 exit:
     eland_tcp_log("TCP_Service_Start err = %d", err);

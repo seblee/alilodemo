@@ -35,7 +35,7 @@
 
 #define APP_INFO "Eland Demo"
 
-#define FIRMWARE_REVISION "01.21"
+#define FIRMWARE_REVISION "01.22"
 #define MANUFACTURER "MXCHIP Inc."
 #define SERIAL_NUMBER "20140606"
 #define PROTOCOL "com.mxchip.basic"
@@ -44,7 +44,7 @@
 
 /************************************************************************
  * Application thread stack size */
-#define MICO_DEFAULT_APPLICATION_STACK_SIZE (0x2800)
+#define MICO_DEFAULT_APPLICATION_STACK_SIZE (0x2000)
 
 /************************************************************************
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */

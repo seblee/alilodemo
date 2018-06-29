@@ -13,6 +13,7 @@
         "eland_http_client.h": "c",
         "netclockconfig.h": "c",
         "xstddef": "c",
-        "audio_service.h": "c"
+        "audio_service.h": "c",
+        "xutility": "c"
     }
 }

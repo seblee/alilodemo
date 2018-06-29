@@ -584,6 +584,8 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
     else
     { //extra data use a chunked data protocol
         client_log("This is a chunked data, %d", inLen);
+        if (inHeader->contentLength > 1500)
+            goto exit;
         if (inPos == 0)
         {
             context->content = calloc(inHeader->contentLength + 1, sizeof(uint8_t));
@@ -593,6 +595,8 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         else
         {
             context->content_length += inLen;
+            if (context->content_length > 1500)
+                goto exit;
             context->content = realloc(context->content, context->content_length + 1);
             require_action(context->content, exit, err = kNoMemoryErr);
         }
@@ -634,12 +638,11 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
     struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
-    char uri_temp[150];
+
     const char *X_EL_CONTINUED_URL_STR;
     size_t X_EL_CONTINUED_URL_LEN;
     url_field_t *X_EL_CONTINUED_URL;
 
-    memcpy(uri_temp, request_uri, strlen(request_uri));
     err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     client_log("lock http_mutex");
     if (http_body)
@@ -662,11 +665,11 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     /******set request mode******/
     if (method == HTTP_POST)
     {
-        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, uri_temp);
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_POST, request_uri);
     }
     else if (method == HTTP_GET)
     {
-        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, uri_temp);
+        sprintf(eland_http_requeset, "%s %s HTTP/1.1\r\n", HTTP_HEAD_METHOD_GET, request_uri);
     }
     sprintf(eland_http_requeset + strlen(eland_http_requeset), "Host: %s\r\n", host_name); //增加hostname
     //sprintf(eland_http_requeset + strlen(eland_http_requeset), "Keep-Alive：300\r\n");                     //增加Connection设置
