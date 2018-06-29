@@ -1,5 +1,33 @@
 # Netclock
 
+# v01.22
+2018年6月29日14:03:45
+## 
+    set version v02.22
+    issue chunked data memory bug
+    issue alarm latest history stop error
+    issue eland_alarm_is_same alarm_off_dates error
+    alarm al01 add reserved para
+    add TCP_RX_MAX_LEN
+    http setting add default data
+    skip alarm playing when oid is on
+    rain file as one byte
+    alarm sound download split
+    change flash file write in style
+    issue block_erase bug
+    
+# v01.21
+2018年6月29日14:08:03
+## 
+    set version v01.21    
+    add Restart status juge
+    add __no_init when IWDG
+    set Brightness * Brightness / 10
+    add time out when usart send
+    change alarm on/off days calculet style
+    add goto little_cycle_loop when tcp receive success
+    issue alarm data push bug
+
 # v01.20
 2018年6月15日13:48:49
 ## 
@@ -17,7 +45,7 @@
     when alarm off pressed in snoozing paly ofid
     ALARM_STOP push history
     change AP start functory
-    Opration_02H with operation function;
+    Opration_02H with operation function
     change uart task size
 
 # v01.19
@@ -30,7 +58,7 @@
     issue alarm play volume err
     add audio play stop stop_play
     issue default err_sound volume max
-    issue display time set year problem;
+    issue display time set year problem
     issue when up down pressed ,ap can in
 
 # v01.18
@@ -102,28 +130,28 @@
 # v01.14
 2018年4月28日14:19:34
 ## 
-    1 alarm led display;
-    2 issue ALARM_SKIP mode alarm not operation;
-    3 simple clock operation;
-    4 add area code in eland data;
-    5 issue alarm_number =0 clear alarm display;
-    6 add led bright in eland data;
+    1 alarm led display
+    2 issue ALARM_SKIP mode alarm not operation
+    3 simple clock operation
+    4 add area code in eland data
+    5 issue alarm_number =0 clear alarm display
+    6 add led bright in eland data
     7 alarm skip according to elsv
-    8 add oid sound control;
-    9 add download fail count out;
-    10 issue alarm skip push failed;
-    11 add oid sound volume;
-    12 add data get_notification_volume;    
-    13 add alarm_nearest temporary memory;
-    14 change flash sector erase in SOUND_FILE_CLEAR;
-    15 add Alarm clock schedule request;
+    8 add oid sound control
+    9 add download fail count out
+    10 issue alarm skip push failed
+    11 add oid sound volume
+    12 add data get_notification_volume       
+    13 add alarm_nearest temporary memory
+    14 change flash sector erase in SOUND_FILE_CLEAR
+    15 add Alarm clock schedule request
     16 display alarm clock schedule operation NA mode
-    17 add timezone area code save in flash inside;
-    18 add weather file download;
-    19 add eland_error;
+    17 add timezone area code save in flash inside
+    18 add weather file download
+    19 add eland_error
     20 wait weather queue operation
-    21 issue file download err exit;
-    22 tcp health check err --> reconnect;
+    21 issue file download err exit
+    22 tcp health check err --> reconnect
 
     23 change muc iwdg 1.717s
 
@@ -134,18 +162,17 @@
 # v01.11
 2018年4月12日13:44:18 
 ## 
-    1 fix alarm repeat 3 bug;
+    1 fix alarm repeat 3 bug
     2 alarm off with app record time & stop reason 2
     3 press ALARM_OFF in snoozing,stop alarm snooze
     4 new alarm data play priority
     5 change alarm_mcu_data struct
     6 add primary_dns
     7 change ssid scan value 0-100
-    8 add ELAND_H0E_Send to issue eland delet data operation;
-    9 change _alarm_mcu_data_t struct; 
-    10 add alarm skip tcp send; 
-    11 alarm skip operation;
-
+    8 add ELAND_H0E_Send to issue eland delet data operation
+    9 change _alarm_mcu_data_t struct    
+    10 add alarm skip tcp send    
+    11 alarm skip operation
     12 flash capacity arrange
 
 # v01.10 
