@@ -668,7 +668,7 @@ OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type)
         HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_WRITE;
         HTTP_W_R_struct.alarm_w_r_queue->write_state = WRITE_ING;
         err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
-        Eland_log("inlen = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
+        Eland_log("total_len = %ld,pos = %ld,address = %ld", HTTP_W_R_struct.alarm_w_r_queue->total_len, HTTP_W_R_struct.alarm_w_r_queue->pos, HTTP_W_R_struct.alarm_w_r_queue->file_address);
         require_noerr(err, remove_file);
 
         HTTP_W_R_struct.alarm_w_r_queue->len = strlen(ALARM_FILE_END_STRING);

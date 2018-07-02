@@ -220,7 +220,6 @@ void set_alarm_state(_alarm_list_state_t state)
 }
 static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
 {
-    OSStatus err = kGeneralErr;
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
     alarm_stream.sound_type = sound_type;
@@ -248,12 +247,7 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     default:
         break;
     }
-    err = alarm_sound_file_check(alarm_stream.alarm_id);
-    if (err != kNoErr)
-    {
-        memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
-        strncpy(alarm_stream.alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
-    }
+
     mico_rtos_unlock_mutex(&alarm_stream.stream_Mutex);
 }
 
@@ -290,7 +284,7 @@ void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data)
     alarm_mcu_data->moment_time.hr = ho;
     alarm_mcu_data->moment_time.min = mi;
     alarm_mcu_data->moment_time.sec = se;
-    if (elsv_alarm_data->alarm_repeat == 0)
+    if (elsv_alarm_data->alarm_repeat <= 0)
     {
         alarm_log("alarm_time:%s", elsv_alarm_data->alarm_time);
         utc_time = GET_current_second();
@@ -352,7 +346,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     utc_time = GET_current_second();
     for (i = 0; i < list->alarm_number; i++)
     {
-        if ((list->alarm_lib + i)->alarm_repeat)
+        if ((list->alarm_lib + i)->alarm_repeat > 0)
             get_alarm_utc_second(list->alarm_lib + i, &utc_time);
     }
     /*****Sequence*****/
@@ -392,6 +386,13 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
     {
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <= utc_time)
             continue;
+        if ((list->alarm_lib + i)->alarm_repeat == -1)
+        {
+            alarm_log("alarm -1:%s,second:%ld,alarm_id:%s,skip_flag:%d", (list->alarm_lib + i)->alarm_time, (list->alarm_lib + i)->alarm_data_for_eland.moment_second, (list->alarm_lib + i)->alarm_id, (list->alarm_lib + i)->skip_flag);
+            list->alarm_now_serial = i;
+            elsv_alarm_data = list->alarm_lib + i;
+            break;
+        }
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <
             elsv_alarm_data->alarm_data_for_eland.moment_second)
         {
@@ -688,7 +689,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 /**alarm on notice**/
                 TCP_Push_MSG_queue(TCP_HT00_Sem);
                 /** record_time **/
-                mico_time_get_iso8601_time(&iso8601_time);
+                mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
                 alarm_off_history_record_time(ALARM_ON, &iso8601_time);
                 eland_push_uart_send_queue(ALARM_SEND_0B);
                 if (eland_oid_status(false, 0) == 0)
@@ -721,7 +722,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             }
             if ((utc_time >= alarm_moment) || (eland_oid_status(false, 0) > 0))
             {
-                mico_time_get_iso8601_time(&iso8601_time);
+                mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
                 if (eland_oid_status(false, 0) > 0)
                     alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
                 else
@@ -742,7 +743,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_SORT:
         case ALARM_SKIP:
         case ALARM_STOP:
-            mico_time_get_iso8601_time(&iso8601_time);
+            mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             set_alarm_history_send_sem();
@@ -886,9 +887,16 @@ static void play_voice(mico_thread_arg_t arg)
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
     _stream_state_t stream_state;
+    alarm_log("player_flash_thread");
 
     mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
-    alarm_log("player_flash_thread");
+    err = alarm_sound_file_check(stream->alarm_id);
+    if (err != kNoErr)
+    {
+        memset(stream->alarm_id, 0, ALARM_ID_LEN + 1);
+        strncpy(stream->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
+    }
+
     flashdata = malloc(SOUND_STREAM_DEFAULT_LENGTH + 1);
 start_play_voice:
     stream_state = get_alarm_stream_state();
@@ -897,7 +905,7 @@ start_play_voice:
     case STREAM_STOP:
         audio_service_get_audio_status(&result, &audio_status);
         if (audio_status != MSCP_STATUS_IDLE)
-            audio_service_stream_stop(&result, alarm_stream.stream_id);
+            audio_service_stream_stop(&result, stream->stream_id);
         goto exit;
         break;
     case STREAM_PLAY:
@@ -1111,6 +1119,10 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
 
     switch (alarm->alarm_repeat)
     {
+    case -1: //只在新数据导入时候计算一次
+        alarm_log("alarm -1:%s,second:%ld,alarm_id:%s,skip_flag:%d", alarm->alarm_time, alarm->alarm_data_for_eland.moment_second, alarm->alarm_id, alarm->skip_flag);
+        alarm->alarm_data_for_eland.moment_second = (*utc_time + 2);
+        break;
     case 0: //只在新数据导入时候计算一次
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
         if (alarm->alarm_data_for_eland.moment_second < *utc_time)
@@ -1781,13 +1793,16 @@ void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
                          uint16_t Restain, uint16_t Restain_Trg,
                          _ELAND_MODE_t eland_mode)
 {
+    mico_utc_time_t utc_time;
     iso8601_time_t iso8601_time;
     _alarm_list_state_t alarm_status = get_alarm_state();
     if (alarm_status == ALARM_ING)
     {
         if ((Count_Trg & KEY_Snooze) || (Count_Trg & KEY_Alarm))
         {
-            mico_time_get_iso8601_time(&iso8601_time);
+            utc_time = GET_current_second();
+            mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
+
             if (Count_Trg & KEY_Snooze)
             {
                 set_alarm_state(ALARM_SNOOZ_STOP);

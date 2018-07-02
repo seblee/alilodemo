@@ -141,7 +141,7 @@ static int ota_start_command(void)
     {
         times--;
         MicoUartSend(MICO_UART_2, inDatabuf, 5);
-        mico_rtos_thread_msleep(2);
+        mico_rtos_thread_msleep(10);
         recv_len = MicoUartGetLengthInBuffer(MICO_UART_2);
         if (recv_len)
             MicoUartRecv(MICO_UART_2, outDatabuf, recv_len, 2);

@@ -967,8 +967,6 @@ static OSStatus HTTP_REQUEST_BUILD(url_field_t *CONTINUED_URL, char *request, ui
     memset(uri, 0, sizeof(uri));
     memset(request, 0, http_req_len);
 
-    // client_log("host:%s", CONTINUED_URL->host);
-    // client_log("path:%s", CONTINUED_URL->path);
     sprintf(uri + strlen(uri), "%s%s%s", "/", CONTINUED_URL->path, "?");
     // client_log("query_num:%d", CONTINUED_URL->query_num);
     for (i = 0; i < CONTINUED_URL->query_num; i++)
