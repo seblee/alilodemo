@@ -987,7 +987,7 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
     {
         if (Count_Trg & KEY_Snooze)
         {
-            if (netclock_des_g->flash_check)
+            if (flash_kh25_check_RDID() == kNoErr)
                 eland_error(EL_RAM_WRITE, EL_FLASH_OK);
             else
                 eland_error(EL_RAM_WRITE, EL_FLASH_ERR);

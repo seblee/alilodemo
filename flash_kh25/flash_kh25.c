@@ -19,7 +19,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-//#define CONFIG_FLASH_DEBUG
+#define CONFIG_FLASH_DEBUG
 #ifdef CONFIG_FLASH_DEBUG
 #define flash_kh25_log(M, ...) custom_log("flash_kh25", M, ##__VA_ARGS__)
 #else
@@ -142,8 +142,8 @@ static OSStatus flash_kh25_check_device(void)
     SPIDelay(1);
     v_CSIsEnableSimulate(&Spi_eland, 0);
     require_string((cache[1] == 0xc2), exit, "flash_kh25 check err");
-    // flash_kh25_log("\r\nmanufacturer ID = 0x%02X\r\nmemory type     = 0x%02X\r\nmemory density  = 0x%02X\r\nflash model     = %s",
-    //                cache[1], cache[2], cache[3], (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
+    flash_kh25_log("\r\nmanufacturer ID = 0x%02X\r\nmemory type     = 0x%02X\r\nmemory density  = 0x%02X\r\nflash model     = %s",
+                   cache[1], cache[2], cache[3], (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
     /**************RES***********************/
     v_CSIsEnableSimulate(&Spi_eland, 1);
     SPIDelay(1);
@@ -333,7 +333,8 @@ OSStatus flash_kh25_init(void)
     mico_thread_sleep(1);
 
     /*****check flash******/
-    err = flash_kh25_check_device();
+    //err = flash_kh25_check_device();
+    err = flash_kh25_check_RDID();
     require_noerr_string(err, exit, "check kh25 flash failed");
 
     elandSPIBuffer = malloc(strlen(FLASH_KH25_CHECK_STRING) + 2);
@@ -363,5 +364,42 @@ exit:
         free(elandSPIBuffer);
         elandSPIBuffer = NULL;
     }
+    return err;
+}
+
+OSStatus flash_kh25_check_RDID(void)
+{
+    OSStatus err = kGeneralErr;
+    uint8_t cache[6];
+    memset(cache, 0, 6);
+    /**************RDID***********************/
+    flash_kh25_log("check kh25 RDID");
+    v_CSIsEnableSimulate(&Spi_eland, 1);
+    SPIDelay(1);
+    cache[0] = (uint8_t)ElandFlash_READ_JEDEC_ID;
+    spiReadWirteOneData(&Spi_eland, cache, 4);
+    SPIDelay(1);
+    v_CSIsEnableSimulate(&Spi_eland, 0);
+    require_string((cache[1] == 0xc2), exit, "flash_kh25 check err");
+    flash_kh25_log("\r\nmanufacturer ID = 0x%02X\r\nmemory type     = 0x%02X\r\nmemory density  = 0x%02X\r\nflash model     = %s",
+                   cache[1], cache[2], cache[3], (cache[3] == 0x14) ? "KH25L8006E" : "KH25L1606E");
+/************8M flash***********************/
+#ifdef KH25L8006
+    if ((cache[1] != 0xc2) ||
+        (cache[2] != 0x20) ||
+        (cache[3] != 0x14))
+        err = kGeneralErr;
+#endif
+/***********16M flash***********************/
+#ifdef KH25L1606
+    if ((cache[1] != 0xc2) ||
+        (cache[2] != 0x20) ||
+        (cache[3] != 0x15))
+        err = kGeneralErr;
+#endif
+    else
+        err = kNoErr;
+
+exit:
     return err;
 }

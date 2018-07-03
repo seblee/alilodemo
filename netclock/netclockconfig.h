@@ -31,22 +31,22 @@
 #define ELAND_AP_DNS_SERVER ("192.168.0.1") //本體 DNS
 #define ELAND_AP_NET_MASK ("255.255.255.0") //本體IP
 
-#define ELAND_TEST_SSID ("TP-LINK_eland") //eland test ap
-#define ELAND_TEST_KEY ("eland1234")      //eland test ap
+#define ELAND_TEST_SSID ("LT10_TEST") //eland test ap
+#define ELAND_TEST_KEY ("eland1234")  //eland test ap
 
-#define user_id_len 37          //Eland name
-#define eland_name_Len 151      //Eland名称，用户输入
-#define serial_number_len 12    //Eland的串口番号。
-#define firmware_version_len 6  //Eland固件版本号
-#define mac_address_Len 18      //MAC地址
-#define ip_address_Len maxIpLen //Eland IP地址 必須為16，防止內存操作有問題
-#define ElandSsid_Len 32        //wifi 用户名长度
-#define ElandKey_Len 64         //wifi 密码长度
-#define Time_Format_Len 9       //"HH:mm:ss"的形式
-#define DateTime_Len 19         //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
-#define Date_formate_len 11     //日期为"yyyy-MM-dd"的形式
-#define URL_Len 128             //URL长度
-#define hash_Len 33             //URL长度
+#define user_id_len 37           //Eland name
+#define eland_name_Len 151       //Eland名称，用户输入
+#define serial_number_len 12     //Eland的串口番号。
+#define firmware_version_len 6   //Eland固件版本号
+#define mac_address_Len 18       //MAC地址
+#define ip_address_Len maxIpLen  //Eland IP地址 必須為16，防止內存操作有問題
+#define ElandSsid_Len maxSsidLen //wifi 用户名长度
+#define ElandKey_Len maxKeyLen   //wifi 密码长度
+#define Time_Format_Len 9        //"HH:mm:ss"的形式
+#define DateTime_Len 19          //闹钟播报的时间 "yyyy-MM-dd HH:mm:ss"的形式。
+#define Date_formate_len 11      //日期为"yyyy-MM-dd"的形式
+#define URL_Len 128              //URL长度
+#define hash_Len 33              //URL长度
 
 #define DEFAULT_TIME_FORMAT 1
 #define DEFAULT_BRIGHTNESS_NORMAL 80

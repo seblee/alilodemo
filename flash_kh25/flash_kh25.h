@@ -6,6 +6,15 @@
 //#define KH25L8006
 #define KH25L1606
 
+/************8M flash***********************/
+#ifdef KH25L8006
+#define KH25_STR "KH25L8006"
+#endif
+/***********16M flash***********************/
+#ifdef KH25L1606
+#define KH25_STR "KH25L1606"
+#endif
+
 // Define 4 SPI pins
 #define Eland_CS MICO_GPIO_23
 #define Eland_SCLK MICO_GPIO_12
@@ -69,6 +78,7 @@ void flash_kh25_sector_erase(uint32_t address);
 void flash_kh25_block_erase(uint32_t address);
 void flash_kh25_chip_erase(void);
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
+OSStatus flash_kh25_check_RDID(void);
 
 #define FLASH_KH25_CHECK_STRING "flash_kh25_check_str0ng"
 
