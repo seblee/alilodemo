@@ -44,7 +44,7 @@
 
 /************************************************************************
  * Application thread stack size */
-#define MICO_DEFAULT_APPLICATION_STACK_SIZE (0x2000)
+#define MICO_DEFAULT_APPLICATION_STACK_SIZE (0x1000)
 
 /************************************************************************
  * Enable wlan connection, start easylink configuration if no wlan settings are existed */

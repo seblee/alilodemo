@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-10 16:13:26
+ * @Last Modified time:2018-07-04 14:46:24
  * @brief   :
  ****************************************************************************
 **/
@@ -35,6 +35,9 @@
 #define SOUND_FILE_WEATHER_D (uint8_t)0X06
 #define SOUND_FILE_WEATHER_E (uint8_t)0X07
 #define SOUND_FILE_WEATHER_F (uint8_t)0X08
+
+#define KH25_CHECK_ADDRESS (KH25_FLASH_FILE_COUNT * KH25L8006_SECTOR_SIZE)
+#define DOWNLOAD_FLAG_ADDRESS KH25_CHECK_ADDRESS + strlen(FLASH_KH25_CHECK_STRING)
 /* Private typedef -----------------------------------------------------------*/
 
 typedef struct __SOUND_FILE_TYPE_

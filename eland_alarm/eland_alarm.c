@@ -652,6 +652,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         alarm_list.state.alarm_stoped = true;
         mico_time_get_iso8601_time(&iso8601_time);
         alarm_off_history_record_time(ALARM_OFF_SKIP, &iso8601_time);
+        set_alarm_history_send_sem();
         set_alarm_state(ALARM_STOP);
         return;
     }

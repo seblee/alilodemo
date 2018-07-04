@@ -1,8 +1,24 @@
+/**
+ ****************************************************************************
+ * @Warning :Without permission from the author,Not for commercial use
+ * @File    :undefined
+ * @Author  :seblee
+ * @date    :2018-07-04 14:16:33
+ * @version :V 1.0.0
+ *************************************************
+ * @Last Modified by  :seblee
+ * @Last Modified time:2018-07-04 14:40:08
+ * @brief   :
+ ****************************************************************************
+**/
 #ifndef __FLASH_KH25_H__
 #define __FLASH_KH25_H__
+
+/* Private include -----------------------------------------------------------*/
 #include "mico.h"
 #include "eland_spi.h"
 
+/* Private define ------------------------------------------------------------*/
 //#define KH25L8006
 #define KH25L1606
 
@@ -41,6 +57,8 @@
 #define KH25L8006_WIP_WAIT_TIME_MAX (uint32_t)0X006ACFC0 //最大等待 7000000us
 #define KH25L1606_WIP_WAIT_TIME_MAX (uint32_t)0X00D59F80 //最大等待 14000000us
 
+#define FLASH_KH25_CHECK_STRING "flash_kh25_check_str0ng"
+/* Private typedef -----------------------------------------------------------*/
 /* Command definitions */
 typedef enum
 {
@@ -69,8 +87,12 @@ typedef enum
     ElandFlash_DUMMY_BYTE = 0xA5,
 } ElandFlash_command_t;
 
+/* Private macro -------------------------------------------------------------*/
 extern uint8_t *elandSPIBuffer;
 
+/* Private variables ---------------------------------------------------------*/
+
+/* Private function prototypes -----------------------------------------------*/
 OSStatus flash_kh25_init(void);
 void flash_kh25_read(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
 //void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t length);
@@ -80,6 +102,6 @@ void flash_kh25_chip_erase(void);
 void flash_kh25_write_page(uint8_t *scr, uint32_t address, uint32_t length);
 OSStatus flash_kh25_check_RDID(void);
 
-#define FLASH_KH25_CHECK_STRING "flash_kh25_check_str0ng"
+/* Private functions ---------------------------------------------------------*/
 
 #endif

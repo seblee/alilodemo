@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-06-13 09:55:52
+ * @Last Modified time:2018-07-04 14:44:49
  * @brief   :
  ****************************************************************************
 **/
@@ -56,7 +56,9 @@ int application_start(void)
     err = Eland_Rtc_Init();
     require_noerr(err, exit);
 
+    /*Wify debug*/
     //wifimgr_debug_enable(0);
+
     /*init fog v2 service*/
     err = netclock_desInit();
     require_noerr(err, exit);
