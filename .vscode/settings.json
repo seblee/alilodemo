@@ -15,5 +15,6 @@
         "xstddef": "c",
         "audio_service.h": "c",
         "xutility": "c"
-    }
+    },
+    "C_Cpp.dimInactiveRegions": true
 }

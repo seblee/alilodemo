@@ -129,7 +129,7 @@ static void flash_kh25_write(uint8_t *spireadbuffer, uint32_t address, uint32_t 
     flash_kh25_write_disable();
     flash_kh25_wait_for_WIP(KH25L8006_WIP_WAIT_TIME_MAX);
 }
-  OSStatus flash_kh25_check_device(void)
+OSStatus flash_kh25_check_device(void)
 {
     uint8_t cache[6];
     memset(cache, 0, 6);

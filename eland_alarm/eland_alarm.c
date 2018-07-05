@@ -1652,13 +1652,16 @@ exit:
 }
 OSStatus check_default_sound(void)
 {
+    uint8_t check_times = 0;
     OSStatus err = kNoErr;
     __elsv_alarm_data_t alarm_simple;
+
 check_start:
     alarm_log("check default sound");
     err = SOUND_CHECK_DEFAULT_FILE();
     if (err != kNoErr)
     {
+    download_start:
         alarm_log("SOUND_FILE_CLEAR");
         SOUND_FILE_CLEAR();
         memset(&alarm_simple, 0, sizeof(__elsv_alarm_data_t));
@@ -1670,6 +1673,17 @@ check_start:
 exit:
     if (err == kNoErr)
         alarm_log("check ok");
+    else
+    {
+        mico_rtos_thread_sleep(5);
+        goto download_start;
+        if (check_times < 10)
+        {
+            check_times++;
+        }
+        else
+            mico_rtos_delete_thread(NULL);
+    }
     return err;
 }
 
