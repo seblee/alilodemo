@@ -360,7 +360,7 @@ void file_download(void)
     OSStatus err;
     _download_type_t download_type;
     mico_rtos_thread_sleep(3);
-    //eland_push_http_queue(DOWNLOAD_OID);
+    // eland_push_http_queue(DOWNLOAD_OID);
 wait_for_queue:
     sound_log("#####:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
     err = mico_rtos_pop_from_queue(&http_queue, &download_type, MICO_WAIT_FOREVER);

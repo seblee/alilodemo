@@ -625,10 +625,7 @@ pop_queue:
         }
         /*******health check***********/
         else if (tcp_message == TCP_HC00_Sem)
-        {
             rc = TCP_health_check(&Eland_Client);
-            eland_tcp_log("TCP_HC00_Sem");
-        }
         /*******OTA start***********/
         else if (tcp_message == TCP_FW01_Sem)
         {
@@ -644,7 +641,6 @@ pop_queue:
             rc = TCP_request_response(&Eland_Client, SD00, SD01);
             if (rc != TCP_SUCCESS)
                 eland_tcp_log("*****************schedule Error rc = %d", rc);
-            // require_string(TCP_SUCCESS == rc, exit, "TCP_request_response SD00, SD01 Error");
         repop_message:
             if (mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0) == kNoErr)
             {
@@ -655,10 +651,10 @@ pop_queue:
             }
         }
 
-        if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_READ_TIMEOUT_ERROR == rc) || (NETWORK_SSL_WRITE_ERROR == rc) || (NETWORK_SSL_WRITE_TIMEOUT_ERROR == rc))
+        if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_WRITE_ERROR == rc) /*|| (NETWORK_SSL_WRITE_TIMEOUT_ERROR == rc)*/)
         {
-            goto exit;
             eland_tcp_log("Connection Error rc = %d", rc);
+            goto exit;
         }
         if (TCP_SUCCESS == rc)
             goto pop_queue;
@@ -871,7 +867,6 @@ static TCP_Error_t TCP_health_check(_Client_t *pClient)
         return rc;
     }
 
-    eland_tcp_log("health_check:OK");
     // eland_tcp_log("health_check:OK json:%s", pClient->clientData.readBuf + sizeof(_TELEGRAM_t));
     telegram = (_TELEGRAM_t *)pClient->clientData.readBuf;
     eland_tcp_log("RECEIVE %c%c%c%c", telegram->command[0], telegram->command[1], telegram->command[2], telegram->command[3]);
@@ -1133,7 +1128,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
             break;
     }
     tep_cmd = (_TCP_CMD_t)i; // TCPCMD_MAX 23
-    eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
+    // eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
     switch (tep_cmd)
     {
     case CN00: //00 Connection Request
@@ -1878,7 +1873,6 @@ static void eland_set_time(void)
     mico_rtos_lock_mutex(&time_Mutex);
     mico_time_get_utc_time(&utc_time);
     utc_time += offset_time;
-    eland_tcp_log("utc_time:%ld", utc_time);
     utc_time_ms = (mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000);
     mico_time_set_utc_time_ms(&utc_time_ms);
 
@@ -1896,7 +1890,7 @@ static void eland_set_time(void)
     mico_time_get_iso8601_time(&iso8601_time);
     mico_time_get_utc_time(&eland_current_utc);
     mico_rtos_unlock_mutex(&time_Mutex);
-    eland_tcp_log("sntp_time_synced: %.26s", (char *)&iso8601_time);
+    eland_tcp_log("utc_time:%ld,time: %.26s", utc_time, (char *)&iso8601_time);
     /*send time to lcd*/
 
     if ((offset_time > 86400) || (offset_time < -86400))

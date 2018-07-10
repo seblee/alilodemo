@@ -123,6 +123,7 @@ void Alarm_Manager(uint32_t arg)
     mico_utc_time_t utc_time = 0;
     uint8_t count_temp = 0;
     uint8_t led_check_flag = 0, weather_refreshed = 0;
+    uint16_t time_count = 0;
     OSStatus err;
     uint8_t i;
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
@@ -149,6 +150,11 @@ void Alarm_Manager(uint32_t arg)
             combing_alarm(&alarm_list, &(alarm_list.alarm_nearest), alarm_state);
             led_check_flag = 0;
             weather_refreshed = 0;
+            time_count = 0;
+            if (alarm_list.alarm_nearest)
+            {
+                TCP_Push_MSG_queue(TCP_SD00_Sem);
+            }
         }
         else if ((alarm_state == ALARM_IDEL) &&
                  (alarm_list.alarm_nearest) &&
@@ -156,6 +162,18 @@ void Alarm_Manager(uint32_t arg)
         {
             count_temp = 0;
             utc_time = GET_current_second();
+            /**************check alarm_color*********************/
+            if (time_count < 1000)
+                time_count++;
+            if (time_count == 2)
+            {
+                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 110) ||
+                    (alarm_list.alarm_nearest->alarm_repeat == -1))
+                {
+                    alarm_log("##### DOWNLOAD_SCAN ######");
+                    eland_push_http_queue(DOWNLOAD_SCAN);
+                }
+            }
             /**************check alarm_color*********************/
             if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY) &&
                 (alarm_list.alarm_nearest->alarm_data_for_mcu.alarm_color == 0) &&
@@ -169,11 +187,16 @@ void Alarm_Manager(uint32_t arg)
             /**************check weather*********************/
             if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < 300) &&
                 (alarm_list.alarm_nearest->skip_flag == 0) &&
-                (weather_refreshed == 0))
+                (weather_refreshed == 0) &&
+                (time_count >= 3))
             {
                 weather_refreshed = 1;
-                alarm_log("##### DOWNLOAD_WEATHER ######");
-                eland_push_http_queue(DOWNLOAD_WEATHER);
+                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 110) ||
+                    (alarm_list.alarm_nearest->alarm_repeat == -1))
+                {
+                    alarm_log("##### DOWNLOAD_WEATHER ######");
+                    eland_push_http_queue(DOWNLOAD_WEATHER);
+                }
             }
 
             if (utc_time >= alarm_list.alarm_nearest->alarm_data_for_eland.moment_second)
@@ -366,7 +389,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 
     for (i = 0; i < list->alarm_number; i++)
     {
-        alarm_log("moment_second:%ld,utc:%ld", (list->alarm_lib + i)->alarm_data_for_eland.moment_second, utc_time);
+        alarm_log("%d,moment_second:%ld,utc:%ld", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second, utc_time);
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <= utc_time)
             continue;
         else
@@ -654,7 +677,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         alarm_off_history_record_time(ALARM_OFF_SKIP, &iso8601_time);
         set_alarm_history_send_sem();
         set_alarm_state(ALARM_STOP);
-        return;
+        goto exit;
     }
 
     if (alarm->snooze_enabled)
@@ -671,7 +694,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         if (utc_time < alarm->alarm_data_for_eland.moment_second)
         {
             set_alarm_state(ALARM_STOP);
-            return;
+            goto exit;
         }
         switch (current_state)
         {
@@ -733,7 +756,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 {
                     set_alarm_history_send_sem();
                     Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
-                    return;
+                    goto exit;
                 }
             }
             else
@@ -746,9 +769,16 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_STOP:
             mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
-            Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
+            if (eland_oid_status(false, 0) == 0)
+            {
+                for (i = 0; i < 33; i++)
+                    audio_service_volume_down(&result, 1);
+                for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+                    audio_service_volume_up(&result, 1);
+                Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
+            }
             set_alarm_history_send_sem();
-            return;
+            goto exit;
             break;
         case ALARM_SNOOZ_STOP:
             if (snooze_count)
@@ -784,11 +814,13 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 set_alarm_state(ALARM_STOP);
             break;
         default:
-            return;
+            goto exit;
             break;
         }
         mico_rtos_thread_msleep(50);
     }
+exit:
+    mico_rtos_thread_msleep(500);
 }
 /***CMD = 1 PALY   CMD = 0 STOP***/
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CMD)
@@ -1122,7 +1154,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     {
     case -1: //只在新数据导入时候计算一次
         alarm_log("alarm -1:%s,second:%ld,alarm_id:%s,skip_flag:%d", alarm->alarm_time, alarm->alarm_data_for_eland.moment_second, alarm->alarm_id, alarm->skip_flag);
-        alarm->alarm_data_for_eland.moment_second = (*utc_time + 2);
+        alarm->alarm_data_for_eland.moment_second = (*utc_time + 3);
         break;
     case 0: //只在新数据导入时候计算一次
         alarm->alarm_data_for_eland.moment_second = GetSecondTime(&date_time);
@@ -1567,8 +1599,6 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     if (*alarm_nearest)
     {
-        eland_push_http_queue(DOWNLOAD_SCAN);
-        TCP_Push_MSG_queue(TCP_SD00_Sem);
         alarm_log("alarm_nearest time:%s,second:%ld,alarm_id:%s,skip_flag:%d", (*alarm_nearest)->alarm_time, (*alarm_nearest)->alarm_data_for_eland.moment_second, (*alarm_nearest)->alarm_id, (*alarm_nearest)->skip_flag);
     }
     else
