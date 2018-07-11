@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-07-04 15:11:30
+ * @Last Modified time:2018-07-10 14:09:34
  * @brief   :
  ****************************************************************************
 **/
@@ -29,7 +29,7 @@
 #include "eland_tcp.h"
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_ELAND_DEBUG
+//#define CONFIG_ELAND_DEBUG
 #ifdef CONFIG_ELAND_DEBUG
 #define Eland_log(M, ...) custom_log("Eland", M, ##__VA_ARGS__)
 #else
@@ -197,11 +197,7 @@ start_Check:
     /*start init eland SPI*/
     err = start_eland_flash_service();
     if (err == kNoErr)
-    {
         netclock_des_g->flash_check = 1;
-        flash_kh25_read(&(netclock_des_g->download_flag),
-                        DOWNLOAD_FLAG_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
-    }
     else
         netclock_des_g->flash_check = 0;
 

@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-06-13 09:54:58
+ * @Last Modified time:2018-07-10 16:24:51
  * @brief   :
  ****************************************************************************
 **/
@@ -419,7 +419,7 @@ send_request:
             //只有code正确才解析返回数据,错误情况下解析容易造成内存溢出
             if (httpHeader->statusCode == 200) //正常應答
             {
-                //PrintHTTPHeader(httpHeader);
+                // PrintHTTPHeader(httpHeader);
                 err = HTTPGetHeaderField(httpHeader->buf, httpHeader->len, "X-EL-CONTINUED-URL", NULL, NULL, &X_EL_CONTINUED_URL_STR, &X_EL_CONTINUED_URL_LEN, NULL);
 
                 context.with_continue_flag = (err == kNoErr) ? 1 : 0;
@@ -449,7 +449,7 @@ send_request:
                     require_action(X_EL_CONTINUED_URL, exit, err = kParamErr);
                     err = HTTP_REQUEST_BUILD(X_EL_CONTINUED_URL, eland_http_requeset, http_req_all_len);
                     url_free(X_EL_CONTINUED_URL);
-                    client_log("requeset:%s", eland_http_requeset);
+                    // client_log("requeset:%s", eland_http_requeset);
                     httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData, onClearData, &context);
                     require_action(httpHeader, exit, err = kGeneralErr);
                     context.continue_flag = 1;
@@ -820,7 +820,7 @@ send_request:
                         require_action(X_EL_CONTINUED_URL, exit, err = kParamErr);
                         err = HTTP_REQUEST_BUILD(X_EL_CONTINUED_URL, eland_http_requeset, http_req_all_len);
                         url_free(X_EL_CONTINUED_URL);
-                        //client_log("requeset:%s", eland_http_requeset);
+                        // client_log("requeset:%s", eland_http_requeset);
                         HTTPHeaderDestory(&httpHeader);
                         httpHeader = HTTPHeaderCreateWithCallback(1024, onReceivedData_oid, onClearData, &context);
                         require_action(httpHeader, exit, err = kGeneralErr);

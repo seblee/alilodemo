@@ -105,8 +105,9 @@ typedef enum
 } SOUND_FILE_SCAN_STATUS;
 typedef enum SOUND_ROM_T
 {
-    SOUND_ROM_ERROR,   //ERROR SOUND
-    SOUND_ROM_DEFAULT, //DEFAULT SOUND
+    ROM_FLASH,   //ERROR SOUND
+    ROM_ERROR,   //ERROR SOUND
+    ROM_DEFAULT, //DEFAULT SOUND
 } _sound_rom_t;
 
 /* Private macro -------------------------------------------------------------*/

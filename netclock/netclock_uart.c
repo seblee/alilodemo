@@ -998,7 +998,7 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
     {
         if (Count_Trg & KEY_Snooze)
         {
-            eland_play_rom_sound(SOUND_ROM_DEFAULT);
+            eland_play_rom_sound(ROM_DEFAULT);
         }
     }
 }

@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-07-04 14:46:27
+ * @Last Modified time:2018-07-10 11:38:12
  * @brief   :
  ****************************************************************************
 **/
@@ -101,7 +101,6 @@ typedef struct _ELAND_DES_S //设备状态结构
 
     /*******************/
     uint8_t flash_check;
-    uint8_t download_flag;
     /*****************/
     char Wifissid[ElandSsid_Len]; //wifi 賬號
     char WifiKey[ElandKey_Len];   //wifi 密碼

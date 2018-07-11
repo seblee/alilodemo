@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-04-16 15:06:54
+ * @Last Modified time:2018-07-10 14:29:24
  * @brief   :
  ****************************************************************************
 **/
@@ -543,8 +543,9 @@ GET_CONNECT_INFO:
     require_string(TCP_SUCCESS == rc, exit, "Shadow Connection Error");
 RECONN:
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
-    if ((err == kNoErr) && (tcp_message = TCP_Stop_Sem))
+    if ((err == kNoErr) && (tcp_message == TCP_Stop_Sem))
     {
+        eland_tcp_log("TCP stoped...");
         Eland_Client.networkStack.disconnect(&Eland_Client.networkStack);
         Eland_Client.networkStack.destroy(&Eland_Client.networkStack);
         mico_rtos_delete_thread(NULL);
@@ -552,13 +553,15 @@ RECONN:
 
     eland_tcp_log("Shadow Connect...");
     rc = eland_tcp_connect(&Eland_Client, NULL);
-    eland_tcp_log("Connect.over..");
+    eland_tcp_log("#####history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
+
     if (TCP_SUCCESS != rc)
     {
         eland_tcp_log("Server Connection Error,rc = %d", rc);
         mico_thread_sleep(5);
         goto RECONN;
     }
+    eland_tcp_log("Connect.over..");
 
     eland_tcp_log("TCP_connection_request");
     /**Connection Request**/
@@ -702,7 +705,7 @@ static TCP_Error_t eland_tcp_connect(_Client_t *pClient, ServerParams_t *ServerP
     rc = TCP_Physical_is_connected(&(pClient->networkStack));
     if (rc != NETWORK_PHYSICAL_LAYER_CONNECTED)
     {
-        eland_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT");
+        eland_tcp_log("PHYSICAL_LAYER_DISCONNECTED WAIT history:chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
         return rc;
     }
 
@@ -1128,7 +1131,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
             break;
     }
     tep_cmd = (_TCP_CMD_t)i; // TCPCMD_MAX 23
-    // eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
+    eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
     switch (tep_cmd)
     {
     case CN00: //00 Connection Request

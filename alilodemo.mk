@@ -35,6 +35,8 @@ $(NAME)_SOURCES := mico_main.c \
 				   elandnetwork/eland_http_client.c \
 				   elandnetwork/eland_tcp.c \
 				   elandsound/eland_sound.c \
+				   elandsound/default_bin.c \
+				   elandsound/error_bin.c \
 				   eland_mcu_ota/eland_mcu_ota.c \
 				   eland_alarm/eland_alarm.c \
 				   eland_alarm/eland_control.c 

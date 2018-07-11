@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-06-13 10:18:58
+ * @Last Modified time:2018-07-10 15:15:28
  * @brief   :
  ****************************************************************************
 **/
@@ -637,12 +637,12 @@ OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
 
     fm_stream.type = AUDIO_STREAM_TYPE_MP3;
     fm_stream.stream_id = audio_service_system_generate_stream_id();
-    if (SOUND == SOUND_ROM_ERROR)
+    if (SOUND == ROM_ERROR)
     {
         fm_stream.pdata = (uint8_t *)error_sound;
         fm_stream.total_len = sizeof(error_sound);
     }
-    else if (SOUND == SOUND_ROM_DEFAULT)
+    else if (SOUND == ROM_DEFAULT)
     {
         fm_stream.pdata = (uint8_t *)default_sound;
         fm_stream.total_len = sizeof(default_sound);

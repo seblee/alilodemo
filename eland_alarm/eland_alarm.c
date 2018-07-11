@@ -7,7 +7,7 @@
  * @version :V 1.0.0
  *************************************************
  * @Last Modified by  :seblee
- * @Last Modified time:2018-06-13 09:53:34
+ * @Last Modified time:2018-07-10 17:59:49
  * @brief   :
  ****************************************************************************
 **/
@@ -20,6 +20,8 @@
 #include "eland_tcp.h"
 #include "netclock_uart.h"
 #include "eland_http_client.h"
+#include "error_bin.h"
+#include "default_bin.h"
 /* Private define ------------------------------------------------------------*/
 #define CONFIG_ALARM_DEBUG
 #ifdef CONFIG_ALARM_DEBUG
@@ -571,7 +573,7 @@ exit:
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
     OSStatus err = kNoErr;
-    uint8_t i;
+    uint8_t i, j = 0;
     if (AlarmList->alarm_number == 0)
     {
         memcpy(AlarmList->alarm_lib, inData, sizeof(__elsv_alarm_data_t));
@@ -594,18 +596,23 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
                 goto exit;
             }
         }
+        /**a new alarm**/
         if (AlarmList->alarm_number < ALARM_DATA_MAX_LEN)
         {
-            /**a new alarm**/
             memmove(AlarmList->alarm_lib + 1, AlarmList->alarm_lib, AlarmList->alarm_number * sizeof(__elsv_alarm_data_t));
             memcpy((uint8_t *)(AlarmList->alarm_lib), inData, sizeof(__elsv_alarm_data_t));
             AlarmList->alarm_number++;
         }
         else
         {
-            alarm_log("alarm full!");
-            err = kGeneralErr;
-            goto exit_nothing_done;
+            for (i = 0; i < AlarmList->alarm_number; i++)
+            {
+                if ((AlarmList->alarm_lib + i)->alarm_data_for_eland.moment_second >
+                    (AlarmList->alarm_lib + j)->alarm_data_for_eland.moment_second)
+                    j = i;
+            }
+            memcpy((uint8_t *)(AlarmList->alarm_lib + j), inData, sizeof(__elsv_alarm_data_t));
+            goto exit;
         }
     }
 
@@ -913,24 +920,29 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
 static void play_voice(mico_thread_arg_t arg)
 {
     _alarm_stream_t *stream = (_alarm_stream_t *)arg;
-    AUDIO_STREAM_PALY_S flash_read_stream;
+    AUDIO_STREAM_PALY_S fm_stream;
     mscp_status_t audio_status;
     OSStatus err = kNoErr;
     mscp_result_t result = MSCP_RST_ERROR;
     uint32_t data_pos = 0;
     uint8_t *flashdata = NULL;
+    _sound_rom_t rom_place = ROM_FLASH;
     _stream_state_t stream_state;
+    uint8_t fm_test_cnt = 0;
+
     alarm_log("player_flash_thread");
 
     mico_rtos_lock_mutex(&HTTP_W_R_struct.mutex);
     err = alarm_sound_file_check(stream->alarm_id);
     if (err != kNoErr)
     {
-        memset(stream->alarm_id, 0, ALARM_ID_LEN + 1);
-        strncpy(stream->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
+        if (strstr(stream->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK))
+            rom_place = ROM_DEFAULT;
+        else
+            rom_place = ROM_ERROR;
     }
-
-    flashdata = malloc(SOUND_STREAM_DEFAULT_LENGTH + 1);
+    if (rom_place == ROM_FLASH)
+        flashdata = malloc(SOUND_STREAM_DEFAULT_LENGTH + 1);
 start_play_voice:
     stream_state = get_alarm_stream_state();
     switch (stream_state)
@@ -959,37 +971,69 @@ start_play_voice:
     else
         goto exit;
 
-    flash_read_stream.type = AUDIO_STREAM_TYPE_MP3;
-    flash_read_stream.pdata = flashdata;
-    flash_read_stream.stream_id = stream->stream_id;
     data_pos = 0;
+    fm_stream.type = AUDIO_STREAM_TYPE_MP3;
+    fm_stream.stream_id = stream->stream_id;
+    if (rom_place == ROM_FLASH)
+    {
+        fm_stream.pdata = flashdata;
+        memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
+        memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
+        HTTP_W_R_struct.alarm_w_r_queue->sound_type = stream->sound_type;
+        HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_READ;
+        HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
+        HTTP_W_R_struct.alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
+        alarm_log("id:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
+    }
+    else if (rom_place == ROM_DEFAULT)
+    {
+        fm_stream.pdata = (uint8_t *)default_sound;
+        fm_stream.total_len = sizeof(default_sound);
+    }
+    else if (rom_place == ROM_ERROR)
+    {
+        fm_stream.pdata = (uint8_t *)error_sound;
+        fm_stream.total_len = sizeof(error_sound);
+    }
 
-    memset(HTTP_W_R_struct.alarm_w_r_queue, 0, sizeof(_sound_read_write_type_t));
-    memcpy(HTTP_W_R_struct.alarm_w_r_queue->alarm_ID, stream->alarm_id, ALARM_ID_LEN + 1);
-    HTTP_W_R_struct.alarm_w_r_queue->sound_type = stream->sound_type;
-    HTTP_W_R_struct.alarm_w_r_queue->operation_mode = FILE_READ;
-    HTTP_W_R_struct.alarm_w_r_queue->sound_data = flashdata;
-    HTTP_W_R_struct.alarm_w_r_queue->len = SOUND_STREAM_DEFAULT_LENGTH;
-    alarm_log("id:%s", HTTP_W_R_struct.alarm_w_r_queue->alarm_ID);
 falsh_read_start:
-    HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
-    err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
-    if (err != kNoErr)
+    if (rom_place == ROM_FLASH)
     {
-        alarm_log("sound_file_read error!!!!");
-        require_noerr_action(err, exit, eland_error(EL_RAM_WRITE, EL_FLASH_READ));
+        HTTP_W_R_struct.alarm_w_r_queue->pos = data_pos;
+        err = sound_file_read_write(&sound_file_list, HTTP_W_R_struct.alarm_w_r_queue);
+        if (err != kNoErr)
+        {
+            alarm_log("sound_file_read error!!!!");
+            require_noerr_action(err, exit, eland_error(EL_RAM_WRITE, EL_FLASH_READ));
+        }
+        if (data_pos == 0)
+        {
+            if (HTTP_W_R_struct.alarm_w_r_queue->total_len == 1)
+                goto exit;
+            fm_stream.total_len = HTTP_W_R_struct.alarm_w_r_queue->total_len;
+        }
+        fm_stream.stream_len = HTTP_W_R_struct.alarm_w_r_queue->len;
     }
-    if (data_pos == 0)
+    else if ((rom_place == ROM_ERROR) || (rom_place == ROM_DEFAULT))
     {
-        if (HTTP_W_R_struct.alarm_w_r_queue->total_len == 1)
-            goto exit;
-        flash_read_stream.total_len = HTTP_W_R_struct.alarm_w_r_queue->total_len;
+        if ((fm_stream.total_len - data_pos) > SOUND_STREAM_DEFAULT_LENGTH) //len
+            fm_stream.stream_len = SOUND_STREAM_DEFAULT_LENGTH;
+        else
+            fm_stream.stream_len = fm_stream.total_len - data_pos;
+        if (rom_place == ROM_DEFAULT)
+            fm_stream.pdata = (uint8_t *)default_sound + data_pos;
+        else if (rom_place == ROM_ERROR)
+            fm_stream.pdata = (uint8_t *)error_sound + data_pos;
     }
-    flash_read_stream.stream_len = HTTP_W_R_struct.alarm_w_r_queue->len;
+    if ((++fm_test_cnt) >= 10)
+    {
+        fm_test_cnt = 0;
+        alarm_log("type:%d,id:%d,total_len:%d,len:%d,pos:%ld", (int)fm_stream.type, (int)fm_stream.stream_id, (int)fm_stream.total_len, (int)fm_stream.stream_len, data_pos);
+    }
 audio_transfer:
     if (get_alarm_stream_state() == STREAM_PLAY)
     {
-        err = audio_service_stream_play(&result, &flash_read_stream);
+        err = audio_service_stream_play(&result, &fm_stream);
         if (err != kNoErr)
         {
             alarm_log("audio_stream_play() error!!!!");
@@ -1008,8 +1052,9 @@ audio_transfer:
                 err = kNoErr;
             }
         }
-        data_pos += flash_read_stream.stream_len;
-        if (data_pos < flash_read_stream.total_len)
+        data_pos += fm_stream.stream_len;
+
+        if (data_pos < fm_stream.total_len)
             goto falsh_read_start;
         else
             data_pos = 0;
@@ -1025,7 +1070,11 @@ exit:
 
     set_alarm_stream_state(STREAM_IDEL);
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
-    free(flashdata);
+    if (flashdata)
+    {
+        free(flashdata);
+        flashdata = NULL;
+    }
     mico_rtos_delete_thread(NULL);
 }
 
@@ -1656,7 +1705,7 @@ exit:
         audio_service_stream_stop(&result, alarm_stream.stream_id);
     }
     if ((get_alarm_stream_state() != STREAM_STOP) && (err != kNoErr))
-        err = eland_play_rom_sound(SOUND_ROM_ERROR);
+        err = eland_play_rom_sound(ROM_ERROR);
     eland_oid_status(true, 0);
     set_alarm_stream_state(STREAM_IDEL);
     alarm_log("play stopped err:%d", err);
