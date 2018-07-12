@@ -200,6 +200,7 @@ OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inD
 OSStatus alarm_list_minus(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData);
 OSStatus alarm_list_clear(_eland_alarm_list_t *AlarmList);
 void elsv_alarm_data_sort_out(__elsv_alarm_data_t *elsv_alarm_data);
+bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2);
 OSStatus Start_Alarm_service(void);
 OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data);
 void alarm_print(__elsv_alarm_data_t *alarm_data);

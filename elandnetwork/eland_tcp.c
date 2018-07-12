@@ -1379,6 +1379,8 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd, _TELEGRA
     __elsv_alarm_data_t alarm_data_cache;
     OSStatus err;
     static bool alarm_add_flag = false;
+    static bool alarm_cannot_refresh = false;
+    _alarm_list_state_t alarm_status = get_alarm_state();
 
     if (*buf != '{')
     {
@@ -1411,17 +1413,35 @@ static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd, _TELEGRA
             alarm = json_object_array_get_idx(alarm_array, i);
             TCP_Operate_AL_JSON(alarm, &alarm_data_cache);
             elsv_alarm_data_sort_out(&alarm_data_cache);
+            if ((alarm_status == ALARM_ING) || (alarm_status == ALARM_SNOOZ_STOP))
+            {
+                if (strcmp(get_nearest_alarm()->alarm_id, alarm_data_cache.alarm_id) == 0)
+                {
+                    eland_tcp_log("ALARM_ING alarm");
+                    if (eland_alarm_is_same(get_nearest_alarm(), &alarm_data_cache))
+                    {
+                        eland_tcp_log("alarm_cannot_refresh");
+                        alarm_cannot_refresh = true;
+                    }
+                }
+            }
             err = alarm_list_add(&alarm_list, &alarm_data_cache);
             if (err == kNoErr)
                 alarm_add_flag = true;
             free_json_obj(&alarm);
         }
-
-        if ((alarm_add_flag) && (telegram->reserved == 0))
+        if (telegram->reserved == 0)
         {
+            if ((alarm_add_flag) && !alarm_cannot_refresh)
+            {
+                eland_tcp_log("refresh alarm ");
+                alarm_list.list_refreshed = true;
+                set_alarm_state(ALARM_ADD);
+            }
+            else
+                eland_tcp_log("do not refresh alarm");
             alarm_add_flag = false;
-            alarm_list.list_refreshed = true;
-            set_alarm_state(ALARM_ADD);
+            alarm_cannot_refresh = false;
         }
     }
     else if ((telegram_cmd == AL02) ||

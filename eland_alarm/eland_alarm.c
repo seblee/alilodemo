@@ -64,7 +64,6 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
 static bool today_is_holiday(DATE_TIME_t *date, uint8_t offset);
 static bool today_is_alarm_off_day(DATE_TIME_t *date, uint8_t offset, __elsv_alarm_data_t *alarm);
 static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm_nearest, _alarm_list_state_t state);
-static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2);
 static OSStatus set_alarm_history_send_sem(void);
 static void timer_1s_handle(void *arg);
 /* Private functions ---------------------------------------------------------*/
@@ -193,7 +192,7 @@ void Alarm_Manager(uint32_t arg)
                 (time_count >= 3))
             {
                 weather_refreshed = 1;
-                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 110) ||
+                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 30) ||
                     (alarm_list.alarm_nearest->alarm_repeat == -1))
                 {
                     alarm_log("##### DOWNLOAD_WEATHER ######");
@@ -1772,7 +1771,7 @@ void eland_push_http_queue(_download_type_t msg)
     mico_rtos_push_to_queue(&http_queue, &http_msg, 10);
 }
 /***alarm compare***/
-static bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2)
+bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2)
 {
     if (strncmp(alarm1->alarm_id, alarm2->alarm_id, ALARM_ID_LEN))
     {
