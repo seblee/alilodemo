@@ -2,6 +2,8 @@
 
 ## v01.25
 2018年7月13日13:47:59
+* issue mcu time reset when restart by software
+* change alarm_off Key_Restain to 4s
 * change DOWNLOAD_SCAN push as 1 second later
 * if alarm second < now utc +110 then do not download sound
 * tcp_ip donot reconnect when read timeout or write timeout
