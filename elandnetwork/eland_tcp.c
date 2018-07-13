@@ -221,7 +221,7 @@ TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params)
         pNetwork->tlsDataParams.ssl = ssl_connect(socket_fd,
                                                   root_ca_len,
                                                   pNetwork->tlsDataParams.cacert, &errno);
-        eland_tcp_log("fd: %d, err:  %d", socket_fd, errno);
+        eland_tcp_log("fd:%d, err:%d", socket_fd, errno);
         if (pNetwork->tlsDataParams.ssl == NULL)
         {
             eland_tcp_log("ssl connect err");
@@ -324,9 +324,9 @@ startread:
             else
             {
                 ret = select(fd + 1, &readfds, NULL, NULL, &time);
-                // eland_tcp_log("select ret %d fd %d", ret, fd);
                 if (ret <= 0)
                 {
+                    eland_tcp_log("select error ret:%d,fd:%d", ret, fd);
                     break;
                 }
                 if (!FD_ISSET(fd, &readfds))
@@ -361,7 +361,7 @@ startread:
         }
         else if (ret < 0)
         {
-            eland_tcp_log("socket read err");
+            eland_tcp_log("socket read err ret:%d", ret);
             return NETWORK_SSL_READ_ERROR;
         }
         // Evaluate timeout after the read to make sure read is done at least once
@@ -582,7 +582,7 @@ RECONN:
 
     /**alarm info **/
     rc = TCP_update_alarm(&Eland_Client);
-    require_string(TCP_SUCCESS == rc, exit, "TCP_update_alarm Error");
+    require_string(((TCP_SUCCESS == rc) || (NETWORK_SSL_NOTHING_TO_READ == rc)), exit, "TCP_update_alarm Error");
 
 little_cycle_loop:
     timer.tv_sec = 1;
@@ -594,7 +594,9 @@ little_cycle_loop:
         if ((rc == NETWORK_SSL_READ_ERROR) /*|| (NETWORK_SSL_READ_TIMEOUT_ERROR == rc)*/)
             goto exit; //reconnect
     }
-    else if (TCP_SUCCESS == rc)
+    // else if (TCP_SUCCESS == rc)
+    //     goto little_cycle_loop;
+    if (rc != NETWORK_SSL_NOTHING_TO_READ)
         goto little_cycle_loop;
 pop_queue:
     /*pop queue*/
@@ -792,12 +794,15 @@ static TCP_Error_t TCP_update_alarm(_Client_t *pClient)
     _TELEGRAM_t *telegram;
     if (NULL == pClient)
         return NULL_VALUE_ERROR;
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    alarm_list.alarm_number = 0;
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     timer.tv_sec = 5;
     timer.tv_usec = 0;
     rc = TCP_send_packet(pClient, AL00, &timer);
     if (rc != TCP_SUCCESS)
         return rc;
-
+recv_alarm:
     timer.tv_sec = 5;
     timer.tv_usec = 0;
     rc = TCP_receive_packet(pClient, &timer);
@@ -811,7 +816,11 @@ static TCP_Error_t TCP_update_alarm(_Client_t *pClient)
     if (strncmp(telegram->command, CommandTable[AL01], COMMAND_LEN) != 0)
         rc = CMD_BACK_ERROR;
 
-    return rc;
+    // eland_tcp_log("Connection Error rc = %d", rc);
+    if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_NOTHING_TO_READ == rc))
+        return rc;
+    else
+        goto recv_alarm;
 }
 
 static TCP_Error_t TCP_update_holiday(_Client_t *pClient)
@@ -1170,6 +1179,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
     case HD01: //14 holiday data response
     case HD02: //15 holiday data change notice
         rc = TCP_Operate_HD0X((char *)(buff + sizeof(_TELEGRAM_t)), &holiday_list);
+        TCP_Push_MSG_queue(TCP_SD00_Sem);
         break;
     case HT00: //16 alarm on notification
         break;
@@ -1365,7 +1375,10 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
     eland_update_flash();
     /**stop tcp communication**/
     if (des_data_chang_flag)
+    {
         TCP_Push_MSG_queue(TCP_HC00_Sem);
+        TCP_Push_MSG_queue(TCP_SD00_Sem);
+    }
 exit:
     free_json_obj(&ReceivedJsonCache);
     return rc;
@@ -1373,11 +1386,11 @@ exit:
 
 static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd, _TELEGRAM_t *telegram)
 {
-    json_object *ReceivedJsonCache = NULL, *alarm_array = NULL, *alarm = NULL;
+    OSStatus err;
     TCP_Error_t rc = TCP_SUCCESS;
     uint8_t list_len = 0, i;
     __elsv_alarm_data_t alarm_data_cache;
-    OSStatus err;
+    json_object *ReceivedJsonCache = NULL, *alarm_array = NULL, *alarm = NULL;
     static bool alarm_add_flag = false;
     static bool alarm_cannot_refresh = false;
     _alarm_list_state_t alarm_status = get_alarm_state();

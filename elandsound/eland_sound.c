@@ -259,18 +259,20 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
         {
             if (memcmp((sound_list->lib + i)->alarm_ID, alarm_w_r_temp->alarm_ID, ALARM_ID_LEN) == 0)
             {
-                memset((sound_list->lib + i)->alarm_ID, 0, ALARM_ID_LEN);
+                memmove(sound_list->lib + i, sound_list->lib + i + 1, (sound_list->file_number - i - 1) * sizeof(_sound_file_type_t));
+                sound_list->file_number--;
+                if (sound_list->file_number == 0)
+                {
+                    free(sound_list->lib);
+                    sound_list->lib = NULL;
+                }
                 sound_log("len = %ld,pos = %ld,address:%ld", alarm_w_r_temp->total_len, alarm_w_r_temp->pos, alarm_w_r_temp->file_address);
-                goto start_remove_sound;
             }
         }
 
         err = kNoErr;
         sound_log("Do not find file");
         goto exit;
-
-    start_remove_sound:
-        flash_kh25_write_page((uint8_t *)(sound_list->lib + i), (sound_list->lib + i)->file_address - sizeof(_sound_file_type_t), sizeof(_sound_file_type_t)); //寫入文件信息
     }
 exit:
     if (err != kNoErr)
@@ -446,7 +448,8 @@ OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list)
             alarm_file_cache.sound_type = (sound_list->lib + i)->sound_type;
             alarm_file_cache.file_len = (sound_list->lib + i)->file_len;
             alarm_file_cache.file_address = sound_list_temp.sector_end + sizeof(_sound_file_type_t);
-            if (alarm_file_cache.file_address != (sound_list->lib + i)->file_address)
+            if ((alarm_file_cache.file_address != (sound_list->lib + i)->file_address) &&
+                ((sound_list->lib + i)->file_len != (uint32_t)0xffffffff))
             {
                 /**data move**/
                 sound_log("data move");

@@ -139,13 +139,7 @@ void Alarm_Manager(uint32_t arg)
     {
         err = mico_rtos_get_semaphore(&alarm_update, 50);
         alarm_state = get_alarm_state();
-        if ((alarm_state == ALARM_ADD) ||
-            (alarm_state == ALARM_MINUS) ||
-            (alarm_state == ALARM_SORT) ||
-            (alarm_state == ALARM_ING) ||
-            (alarm_state == ALARM_SNOOZ_STOP) ||
-            (alarm_state == ALARM_STOP) ||
-            (alarm_state == ALARM_SKIP) ||
+        if ((alarm_state != ALARM_IDEL) ||
             (err == kNoErr))
         {
             combing_alarm(&alarm_list, &(alarm_list.alarm_nearest), alarm_state);
@@ -153,9 +147,7 @@ void Alarm_Manager(uint32_t arg)
             weather_refreshed = 0;
             time_count = 0;
             if (alarm_list.alarm_nearest)
-            {
                 TCP_Push_MSG_queue(TCP_SD00_Sem);
-            }
         }
         else if ((alarm_state == ALARM_IDEL) &&
                  (alarm_list.alarm_nearest) &&
@@ -192,12 +184,12 @@ void Alarm_Manager(uint32_t arg)
                 (time_count >= 3))
             {
                 weather_refreshed = 1;
-                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 30) ||
-                    (alarm_list.alarm_nearest->alarm_repeat == -1))
-                {
-                    alarm_log("##### DOWNLOAD_WEATHER ######");
-                    eland_push_http_queue(DOWNLOAD_WEATHER);
-                }
+                // if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 5) ||
+                //     (alarm_list.alarm_nearest->alarm_repeat == -1))
+                // {
+                alarm_log("##### DOWNLOAD_WEATHER ######");
+                eland_push_http_queue(DOWNLOAD_WEATHER);
+                // }
             }
 
             if (utc_time >= alarm_list.alarm_nearest->alarm_data_for_eland.moment_second)
