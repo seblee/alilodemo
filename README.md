@@ -1,5 +1,35 @@
 # Netclock
 
+## v01.25
+2018年7月13日13:47:59
+* issue mcu time reset when restart by software
+* change alarm_off Key_Restain to 4s
+* change DOWNLOAD_SCAN push as 1 second later
+* if alarm second < now utc +110 then do not download sound
+* tcp_ip donot reconnect when read timeout or write timeout
+* change error_bin default_bin to C
+* set version v01.25
+* above 50 alarms, cover the latest one
+* change alarm play error_bin when donot download success
+* issue tcp_ip bug at RECONN
+* if al01 contains operating alarm,the alarm continue
+* issue file download distinguish whether it is a continued file
+* weather download always time
+* issue flash capacity insufficient bug when download file
+* chear alarm list when update alarm info
+* consummate bad file remove operation
+* 
+
+## v01.24
+2018年7月6日13:45:12
+
+* issue miss alarm_skip alarm history
+* change default stack size as test 0x1000
+* add netclock_des_g->download_flag
+* set version v01.24
+* issue check_default_sound error logic bug
+
+
 ## v01.23
 2018年7月3日16:03:53
  
