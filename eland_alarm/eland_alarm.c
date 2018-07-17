@@ -1708,14 +1708,14 @@ static OSStatus set_alarm_history_send_sem(void)
 {
     OSStatus err = kNoErr;
     AlarmOffHistoryData_t *history_P = NULL;
-    if (strlen(off_history.HistoryData.alarm_id) > 10)
+    if (strlen(off_history.HistoryData.alarm_id) > 15)
     {
         history_P = malloc(sizeof(AlarmOffHistoryData_t));
         memcpy(history_P, &(off_history.HistoryData), sizeof(AlarmOffHistoryData_t));
-        memset(&(off_history.HistoryData), 0, sizeof(AlarmOffHistoryData_t));
         err = mico_rtos_push_to_queue(&history_queue, &history_P, 10);
         require_noerr_action(err, exit, alarm_log("[error]history_queue err"));
     }
+    memset(&(off_history.HistoryData), 0, sizeof(AlarmOffHistoryData_t));
 
 exit:
     return err;
@@ -1894,10 +1894,7 @@ void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
                 alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
             }
             else if (Count_Trg & KEY_Alarm)
-            {
                 set_alarm_state(ALARM_STOP);
-                // alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
-            }
         }
     }
     else if (alarm_status == ALARM_SNOOZ_STOP)

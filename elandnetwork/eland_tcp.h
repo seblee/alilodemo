@@ -376,6 +376,7 @@ typedef enum TCP_CMD_SEM
 
 /* Private variables ---------------------------------------------------------*/
 extern mico_queue_t TCP_queue;
+extern mico_semaphore_t TCP_Reconnect_sem;
 /* Private function prototypes -----------------------------------------------*/
 TCP_Error_t TCP_Connect(Network_t *pNetwork, ServerParams_t *Params);
 TCP_Error_t TCP_Write(Network_t *pNetwork, uint8_t *pMsg, struct timeval *timer, size_t *written_len);
