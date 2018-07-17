@@ -100,9 +100,7 @@ int application_start(void)
     err = kNoErr;
 exit:
     if (err != kNoErr)
-    {
         MicoSystemReboot();
-    }
     file_download();
     eland_error(EL_RAM_WRITE, EL_MAIN_THREAD);
     mico_rtos_delete_thread(NULL);

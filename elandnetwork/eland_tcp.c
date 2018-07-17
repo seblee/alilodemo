@@ -66,6 +66,7 @@ mico_utc_time_t elsv_send_time;
 mico_utc_time_t eland_receive_time;
 
 mico_queue_t TCP_queue = NULL;
+mico_semaphore_t TCP_Reconnect_sem = NULL;
 
 /* Private function prototypes -----------------------------------------------*/
 static void TCP_thread_main(mico_thread_arg_t arg);
@@ -458,6 +459,9 @@ OSStatus TCP_Service_Start(void)
 
     //TCP_queue connect message
     err = mico_rtos_init_queue(&TCP_queue, "TCP_queue", sizeof(_tcp_cmd_sem_t), 5);
+    require_noerr(err, exit);
+    /*****TCP_Reconnect_sem*****************/
+    err = mico_rtos_init_semaphore(&TCP_Reconnect_sem, 1);
     require_noerr(err, exit);
 
     err = mico_rtos_create_thread(NULL, MICO_APPLICATION_PRIORITY, "TCP_Thread", TCP_thread_main,
@@ -978,8 +982,12 @@ static TCP_Error_t TCP_send_packet(_Client_t *pClient, _TCP_CMD_t cmd_type, _tim
 #ifdef MICO_DISABLE_STDIO
     _ELAND_MODE_t eland_mode;
     eland_mode = get_eland_mode();
-    if ((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA))
+    if (((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA)) ||
+        (mico_rtos_get_semaphore(&TCP_Reconnect_sem, 0) == kNoErr))
+    {
+        rc = NETWORK_SSL_WRITE_ERROR;
         goto exit;
+    }
 #endif
     if (NULL == pClient)
     {
@@ -1054,8 +1062,12 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer)
 #ifdef MICO_DISABLE_STDIO
     _ELAND_MODE_t eland_mode;
     eland_mode = get_eland_mode();
-    if ((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA))
+    if (((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA)) ||
+        (mico_rtos_get_semaphore(&TCP_Reconnect_sem, 0) == kNoErr))
+    {
+        rc = NETWORK_SSL_READ_ERROR;
         goto exit;
+    }
 #endif
     if (NULL == pClient)
     {
@@ -1072,8 +1084,14 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer)
                                     timer,
                                     &readed_len);
 #ifdef MICO_DISABLE_STDIO
-    if ((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA))
+    eland_mode = get_eland_mode();
+
+    if (((eland_mode != ELAND_NC) && (eland_mode != ELAND_NA)) ||
+        (mico_rtos_get_semaphore(&TCP_Reconnect_sem, 0) == kNoErr))
+    {
+        rc = NETWORK_SSL_READ_ERROR;
         goto exit;
+    }
 #endif
     if (rc == TCP_SUCCESS)
         TCP_Operate((const char *)pClient->clientData.readBuf);
