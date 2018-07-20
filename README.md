@@ -1,7 +1,21 @@
-# Netclock
+# LT10_eland
+
+## v01.26
+2018年7月20日14:32:01
+
+* set version v01.26
+* issue simple clock alarm history
+* add TCP_Reconnect_sem issue tcp not reconnect bug
+* change volume set styl;e
+* issue weather download push bug
+* alarm info add utc check
+* issue wait for sudio stoped bug
+*
+
 
 ## v01.25
 2018年7月13日13:47:59
+
 * issue mcu time reset when restart by software
 * change alarm_off Key_Restain to 4s
 * change DOWNLOAD_SCAN push as 1 second later
