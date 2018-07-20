@@ -668,11 +668,11 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     mico_utc_time_t utc_time;
     mico_utc_time_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
     bool first_to_snooze = true, first_to_alarming = true;
-
+    mscp_result_t result;
     static uint8_t volume_value = 0;
     uint8_t volume_change_counter = 0;
     iso8601_time_t iso8601_time;
-
+    uint8_t i = 0;
     uint8_t volume_stepup_count = 0;
 
     if (alarm->alarm_data_for_mcu.skip_flag)
@@ -723,11 +723,17 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 eland_push_uart_send_queue(ALARM_SEND_0B);
                 if (eland_oid_status(false, 0) == 0)
                 {
+                    for (i = 0; i < 33; i++)
+                        audio_service_volume_down(&result, 1);
+                    volume_value = 0;
                     if (alarm->volume_stepup_enabled == 0)
-                        volume_value = alarm->alarm_volume * 32 / 100 + 1;
-                    else
-                        volume_value = 0;
-                    eland_volume_set(volume_value);
+                    {
+                        for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+                        {
+                            audio_service_volume_up(&result, 1);
+                            volume_value++;
+                        }
+                    }
                 }
             }
             if ((alarm->volume_stepup_enabled) &&
@@ -740,7 +746,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 {
                     volume_value++;
                     volume_change_counter = 0;
-                    eland_volume_set(volume_value);
+                    audio_service_volume_up(&result, 1);
                 }
             }
             if ((utc_time >= alarm_moment) || (eland_oid_status(false, 0) > 0))
@@ -770,8 +776,10 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             if (eland_oid_status(false, 0) == 0)
             {
-                volume_value = alarm->alarm_volume * 32 / 100 + 1;
-                eland_volume_set(volume_value);
+                for (i = 0; i < 33; i++)
+                    audio_service_volume_down(&result, 1);
+                for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+                    audio_service_volume_up(&result, 1);
                 Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             }
             set_alarm_history_send_sem();
@@ -1653,6 +1661,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
 OSStatus alarm_sound_oid(void)
 {
     OSStatus err = kNoErr;
+    uint8_t i;
     char uri_str[100] = {0};
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
@@ -1663,9 +1672,15 @@ OSStatus alarm_sound_oid(void)
 #endif
     eland_oid_status(true, 1);
     set_alarm_stream_state(STREAM_PLAY);
+    for (i = 0; i < 32; i++)
+        audio_service_volume_down(&result, 1);
     oid_volume = get_notification_volume();
-    eland_volume_set(oid_volume);
     alarm_log("oid_volume:%d", oid_volume);
+    for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
+    {
+        audio_service_volume_up(&result, 1);
+    }
+
     /******************/
     sprintf(uri_str, ELAND_SOUND_OID_URI, netclock_des_g->eland_id, (uint32_t)1);
     alarm_log("uri_str:%s", uri_str);
@@ -1933,33 +1948,33 @@ uint8_t eland_oid_status(bool style, uint8_t value)
     return oid_status;
 }
 
-void eland_volume_set(uint8_t value)
-{
-    uint8_t i;
-    mscp_result_t result;
-    static uint8_t volume = 100;
-    if (volume_Mutex == NULL)
-    {
-        mico_rtos_init_mutex(&volume_Mutex);
-        for (i = 0; i < 33; i++)
-            audio_service_volume_down(&result, 1);
-        volume = 0;
-    }
+// void eland_volume_set(uint8_t value)
+// {
+//     uint8_t i;
+//     mscp_result_t result;
+//     static uint8_t volume = 100;
+//     if (volume_Mutex == NULL)
+//     {
+//         mico_rtos_init_mutex(&volume_Mutex);
+//         for (i = 0; i < 33; i++)
+//             audio_service_volume_down(&result, 1);
+//         volume = 0;
+//     }
 
-    mico_rtos_lock_mutex(&volume_Mutex);
-    if (volume < value)
-    {
-        for (i = volume; i < value; i++)
-            audio_service_volume_up(&result, 1);
-    }
-    else if (volume == value)
-    {
-    }
-    else
-    {
-        for (i = volume; i > value; i--)
-            audio_service_volume_down(&result, 1);
-    }
-    volume = value;
-    mico_rtos_unlock_mutex(&volume_Mutex);
-}
+//     mico_rtos_lock_mutex(&volume_Mutex);
+//     if (volume < value)
+//     {
+//         for (i = volume; i < value; i++)
+//             audio_service_volume_up(&result, 1);
+//     }
+//     else if (volume == value)
+//     {
+//     }
+//     else
+//     {
+//         for (i = volume; i > value; i--)
+//             audio_service_volume_down(&result, 1);
+//     }
+//     volume = value;
+//     mico_rtos_unlock_mutex(&volume_Mutex);
+// }

@@ -626,12 +626,18 @@ OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
     uint32_t inPos = 0;
-    uint8_t oid_volume;
+    uint8_t oid_volume, i;
+
+    for (i = 0; i < 33; i++)
+        audio_service_volume_down(&result, 1);
     if (get_eland_mode() == ELAND_TEST)
         oid_volume = 100;
     else
         oid_volume = get_notification_volume();
-    eland_volume_set(oid_volume * 32 / 100 + 1);
+    for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
+    {
+        audio_service_volume_up(&result, 1);
+    }
 
     audio_service_get_audio_status(&result, &audio_status);
     sound_log("audio_status:%d", audio_status);
