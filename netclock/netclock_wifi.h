@@ -19,7 +19,8 @@
 #include "netclock.h"
 
 /* Private typedef -----------------------------------------------------------*/
-typedef enum {
+typedef enum
+{
     Wify_Station_Connect_Successed,
     Wify_Station_Connect_Failed,
 } msg_wify_status;
@@ -47,6 +48,5 @@ void Wifi_station_threed(mico_thread_arg_t arg);
 void micoNotify_WifiConnectFailedHandler(OSStatus err, void *arg);
 void micoNotify_WifiStatusHandler(WiFiEvent status, void *const inContext);
 OSStatus ElandWifyStateNotifyInit(void);
-void Wifi_SoftAP_fun(void);
 
 #endif /* ALILODEMO_NETCLOCK_NETCLOCK_WIFI_H_ */

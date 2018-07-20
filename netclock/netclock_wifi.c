@@ -184,28 +184,6 @@ static void Wifi_SoftAP_threed(mico_thread_arg_t arg)
     mico_rtos_delete_thread(NULL);
 }
 
-void Wifi_SoftAP_fun(void)
-{
-    network_InitTypeDef_st wNetConfig;
-
-    mico_rtos_lock_mutex(&WifiConfigMutex);
-    micoWlanSuspend();
-    WifiSet_log("Soft_ap_Server");
-    memset(&wNetConfig, 0x0, sizeof(network_InitTypeDef_st));
-    strcpy((char *)wNetConfig.wifi_ssid, ELAND_AP_SSID);
-    strcpy((char *)wNetConfig.wifi_key, ELAND_AP_KEY);
-    wNetConfig.wifi_mode = Soft_AP;
-    wNetConfig.dhcpMode = DHCP_Server;
-    wNetConfig.wifi_retry_interval = 100;
-    strcpy((char *)wNetConfig.local_ip_addr, ELAND_AP_LOCAL_IP);
-    strcpy((char *)wNetConfig.net_mask, ELAND_AP_NET_MASK);
-    strcpy((char *)wNetConfig.dnsServer_ip_addr, ELAND_AP_LOCAL_IP);
-    WifiSet_log("ssid:%s  key:%s", wNetConfig.wifi_ssid, wNetConfig.wifi_key);
-    micoWlanStart(&wNetConfig);
-    mico_rtos_get_semaphore(&wifi_SoftAP_Sem, 5000);
-    mico_rtos_unlock_mutex(&WifiConfigMutex);
-}
-
 OSStatus ElandWifyStateNotifyInit(void)
 {
     OSStatus err;

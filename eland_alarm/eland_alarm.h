@@ -51,6 +51,7 @@ typedef enum
     AUDIO_STOP,
     AUDIO_STOP_PLAY,
 } _alarm_play_tyep_t;
+
 typedef struct
 {
     mico_rtc_time_t moment_time;
@@ -166,8 +167,10 @@ typedef struct
     uint8_t schedules_num;
     /***********/
     __elsv_alarm_data_t *alarm_lib;
+    mico_utc_time_t add_utc;
     uint8_t alarm_number;
     uint8_t alarm_now_serial;
+    mico_mutex_t AlarmNearMutex;
     __elsv_alarm_data_t *alarm_nearest;
     /************************/
 } _eland_alarm_list_t;
@@ -226,7 +229,7 @@ OSStatus check_default_sound(void);
 uint8_t eland_oid_status(bool style, uint8_t value);
 
 OSStatus Alarm_build_JSON(char *json_str);
-void eland_push_http_queue(_download_type_t msg);
+OSStatus eland_push_http_queue(_download_type_t msg);
 
 int get_g_alldays(int year, int month, int day);
 void get_d_withdays(int *year, int *mon, int *day, int days);
@@ -239,7 +242,7 @@ uint32_t GET_current_second(void);
 void eland_alarm_control(uint16_t Count, uint16_t Count_Trg,
                          uint16_t Restain, uint16_t Restain_Trg,
                          _ELAND_MODE_t eland_mode);
-
+void eland_volume_set(uint8_t value);
 /* Private functions ---------------------------------------------------------*/
 
 #endif

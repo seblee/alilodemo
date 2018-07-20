@@ -403,6 +403,10 @@ operation_queue:
     default:
         break;
     }
+
+    err = mico_rtos_pop_from_queue(&http_queue, &download_type, 0);
+    if (err == kNoErr)
+        goto operation_queue;
 exit:
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     goto wait_for_queue;
@@ -452,7 +456,7 @@ OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list)
                 ((sound_list->lib + i)->file_len != (uint32_t)0xffffffff))
             {
                 /**data move**/
-                sound_log("data move");
+                sound_log("data move,lenth:%ld", (sound_list->lib + i)->file_len);
                 Cache = calloc(1, KH25L8006_SECTOR_SIZE);
                 read_address = (sound_list->lib + i)->file_address - sizeof(_sound_file_type_t);
                 write_address = alarm_file_cache.file_address - sizeof(_sound_file_type_t);
@@ -622,18 +626,12 @@ OSStatus eland_play_rom_sound(_sound_rom_t SOUND)
     mscp_result_t result = MSCP_RST_ERROR;
     mscp_status_t audio_status;
     uint32_t inPos = 0;
-    uint8_t oid_volume, i;
-
-    for (i = 0; i < 33; i++)
-        audio_service_volume_down(&result, 1);
+    uint8_t oid_volume;
     if (get_eland_mode() == ELAND_TEST)
         oid_volume = 100;
     else
         oid_volume = get_notification_volume();
-    for (i = 0; i < (oid_volume * 32 / 100 + 1); i++)
-    {
-        audio_service_volume_up(&result, 1);
-    }
+    eland_volume_set(oid_volume * 32 / 100 + 1);
 
     audio_service_get_audio_status(&result, &audio_status);
     sound_log("audio_status:%d", audio_status);
