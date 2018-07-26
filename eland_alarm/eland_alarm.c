@@ -127,7 +127,7 @@ void Alarm_Manager(uint32_t arg)
     _alarm_list_state_t alarm_state;
     mico_utc_time_t utc_time = 0;
     uint8_t count_temp = 0;
-    uint8_t led_check_flag = 0, weather_refreshed = 0;
+    uint8_t weather_refreshed = 0;
     uint16_t time_count = 0;
     OSStatus err;
     uint8_t i;
@@ -146,7 +146,7 @@ void Alarm_Manager(uint32_t arg)
         if ((alarm_state != ALARM_IDEL) || (err == kNoErr))
         {
             combing_alarm(&alarm_list, &(alarm_list.alarm_nearest), alarm_state);
-            led_check_flag = 0;
+
             weather_refreshed = 0;
             time_count = 0;
             if (alarm_list.alarm_nearest)
@@ -170,16 +170,7 @@ void Alarm_Manager(uint32_t arg)
                     err = eland_push_http_queue(DOWNLOAD_SCAN);
                 }
             }
-            /**************check alarm_color*********************/
-            if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) < SECOND_ONE_DAY) &&
-                (alarm_list.alarm_nearest->alarm_data_for_mcu.alarm_color == 0) &&
-                (led_check_flag == 0))
-            {
-                led_check_flag = 1;
-                alarm_list.alarm_nearest->alarm_data_for_mcu.alarm_color = alarm_list.alarm_nearest->alarm_color;
-                alarm_log("##### refresh alarm led ######");
-                eland_push_uart_send_queue(ALARM_SEND_0B);
-            }
+
             /**************check weather*********************/
             if ((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second < (300 + utc_time)) &&
                 (alarm_list.alarm_nearest->skip_flag == 0) &&
@@ -437,12 +428,14 @@ OSStatus alarm_sound_scan(void)
 {
     OSStatus err = kNoErr;
     uint8_t scan_count = 0;
-    uint8_t i, temp_point = 0;
+    uint8_t i, temp_point = 0, count = 0;
+    _sound_download_para_t sound_para_temp[6];
 
     alarm_log("alarm_number:%d", alarm_list.alarm_number);
     if (alarm_list.alarm_number == 0)
         return err;
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    memset(sound_para_temp, 0, 6 * sizeof(_sound_download_para_t));
     for (i = alarm_list.alarm_now_serial; i < (alarm_list.alarm_now_serial + 3); i++)
     {
         temp_point = i % alarm_list.alarm_number;
@@ -450,14 +443,10 @@ OSStatus alarm_sound_scan(void)
             ((alarm_list.alarm_lib + temp_point)->alarm_pattern == 3))
         {
             // alarm_log("alarm:%d,SID:%ld", temp_point, (alarm_list.alarm_lib + temp_point)->alarm_sound_id);
-            scan_count = 0;
-        download_sid:
-            err = alarm_sound_download(alarm_list.alarm_lib + temp_point, SOUND_FILE_SID);
-            if ((err != kNoErr) && (scan_count++ < 3))
-            {
-                mico_rtos_thread_msleep(500);
-                goto download_sid;
-            }
+
+            memcpy(sound_para_temp[count].alarm_ID, &((alarm_list.alarm_lib + temp_point)->alarm_sound_id), sizeof((alarm_list.alarm_lib + temp_point)->alarm_sound_id));
+            sound_para_temp[count].sound_type = SOUND_FILE_SID;
+            count++;
         }
         if (((alarm_list.alarm_lib + temp_point)->alarm_pattern == 2) ||
             ((alarm_list.alarm_lib + temp_point)->alarm_pattern == 3))
@@ -471,14 +460,9 @@ OSStatus alarm_sound_scan(void)
             }
             else
             {
-                scan_count = 0;
-            download_vid:
-                err = alarm_sound_download(alarm_list.alarm_lib + temp_point, SOUND_FILE_VID);
-                if ((err != kNoErr) && (scan_count++ < 3))
-                {
-                    mico_rtos_thread_msleep(500);
-                    goto download_vid;
-                }
+                memcpy(sound_para_temp[count].alarm_ID, (alarm_list.alarm_lib + temp_point)->voice_alarm_id, strlen((alarm_list.alarm_lib + temp_point)->voice_alarm_id));
+                sound_para_temp[count].sound_type = SOUND_FILE_VID;
+                count++;
             }
         }
         if (strlen((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id) > 20)
@@ -492,49 +476,53 @@ OSStatus alarm_sound_scan(void)
             }
             else
             {
-                scan_count = 0;
-            download_ofid:
-                err = alarm_sound_download(alarm_list.alarm_lib + temp_point, SOUND_FILE_OFID);
-                if ((err != kNoErr) && (scan_count++ < 3))
-                {
-                    mico_rtos_thread_msleep(500);
-                    goto download_ofid;
-                }
+                memcpy(sound_para_temp[count].alarm_ID, (alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, strlen((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id));
+                sound_para_temp[count].sound_type = SOUND_FILE_OFID;
+                count++;
             }
         }
     }
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+    for (i = 0; i < count; i++)
+    {
+        scan_count = 0;
+    download_start:
+        err = alarm_sound_download(sound_para_temp[i]);
+        if ((err != kNoErr) && (scan_count++ < 3))
+        {
+            mico_rtos_thread_msleep(500);
+            goto download_start;
+        }
+    }
+
     return err;
 }
 
 OSStatus weather_sound_scan(void)
 {
     OSStatus err = kNoErr;
-    uint8_t scan_count = 0, sound_type;
+    uint8_t scan_count = 0, i;
     __elsv_alarm_data_t *nearest = NULL;
+    uint8_t count = 0;
+    _sound_download_para_t sound_para[2];
     // mico_rtos_lock_mutex(&alarm_list.AlarmNearMutex);
     nearest = get_nearest_alarm();
     require_quiet(nearest, exit);
     //   alarm_log("nearest_id:%s", nearest->alarm_id);
+
     if ((nearest->alarm_pattern == 2) ||
         (nearest->alarm_pattern == 3))
     {
         if (strstr(nearest->voice_alarm_id, "ffffffff"))
-            sound_type = SOUND_FILE_WEATHER_F;
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_F;
         else if (strstr(nearest->voice_alarm_id, "00000000"))
-            sound_type = SOUND_FILE_WEATHER_0;
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_0;
         else
             goto checkout_ofid;
         alarm_log("VID:%s", nearest->voice_alarm_id);
         sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
-        scan_count = 0;
-    weather_vid:
-        err = alarm_sound_download(nearest, sound_type);
-        if ((err != kNoErr) && (scan_count++ < 3))
-        {
-            mico_rtos_thread_msleep(500);
-            goto weather_vid;
-        }
+        memcpy(sound_para[count].alarm_ID, nearest->voice_alarm_id, strlen(nearest->voice_alarm_id));
+        count++;
     }
 checkout_ofid:
 
@@ -542,23 +530,28 @@ checkout_ofid:
     {
         alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
         if (strstr(nearest->alarm_off_voice_alarm_id, "ffffffff"))
-            sound_type = SOUND_FILE_WEATHER_F;
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_F;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "eeeeeeee"))
-            sound_type = SOUND_FILE_WEATHER_E;
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_E;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "dddddddd"))
-            sound_type = SOUND_FILE_WEATHER_D;
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_D;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "00000000"))
-            sound_type = SOUND_FILE_WEATHER_0;
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_0;
         else
             goto exit;
         sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
+        memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
+        count++;
+    }
+    for (i = 0; i < count; i++)
+    {
         scan_count = 0;
-    weather_ofid:
-        err = alarm_sound_download(nearest, sound_type);
+    weather_vid:
+        err = alarm_sound_download(sound_para[i]);
         if ((err != kNoErr) && (scan_count++ < 3))
         {
             mico_rtos_thread_msleep(500);
-            goto weather_ofid;
+            goto weather_vid;
         }
     }
 
@@ -1300,12 +1293,7 @@ static void get_alarm_utc_second(__elsv_alarm_data_t *alarm, mico_utc_time_t *ut
     /*******Calculate date for mcu*********/
     UCT_Convert_Date(&(alarm->alarm_data_for_eland.moment_second), &(alarm->alarm_data_for_mcu.moment_time));
     alarm->alarm_data_for_mcu.next_alarm = 1;
-    /*if alarm > one day then alarm LED disappeared*/
-    if ((*utc_time < alarm->alarm_data_for_eland.moment_second) &&
-        ((alarm->alarm_data_for_eland.moment_second - *utc_time) <= SECOND_ONE_DAY))
-        alarm->alarm_data_for_mcu.alarm_color = alarm->alarm_color;
-    else
-        alarm->alarm_data_for_mcu.alarm_color = 0;
+
     // alarm_log("alarm_id:%s", alarm->alarm_time);
     // alarm_log("%04d-%02d-%02d %02d:%02d:%02d",
     //           alarm->alarm_data_for_mcu.moment_time.year + 2000,
@@ -1734,7 +1722,8 @@ OSStatus check_default_sound(void)
     uint8_t check_times = 0;
     OSStatus err = kNoErr;
     __elsv_alarm_data_t alarm_simple;
-
+    _sound_download_para_t sound_para;
+    memset(&sound_para, 0, sizeof(_sound_download_para_t));
 check_start:
     alarm_log("check default sound");
     err = SOUND_CHECK_DEFAULT_FILE();
@@ -1745,7 +1734,10 @@ check_start:
         SOUND_FILE_CLEAR();
         memset(&alarm_simple, 0, sizeof(__elsv_alarm_data_t));
         alarm_log("download default file");
-        err = alarm_sound_download(&alarm_simple, SOUND_FILE_DEFAULT);
+        memcpy(sound_para.alarm_ID, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
+        sound_para.sound_type = SOUND_FILE_DEFAULT;
+
+        err = alarm_sound_download(sound_para);
         require_noerr(err, exit);
         goto check_start;
     }

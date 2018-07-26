@@ -185,6 +185,12 @@ typedef enum
     GO_INTO_AP_MODE,
     GO_OUT,
 } _download_type_t;
+
+typedef struct __SOUND_DOWNLOAD_PARA_
+{
+    char alarm_ID[ALARM_ID_LEN + 1];
+    uint8_t sound_type;
+} _sound_download_para_t;
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/

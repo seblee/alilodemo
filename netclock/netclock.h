@@ -70,7 +70,7 @@ OSStatus Eland_Rtc_Init(void);
 
 OSStatus InitUpLoadData(char *OutputJsonstring);
 OSStatus ProcessPostJson(char *InputJson);
-OSStatus alarm_sound_download(__elsv_alarm_data_t *alarm, uint8_t sound_type);
+OSStatus alarm_sound_download(_sound_download_para_t sound_para);
 OSStatus eland_communication_info_get(void);
 void eland_update_flash(void);
 int8_t get_notification_volume(void);
