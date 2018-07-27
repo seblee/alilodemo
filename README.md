@@ -1,12 +1,22 @@
 # LT10_eland
 
+## v02.00
+2018年7月27日15:45:33
+
+* set version v01.27
+* change alarm_sound_download function
+* issue download sequence 
+* add AlarmlibMutex in weather
+* issue alarm compare bug 
+* http download timeout increase 2s
+
 ## v01.26
 2018年7月20日14:32:01
 
 * set version v01.26
 * issue simple clock alarm history
 * add TCP_Reconnect_sem issue tcp not reconnect bug
-* change volume set styl;e
+* change volume set style
 * issue weather download push bug
 * alarm info add utc check
 * issue wait for sudio stoped bug
@@ -49,7 +59,7 @@
  
 * set version v01.23
 * add check_RDID function
-* check flash on time in test mode;
+* check flash on time in test mode 
 * move alarm file check to voice_play function
 * add alarm_repeat = -1
 * change alarm history time get as GET_current_second()

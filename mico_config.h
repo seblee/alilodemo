@@ -35,9 +35,9 @@
 
 #define APP_INFO "Eland Demo"
 
-#define FIRMWARE_REVISION "01.26"
+#define FIRMWARE_REVISION "01.27"
 #define MANUFACTURER "MXCHIP Inc."
-#define SERIAL_NUMBER "20180720"
+#define SERIAL_NUMBER "20180727"
 #define PROTOCOL "com.mxchip.basic"
 
 #define EasyLink_Needs_Reboot
