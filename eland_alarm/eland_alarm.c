@@ -86,8 +86,6 @@ OSStatus Start_Alarm_service(void)
     alarm_log("alarm_data memory size:%d", ALARM_DATA_SIZE);
     err = mico_rtos_init_mutex(&alarm_list.AlarmlibMutex);
     require_noerr(err, exit);
-    err = mico_rtos_init_mutex(&alarm_list.AlarmNearMutex);
-    require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_list.AlarmSerialMutex);
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&alarm_list.state.AlarmStateMutex);
@@ -161,21 +159,17 @@ void Alarm_Manager(uint32_t arg)
             if (time_count < 1000)
                 time_count++;
             /**************check alarm sound file*********************/
-            if (time_count == 2)
+            if (time_count == 3)
             {
-                if (((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second - utc_time) > 110) ||
-                    (alarm_list.alarm_nearest->alarm_repeat == -1))
-                {
-                    alarm_log("##### DOWNLOAD_SCAN ######");
-                    err = eland_push_http_queue(DOWNLOAD_SCAN);
-                }
+                alarm_log("##### DOWNLOAD_SCAN ######");
+                err = eland_push_http_queue(DOWNLOAD_SCAN);
             }
 
             /**************check weather*********************/
             if ((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second < (300 + utc_time)) &&
                 (alarm_list.alarm_nearest->skip_flag == 0) &&
                 (weather_refreshed == 0) &&
-                (time_count >= 3))
+                (time_count >= 4))
             {
                 weather_refreshed = 1;
                 alarm_log("##### DOWNLOAD_WEATHER ######");
@@ -183,7 +177,7 @@ void Alarm_Manager(uint32_t arg)
             }
 
             if ((utc_time >= alarm_list.alarm_nearest->alarm_data_for_eland.moment_second) &&
-                (time_count >= 4))
+                (time_count >= 5))
             {
                 alarm_log("##### start alarm ######");
                 /**operation output alarm**/
@@ -505,9 +499,9 @@ OSStatus weather_sound_scan(void)
     __elsv_alarm_data_t *nearest = NULL;
     uint8_t count = 0;
     _sound_download_para_t sound_para[2];
-    // mico_rtos_lock_mutex(&alarm_list.AlarmNearMutex);
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     nearest = get_nearest_alarm();
-    require_quiet(nearest, exit);
+    require_quiet(nearest, checkout_over);
     //   alarm_log("nearest_id:%s", nearest->alarm_id);
 
     if ((nearest->alarm_pattern == 2) ||
@@ -525,7 +519,6 @@ OSStatus weather_sound_scan(void)
         count++;
     }
 checkout_ofid:
-
     if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
     {
         alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
@@ -538,11 +531,13 @@ checkout_ofid:
         else if (strstr(nearest->alarm_off_voice_alarm_id, "00000000"))
             sound_para[count].sound_type = SOUND_FILE_WEATHER_0;
         else
-            goto exit;
+            goto checkout_over;
         sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
         memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
         count++;
     }
+checkout_over:
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
     {
         scan_count = 0;
@@ -555,8 +550,6 @@ checkout_ofid:
         }
     }
 
-exit:
-    // mico_rtos_unlock_mutex(&alarm_list.AlarmNearMutex);
     return err;
 }
 
@@ -1615,7 +1608,6 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
     alarm_log("list_refreshed");
     uint8_t skip_flag_push = 0;
 
-    mico_rtos_lock_mutex(&alarm_list.AlarmNearMutex);
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     if (*alarm_nearest)
     {
@@ -1633,7 +1625,6 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
     }
     *alarm_nearest = Alarm_ergonic_list(list);
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
-    mico_rtos_unlock_mutex(&alarm_list.AlarmNearMutex);
     if (*alarm_nearest)
     {
         alarm_log("alarm_nearest time:%s,second:%ld,alarm_id:%s,skip_flag:%d", (*alarm_nearest)->alarm_time, (*alarm_nearest)->alarm_data_for_eland.moment_second, (*alarm_nearest)->alarm_id, (*alarm_nearest)->skip_flag);
@@ -1819,13 +1810,13 @@ bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm
         alarm_log("alarm_sound_id:%ld", alarm2->alarm_sound_id);
         return false;
     }
-    if (strncmp(alarm1->voice_alarm_id, alarm2->voice_alarm_id, VOICE_ALARM_ID_LEN))
+    if (strncmp(alarm1->voice_alarm_id, alarm2->voice_alarm_id, 24))
     {
         alarm_log("voice_alarm_id:%s", alarm1->voice_alarm_id);
         alarm_log("voice_alarm_id:%s", alarm2->voice_alarm_id);
         return false;
     }
-    if (strncmp(alarm1->alarm_off_voice_alarm_id, alarm2->alarm_off_voice_alarm_id, VOICE_ALARM_ID_LEN))
+    if (strncmp(alarm1->alarm_off_voice_alarm_id, alarm2->alarm_off_voice_alarm_id, 24))
     {
         alarm_log("alarm_off_voice_alarm_id:%s", alarm1->alarm_off_voice_alarm_id);
         alarm_log("alarm_off_voice_alarm_id:%s", alarm2->alarm_off_voice_alarm_id);

@@ -170,7 +170,6 @@ typedef struct
     mico_utc_time_t add_utc;
     uint8_t alarm_number;
     uint8_t alarm_now_serial;
-    mico_mutex_t AlarmNearMutex;
     __elsv_alarm_data_t *alarm_nearest;
     /************************/
 } _eland_alarm_list_t;
