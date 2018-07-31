@@ -40,6 +40,7 @@
 mico_semaphore_t alarm_update = NULL;
 mico_semaphore_t alarm_skip_sem = NULL;
 mico_queue_t http_queue = NULL;
+mico_queue_t download_result = NULL;
 mico_mutex_t time_Mutex = NULL;
 
 _eland_alarm_list_t alarm_list;
@@ -100,6 +101,8 @@ OSStatus Start_Alarm_service(void)
     //eland_state_queue
     err = mico_rtos_init_queue(&http_queue, "http_queue", sizeof(_download_type_t), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
+    err = mico_rtos_init_queue(&download_result, "download_result", sizeof(_download_type_t), 1); //只容纳一个成员 传递的只是地址
+    require_noerr(err, exit);
     err = mico_rtos_init_queue(&history_queue, "history_queue", sizeof(AlarmOffHistoryData_t *), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
 
@@ -125,7 +128,7 @@ void Alarm_Manager(uint32_t arg)
     _alarm_list_state_t alarm_state;
     mico_utc_time_t utc_time = 0;
     uint8_t count_temp = 0;
-    uint8_t weather_refreshed = 0;
+    uint8_t sound_other = 0, weather_0_e_f = 0, weather_c_d = 0;
     uint16_t time_count = 0;
     OSStatus err;
     uint8_t i;
@@ -144,8 +147,9 @@ void Alarm_Manager(uint32_t arg)
         if ((alarm_state != ALARM_IDEL) || (err == kNoErr))
         {
             combing_alarm(&alarm_list, &(alarm_list.alarm_nearest), alarm_state);
-
-            weather_refreshed = 0;
+            sound_other = 0;
+            weather_0_e_f = 0;
+            weather_c_d = 0;
             time_count = 0;
             if (alarm_list.alarm_nearest)
                 TCP_Push_MSG_queue(TCP_SD00_Sem);
@@ -159,21 +163,38 @@ void Alarm_Manager(uint32_t arg)
             if (time_count < 1000)
                 time_count++;
             /**************check alarm sound file*********************/
-            if (time_count == 3)
+            if ((alarm_list.alarm_nearest->skip_flag == 0) &&
+                (sound_other == 0) &&
+                (time_count >= 3))
             {
                 alarm_log("##### DOWNLOAD_SCAN ######");
                 err = eland_push_http_queue(DOWNLOAD_SCAN);
+                if (err == kNoErr)
+                    sound_other = 1;
             }
 
-            /**************check weather*********************/
+            /**************check weather 0 e f *********************/
             if ((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second < (300 + utc_time)) &&
                 (alarm_list.alarm_nearest->skip_flag == 0) &&
-                (weather_refreshed == 0) &&
+                (weather_0_e_f == 0) &&
                 (time_count >= 4))
             {
-                weather_refreshed = 1;
-                alarm_log("##### DOWNLOAD_WEATHER ######");
-                err = eland_push_http_queue(DOWNLOAD_WEATHER);
+                alarm_log("##### DOWNLOAD_0_E_F ######");
+                err = eland_push_http_queue(DOWNLOAD_0_E_F);
+                if (err == kNoErr)
+                    weather_0_e_f = 1;
+            }
+
+            /**************check weather c d *********************/
+            if ((alarm_list.alarm_nearest->alarm_data_for_eland.moment_second < (120 + utc_time)) &&
+                (alarm_list.alarm_nearest->skip_flag == 0) &&
+                (weather_c_d == 0) &&
+                (time_count >= 4))
+            {
+                alarm_log("##### DOWNLOAD_c_d ######");
+                err = eland_push_http_queue(DOWNLOAD_C_D);
+                if (err == kNoErr)
+                    weather_c_d = 1;
             }
 
             if ((utc_time >= alarm_list.alarm_nearest->alarm_data_for_eland.moment_second) &&
@@ -421,9 +442,9 @@ exit:
 OSStatus alarm_sound_scan(void)
 {
     OSStatus err = kNoErr;
-    uint8_t scan_count = 0;
     uint8_t i, temp_point = 0, count = 0;
     _sound_download_para_t sound_para_temp[6];
+    _download_type_t result_msg = DOWNLOAD_SCAN;
 
     alarm_log("alarm_number:%d", alarm_list.alarm_number);
     if (alarm_list.alarm_number == 0)
@@ -446,10 +467,12 @@ OSStatus alarm_sound_scan(void)
             ((alarm_list.alarm_lib + temp_point)->alarm_pattern == 3))
         {
             // alarm_log("alarm:%d,VID:%s", temp_point, (alarm_list.alarm_lib + temp_point)->voice_alarm_id);
-            if (strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "ffffffff") ||
-                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "eeeeeeee") ||
+            if (strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "00000000") ||
+                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "bbbbbbbb") ||
+                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "cccccccc") ||
                 strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "dddddddd") ||
-                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "00000000"))
+                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "eeeeeeee") ||
+                strstr((alarm_list.alarm_lib + temp_point)->voice_alarm_id, "ffffffff"))
             {
             }
             else
@@ -462,10 +485,12 @@ OSStatus alarm_sound_scan(void)
         if (strlen((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id) > 20)
         {
             // alarm_log("alarm:%d,OFID:%s", temp_point, (alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id);
-            if (strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "ffffffff") ||
-                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "eeeeeeee") ||
+            if (strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "00000000") ||
+                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "bbbbbbbb") ||
+                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "cccccccc") ||
                 strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "dddddddd") ||
-                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "00000000"))
+                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "eeeeeeee") ||
+                strstr((alarm_list.alarm_lib + temp_point)->alarm_off_voice_alarm_id, "ffffffff"))
             {
             }
             else
@@ -479,23 +504,19 @@ OSStatus alarm_sound_scan(void)
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
     {
-        scan_count = 0;
-    download_start:
         err = alarm_sound_download(sound_para_temp[i]);
-        if ((err != kNoErr) && (scan_count++ < 3))
-        {
-            mico_rtos_thread_msleep(500);
-            goto download_start;
-        }
+        if (err != kNoErr)
+            result_msg = DOWNLOAD_IDEL;
     }
-
+    err = mico_rtos_push_to_queue(&download_result, &result_msg, 10);
     return err;
 }
 
-OSStatus weather_sound_scan(void)
+OSStatus weather_sound_0_e_f(void)
 {
     OSStatus err = kNoErr;
-    uint8_t scan_count = 0, i;
+    uint8_t i;
+    _download_type_t result_msg = DOWNLOAD_0_E_F;
     __elsv_alarm_data_t *nearest = NULL;
     uint8_t count = 0;
     _sound_download_para_t sound_para[2];
@@ -521,17 +542,15 @@ OSStatus weather_sound_scan(void)
 checkout_ofid:
     if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
     {
-        alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
         if (strstr(nearest->alarm_off_voice_alarm_id, "ffffffff"))
             sound_para[count].sound_type = SOUND_FILE_WEATHER_F;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "eeeeeeee"))
             sound_para[count].sound_type = SOUND_FILE_WEATHER_E;
-        else if (strstr(nearest->alarm_off_voice_alarm_id, "dddddddd"))
-            sound_para[count].sound_type = SOUND_FILE_WEATHER_D;
         else if (strstr(nearest->alarm_off_voice_alarm_id, "00000000"))
             sound_para[count].sound_type = SOUND_FILE_WEATHER_0;
         else
             goto checkout_over;
+        alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
         sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
         memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
         count++;
@@ -540,19 +559,94 @@ checkout_over:
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
     {
-        scan_count = 0;
-    weather_vid:
         err = alarm_sound_download(sound_para[i]);
-        if ((err != kNoErr) && (scan_count++ < 3))
-        {
-            mico_rtos_thread_msleep(500);
-            goto weather_vid;
-        }
+        if (err != kNoErr)
+            result_msg = DOWNLOAD_IDEL;
     }
 
+    mico_rtos_push_to_queue(&download_result, &result_msg, 10);
     return err;
 }
 
+OSStatus weather_sound_c_d(void)
+{
+    OSStatus err = kNoErr;
+    uint8_t i, count = 0;
+    _download_type_t result_msg = DOWNLOAD_C_D;
+    __elsv_alarm_data_t *nearest = NULL;
+    _sound_download_para_t sound_para[2];
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    nearest = get_nearest_alarm();
+    require_quiet(nearest, checkout_over);
+    //   alarm_log("nearest_id:%s", nearest->alarm_id);
+
+    if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
+    {
+        if (strstr(nearest->alarm_off_voice_alarm_id, "cccccccc"))
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_C;
+        else if (strstr(nearest->alarm_off_voice_alarm_id, "dddddddd"))
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_D;
+        else
+            goto checkout_over;
+        sprintf(nearest->alarm_off_voice_alarm_id + 24, "%ldcd", nearest->alarm_data_for_eland.moment_second);
+        memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
+        alarm_log("VID:%s", nearest->alarm_off_voice_alarm_id);
+        count++;
+    }
+checkout_over:
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+
+    for (i = 0; i < count; i++)
+    {
+        err = alarm_sound_download(sound_para[i]);
+        if (err != kNoErr)
+            result_msg = DOWNLOAD_IDEL;
+    }
+
+    err = mico_rtos_push_to_queue(&download_result, &result_msg, 10);
+    return err;
+}
+OSStatus weather_sound_b(void)
+{
+    OSStatus err = kNoErr;
+    uint8_t i, count = 0;
+    _download_type_t result_msg = DOWNLOAD_B;
+    __elsv_alarm_data_t *nearest = NULL;
+    _sound_download_para_t sound_para[2];
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
+    nearest = get_nearest_alarm();
+    require_quiet(nearest, checkout_over);
+    //   alarm_log("nearest_id:%s", nearest->alarm_id);
+
+    if (strlen(nearest->voice_alarm_id) > 10)
+    {
+        alarm_log("VID:%s", nearest->voice_alarm_id);
+        if (strstr(nearest->voice_alarm_id, "bbbbbbbb"))
+        {
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_B;
+            memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
+            count++;
+        }
+        else if (strstr(nearest->alarm_off_voice_alarm_id, "bbbbbbbb"))
+        {
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_B;
+            memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
+            count++;
+        }
+        else
+            goto checkout_over;
+    }
+checkout_over:
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
+    for (i = 0; i < count; i++)
+    {
+        err = alarm_sound_download(sound_para[i]);
+        if (err != kNoErr)
+            result_msg = DOWNLOAD_IDEL;
+    }
+    err = mico_rtos_push_to_queue(&download_result, &result_msg, 10);
+    return err;
+}
 OSStatus alarm_list_add(_eland_alarm_list_t *AlarmList, __elsv_alarm_data_t *inData)
 {
     OSStatus err = kNoErr;
@@ -762,10 +856,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             if (eland_oid_status(false, 0) == 0)
             {
-                for (i = 0; i < 33; i++)
-                    audio_service_volume_down(&result, 1);
-                for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
-                    audio_service_volume_up(&result, 1);
                 Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             }
             set_alarm_history_send_sem();
@@ -816,6 +906,7 @@ exit:
 /***CMD = 1 PALY   CMD = 0 STOP***/
 static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CMD)
 {
+    uint8_t i;
     mscp_result_t result;
     mscp_status_t audio_status;
     static bool isVoice = false;
@@ -891,6 +982,11 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
             } while ((get_alarm_stream_state() != STREAM_IDEL) ||
                      (audio_status != MSCP_STATUS_IDLE));
             alarm_log("*****sudio stoped");
+            for (i = 0; i < 33; i++)
+                audio_service_volume_down(&result, 1);
+            for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+                audio_service_volume_up(&result, 1);
+
             init_alarm_stream(alarm, SOUND_FILE_OFID);
             set_alarm_stream_state(STREAM_PLAY);
             alarm_log("start play ofid");
@@ -1751,8 +1847,23 @@ exit:
 
 OSStatus eland_push_http_queue(_download_type_t msg)
 {
+    OSStatus err;
     _download_type_t http_msg = msg;
-    return mico_rtos_push_to_queue(&http_queue, &http_msg, 10);
+    _download_type_t result_msg = DOWNLOAD_IDEL;
+
+    err = mico_rtos_push_to_queue(&http_queue, &http_msg, 10);
+    if ((msg == DOWNLOAD_OID) || (msg == DOWNLOAD_OTA) || (msg == GO_INTO_AP_MODE) || (msg == GO_OUT))
+        return err;
+
+    while (!mico_rtos_is_queue_empty(&download_result))
+        mico_rtos_pop_from_queue(&download_result, &result_msg, 0);
+    // 等待返回结果
+    err = mico_rtos_pop_from_queue(&download_result, &result_msg, 60000);
+    alarm_log("##### DOWNLOAD_result:%d ######", result_msg);
+    if ((err == kNoErr) && (result_msg == http_msg))
+        return kNoErr;
+    else
+        return kGeneralErr;
 }
 /***alarm compare***/
 bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm2)

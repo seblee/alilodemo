@@ -180,7 +180,9 @@ typedef enum
     DOWNLOAD_SCAN,
     DOWNLOAD_OID,
     DOWNLOAD_OTA,
-    DOWNLOAD_WEATHER,
+    DOWNLOAD_0_E_F,
+    DOWNLOAD_C_D,
+    DOWNLOAD_B,
     GO_INTO_AP_MODE,
     GO_OUT,
 } _download_type_t;
@@ -199,6 +201,7 @@ extern _alarm_stream_t alarm_stream;
 extern mico_semaphore_t alarm_update;
 extern mico_semaphore_t alarm_skip_sem;
 extern mico_queue_t http_queue;
+extern mico_queue_t download_result;
 extern mico_mutex_t time_Mutex;
 
 extern _alarm_off_history_t off_history;
@@ -229,7 +232,9 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
 OSStatus alarm_off_history_json_data_build(AlarmOffHistoryData_t *HistoryData, char *json_buff);
 OSStatus alarm_sound_scan(void);
 OSStatus alarm_sound_oid(void);
-OSStatus weather_sound_scan(void);
+OSStatus weather_sound_0_e_f(void);
+OSStatus weather_sound_c_d(void);
+OSStatus weather_sound_b(void);
 OSStatus check_default_sound(void);
 uint8_t eland_oid_status(bool style, uint8_t value);
 

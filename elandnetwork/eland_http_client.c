@@ -645,7 +645,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     int ssl_errno = 0;
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
-    struct timeval t = {1, HTTP_YIELD_TMIE * 1500};
+    struct timeval t = {3, HTTP_YIELD_TMIE * 1500};
 
     const char *X_EL_CONTINUED_URL_STR;
     size_t X_EL_CONTINUED_URL_LEN;

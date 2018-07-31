@@ -386,17 +386,20 @@ operation_queue:
                 goto operation_queue;
             }
         }
-        // eland_push_http_queue(DOWNLOAD_OID);
         break;
     case DOWNLOAD_OTA:
         eland_ota();
         break;
-    case DOWNLOAD_WEATHER:
-        weather_sound_scan();
+    case DOWNLOAD_0_E_F:
+        weather_sound_0_e_f();
+        break;
+    case DOWNLOAD_C_D:
+        weather_sound_c_d();
+        break;
+    case DOWNLOAD_B:
+        weather_sound_b();
         break;
     case GO_INTO_AP_MODE:
-        goto out;
-        break;
     case GO_OUT:
         goto out;
         break;

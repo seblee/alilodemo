@@ -586,6 +586,10 @@ OSStatus alarm_sound_download(_sound_download_para_t sound_para)
         sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
     else if (sound_para.sound_type == SOUND_FILE_WEATHER_0)
         sprintf(uri_str, ELAND_WEATHER_0_URI, netclock_des_g->eland_id);
+    else if (sound_para.sound_type == SOUND_FILE_WEATHER_B)
+        sprintf(uri_str, ELAND_WEATHER_B_URI, netclock_des_g->eland_id);
+    else if (sound_para.sound_type == SOUND_FILE_WEATHER_C)
+        sprintf(uri_str, ELAND_WEATHER_C_URI, netclock_des_g->eland_id);
     else if (sound_para.sound_type == SOUND_FILE_WEATHER_D)
         sprintf(uri_str, ELAND_WEATHER_D_URI, netclock_des_g->eland_id);
     else if (sound_para.sound_type == SOUND_FILE_WEATHER_E)

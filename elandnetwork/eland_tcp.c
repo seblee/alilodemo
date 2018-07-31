@@ -822,7 +822,10 @@ recv_alarm:
 
     // eland_tcp_log("Connection Error rc = %d", rc);
     if ((rc == NETWORK_SSL_READ_ERROR) || (NETWORK_SSL_NOTHING_TO_READ == rc))
+    {
+        eland_tcp_log("rc:%d", rc);
         return rc;
+    }
     else
         goto recv_alarm;
 }
@@ -1158,7 +1161,7 @@ static TCP_Error_t TCP_Operate(const char *buff)
             break;
     }
     tep_cmd = (_TCP_CMD_t)i; // TCPCMD_MAX 23
-    eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
+    // eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
     switch (tep_cmd)
     {
     case CN00: //00 Connection Request
