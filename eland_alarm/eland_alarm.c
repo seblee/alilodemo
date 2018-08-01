@@ -784,11 +784,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     {
         current_state = get_alarm_state();
         utc_time = GET_current_second();
-        if (utc_time < alarm->alarm_data_for_eland.moment_second)
-        {
-            set_alarm_state(ALARM_STOP);
-            goto exit;
-        }
+
         switch (current_state)
         {
         case ALARM_ING:
@@ -798,18 +794,20 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 first_to_alarming = false;
                 first_to_snooze = true;
 
+                /** record_time **/
+                mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
+                alarm_off_history_record_time(ALARM_ON, &iso8601_time);
                 if (utc_time >= alarm_moment)
                 {
                     alarm_log("time up first_to_alarming");
+                    //play with delay
+                    Alarm_Play_Control(alarm, AUDIO_PALY);
                     set_alarm_state(ALARM_SNOOZ_STOP);
                     break;
                 }
                 /**alarm on notice**/
                 TCP_Push_MSG_queue(TCP_HT00_Sem);
 
-                /** record_time **/
-                mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
-                alarm_off_history_record_time(ALARM_ON, &iso8601_time);
                 eland_push_uart_send_queue(ALARM_SEND_0B);
                 if (eland_oid_status(false, 0) == 0)
                 {
@@ -827,6 +825,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
                 if (strstr(alarm->voice_alarm_id, "aaaaaaaa"))
                 {
+                    alarm_log("##### DOWNLOAD_A ######");
                     sprintf(alarm->voice_alarm_id + 24, "%ldbb", utc_time);
                     eland_push_http_queue(DOWNLOAD_A);
                 }
@@ -869,6 +868,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         case ALARM_STOP:
             mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
+            alarm_log("alarm_operation stop");
             if (eland_oid_status(false, 0) == 0)
                 Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             set_alarm_history_send_sem();
@@ -1001,6 +1001,7 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
             utc_time = GET_current_second();
             if (strstr(alarm->alarm_off_voice_alarm_id, "bbbbbbbb"))
             {
+                alarm_log("##### DOWNLOAD_B ######");
                 sprintf(alarm->alarm_off_voice_alarm_id + 24, "%ldbb", utc_time);
                 eland_push_http_queue(DOWNLOAD_B);
             }
