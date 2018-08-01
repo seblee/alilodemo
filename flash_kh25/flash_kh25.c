@@ -348,7 +348,6 @@ OSStatus flash_kh25_init(void)
         memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);
         // flash_kh25_chip_erase(); //首次上電訪問flash 先erase the chip
         SOUND_FILE_CLEAR();
-        flash_kh25_sector_erase(KH25_CHECK_ADDRESS);
         sprintf((char *)(elandSPIBuffer), "%s", FLASH_KH25_CHECK_STRING);
         flash_kh25_write_page(elandSPIBuffer, KH25_CHECK_ADDRESS, strlen(FLASH_KH25_CHECK_STRING));
         memset(elandSPIBuffer, 0, strlen(FLASH_KH25_CHECK_STRING) + 2);

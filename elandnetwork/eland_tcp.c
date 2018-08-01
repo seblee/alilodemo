@@ -24,7 +24,7 @@
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private define ------------------------------------------------------------*/
-#define CONFIG_TCP_DEBUG
+//#define CONFIG_TCP_DEBUG
 #ifdef CONFIG_TCP_DEBUG
 #define eland_tcp_log(M, ...) custom_log("TCP", M, ##__VA_ARGS__)
 #else

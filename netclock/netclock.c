@@ -617,7 +617,7 @@ OSStatus alarm_sound_download(_sound_download_para_t sound_para)
     else if (user_http_res.status_code == 204)
     {
         Eland_log("<===== alarm_sound_download end 204<======");
-        if (get_flash_capacity() < (sizeof(_sound_file_type_t) + strlen(ALARM_FILE_END_STRING)))
+        if (get_flash_capacity() == 7)
         {
             Eland_log("flash capacity is insufficient");
             eland_sound_file_arrange(&sound_file_list);

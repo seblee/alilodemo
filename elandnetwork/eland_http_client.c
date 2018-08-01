@@ -550,8 +550,8 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
                     HTTP_W_R_struct.alarm_w_r_queue->total_len += inHeader->contentLength;
                     contentLen = HTTP_W_R_struct.alarm_w_r_queue->total_len + sizeof(_sound_file_type_t) + strlen(ALARM_FILE_END_STRING);
                 }
-                client_log("capacity:%ld,contentLen:%ld", get_flash_capacity(), contentLen);
-                if (get_flash_capacity() < contentLen)
+                client_log("capacity:%d,contentLen:%ld", get_flash_capacity(), contentLen);
+                if (get_flash_capacity() >= 7)
                 {
                     client_log("flash capacity is insufficient");
                     eland_sound_file_arrange(&sound_file_list);
