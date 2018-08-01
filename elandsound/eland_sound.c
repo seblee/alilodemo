@@ -42,6 +42,7 @@ _sound_file_lib_t sound_file_list;
 
 const uint16_t _area_sector[7] = {SECTOR_AREA0, SECTOR_AREA1, SECTOR_AREA2, SECTOR_AREA3, SECTOR_AREA4, SECTOR_AREA5, SECTOR_AREA6};
 const uint16_t _start_sector[7] = {START_SECTOR_AREA0, START_SECTOR_AREA1, START_SECTOR_AREA2, START_SECTOR_AREA3, START_SECTOR_AREA4, START_SECTOR_AREA5, START_SECTOR_AREA6};
+const uint32_t _start_address[7] = {START_ADDRESS_AREA0, START_ADDRESS_AREA1, START_ADDRESS_AREA2, START_ADDRESS_AREA3, START_ADDRESS_AREA4, START_ADDRESS_AREA5, START_ADDRESS_AREA6};
 /* Private function prototypes -----------------------------------------------*/
 static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_list_t *alarm_list);
 /* Private functions ---------------------------------------------------------*/
@@ -194,7 +195,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
             if (alarm_w_r_temp->sound_type == SOUND_FILE_DEFAULT)
             {
                 i = 0;
-                alarm_file_cache.file_address = _start_sector[0] + sizeof(_sound_file_type_t);
+                alarm_file_cache.file_address = _start_address[0] + sizeof(_sound_file_type_t);
                 sound_list->exist_flag &= ~(1 << i);
             }
             else
@@ -203,23 +204,23 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
                 {
                     if ((sound_list->exist_flag & (1 << i)) == 0)
                     {
-                        alarm_file_cache.file_address = _start_sector[i] + sizeof(_sound_file_type_t);
-                        break;
+                        alarm_file_cache.file_address = _start_address[i] + sizeof(_sound_file_type_t);
+                        goto check_over;
                     }
                 }
                 err = kGeneralErr;
                 sound_log("flash full");
                 goto exit;
             }
-
+        check_over:
             sound_list->writing_point = i;
             alarm_w_r_temp->file_address = alarm_file_cache.file_address;
 
             memcpy(sound_list->lib + i, &alarm_file_cache, sizeof(_sound_file_type_t));
-            flash_kh25_write_page((uint8_t *)(&alarm_file_cache), _start_sector[i], sizeof(_sound_file_type_t)); //寫入文件信息
+            flash_kh25_write_page((uint8_t *)(&alarm_file_cache), _start_address[i], sizeof(_sound_file_type_t)); //寫入文件信息
         }
 
-        //  sound_log("write sound file data address :%ld", (alarm_w_r_temp->file_address + alarm_w_r_temp->pos));
+        // sound_log("write sound file data address :%ld", (alarm_w_r_temp->file_address + alarm_w_r_temp->pos));
         flash_kh25_write_page((uint8_t *)alarm_w_r_temp->sound_data,
                               (alarm_w_r_temp->file_address + alarm_w_r_temp->pos),
                               alarm_w_r_temp->len);
@@ -230,7 +231,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
             (sound_list->lib + sound_list->writing_point)->file_len = alarm_w_r_temp->total_len;
             /*********write file len********/
             flash_kh25_write_page((uint8_t *)(&alarm_file_cache) + sizeof(alarm_file_cache.flag) + sizeof(alarm_file_cache.alarm_ID) + sizeof(alarm_file_cache.sound_type),
-                                  _start_sector[sound_list->writing_point] + sizeof(alarm_file_cache.flag) + sizeof(alarm_file_cache.alarm_ID) + sizeof(alarm_file_cache.sound_type),
+                                  _start_address[sound_list->writing_point] + sizeof(alarm_file_cache.flag) + sizeof(alarm_file_cache.alarm_ID) + sizeof(alarm_file_cache.sound_type),
                                   sizeof(uint32_t));
             sound_list->exist_flag |= (1 << sound_list->writing_point);
         }
@@ -308,10 +309,11 @@ OSStatus SOUND_FILE_CLEAR(void)
         {
             sound_file_list.exist_flag |= (1 << 0);
             memcpy(sound_file_list.lib, &alarm_file_temp, sizeof(_sound_file_type_t));
+            goto exit;
         }
     }
-
     flash_kh25_sector_erase((uint32_t)0);
+exit:
     mico_rtos_unlock_mutex(&eland_sound_mutex);
     return err;
 }
