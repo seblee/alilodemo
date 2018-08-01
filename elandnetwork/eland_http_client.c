@@ -248,7 +248,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     char ipstr[20] = {0};
     char *eland_host = ELAND_HTTP_DOMAIN_NAME;
     HTTPHeader_t *httpHeader = NULL;
-    http_context_t context = {NULL, 0};
+    http_context_t context = {NULL, 0, 0, 0, 0};
     struct sockaddr_in addr;
     int http_fd = -1;
     int ret = 0;
@@ -262,6 +262,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
 
     err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     client_log("lock http_mutex");
+start_http:
     if (http_body)
         http_req_all_len = strlen(http_body) + 1024; //为head部分预留1024字节 need free
     else
@@ -499,6 +500,16 @@ exit:
         eland_http_requeset = NULL;
     }
     HTTPHeaderDestory(&httpHeader);
+    if ((err != kNoErr) && (context.capacity_arranged == 1))
+    {
+        client_log("********capacity_arranged retry**********");
+        context.capacity_arranged = 0;
+        context.content_length = 0;
+        context.continue_flag = 0;
+        context.with_continue_flag = 0;
+        goto start_http;
+    }
+
     mico_rtos_unlock_mutex(&http_send_setting_mutex); //锁必须要等到response队列返回之后才能释放
     client_log("unlock http_mutex");
     return err;
@@ -546,6 +557,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
                     eland_sound_file_arrange(&sound_file_list);
                     if (HTTP_W_R_struct.alarm_w_r_queue->total_len > (int32_t)inHeader->contentLength)
                     {
+                        context->capacity_arranged = 1;
                         err = kGeneralErr;
                         goto exit;
                     }

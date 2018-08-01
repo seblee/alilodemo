@@ -182,6 +182,7 @@ typedef enum
     DOWNLOAD_OTA,
     DOWNLOAD_0_E_F,
     DOWNLOAD_C_D,
+    DOWNLOAD_A,
     DOWNLOAD_B,
     GO_INTO_AP_MODE,
     GO_OUT,
@@ -234,7 +235,7 @@ OSStatus alarm_sound_scan(void);
 OSStatus alarm_sound_oid(void);
 OSStatus weather_sound_0_e_f(void);
 OSStatus weather_sound_c_d(void);
-OSStatus weather_sound_b(void);
+OSStatus weather_sound_a_b(_download_type_t type);
 OSStatus check_default_sound(void);
 uint8_t eland_oid_status(bool style, uint8_t value);
 

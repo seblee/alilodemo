@@ -396,8 +396,9 @@ operation_queue:
     case DOWNLOAD_C_D:
         weather_sound_c_d();
         break;
+    case DOWNLOAD_A:
     case DOWNLOAD_B:
-        weather_sound_b();
+        weather_sound_a_b(download_type);
         break;
     case GO_INTO_AP_MODE:
     case GO_OUT:
@@ -563,7 +564,13 @@ static bool is_sound_file_usable(_sound_file_type_t *sound_file, _eland_alarm_li
             sound_log("FILE_DEFAULT %s is usable", sound_file->alarm_ID);
             goto exit;
         }
+        break;
+    case SOUND_FILE_WEATHER_A:
+    case SOUND_FILE_WEATHER_B:
+        break;
     case SOUND_FILE_WEATHER_0:
+    case SOUND_FILE_WEATHER_C:
+    case SOUND_FILE_WEATHER_D:
     case SOUND_FILE_WEATHER_E:
     case SOUND_FILE_WEATHER_F:
         nearest = get_nearest_alarm();

@@ -586,6 +586,8 @@ OSStatus alarm_sound_download(_sound_download_para_t sound_para)
         sprintf(uri_str, ELAND_SOUND_DEFAULT_URI);
     else if (sound_para.sound_type == SOUND_FILE_WEATHER_0)
         sprintf(uri_str, ELAND_WEATHER_0_URI, netclock_des_g->eland_id);
+    else if (sound_para.sound_type == SOUND_FILE_WEATHER_A)
+        sprintf(uri_str, ELAND_WEATHER_A_URI, netclock_des_g->eland_id);
     else if (sound_para.sound_type == SOUND_FILE_WEATHER_B)
         sprintf(uri_str, ELAND_WEATHER_B_URI, netclock_des_g->eland_id);
     else if (sound_para.sound_type == SOUND_FILE_WEATHER_C)
@@ -606,7 +608,7 @@ OSStatus alarm_sound_download(_sound_download_para_t sound_para)
                              ELAND_HTTP_DOMAIN_NAME, //主機域名
                              NULL,                   //request body
                              &user_http_res);        //response 接收緩存
-                                                     // require_noerr(err, exit);
+    // require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)
     {
