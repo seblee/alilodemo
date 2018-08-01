@@ -1,6 +1,25 @@
 # LT10_eland
 
-## v02.00
+
+## v01.28
+2018年8月1日14:30:37
+
+* set version v01.28
+* add download reback result
+* alarm waitting when downloading
+* add vid ccccccccccc
+* add vid bbbbbbbbb
+* change file download try again and again until alarm start,file include sid,dddddddd,cccccccccccccc,00000000,ffffffff,eeeeeeee,and other vid
+* issue alarm over ,before ofid volume problem
+* change ofid timeout 2s more
+* vid:ccccccccc/ddddddd download at120s alarm start
+* distinguish aaaaa bbbbb sound download
+* add aaaaa bbbbbb download when alarm operating
+* issue alarm ofid do not play error;
+* 
+
+
+## v01.27
 2018年7月27日15:45:33
 
 * set version v01.27
