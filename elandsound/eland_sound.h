@@ -51,6 +51,15 @@
 // #define START_ADDRESS_AREA6 1773568U
 // #define START_ADDRESS_RESERVE 2088960U
 
+#define START_SECTOR_AREA0 0
+#define START_SECTOR_AREA1 48
+#define START_SECTOR_AREA2 125
+#define START_SECTOR_AREA3 202
+#define START_SECTOR_AREA4 279
+#define START_SECTOR_AREA5 356
+#define START_SECTOR_AREA6 433
+#define START_SECTOR_RESERVE 510
+
 #define SECTOR_AREA0 48
 #define SECTOR_AREA1 77
 #define SECTOR_AREA2 77
@@ -73,10 +82,10 @@ typedef struct __SOUND_FILE_TYPE_
 
 typedef struct __SOUND_FILE_LIB_
 {
-    _sound_file_type_t *lib;
-    uint16_t file_number;
-    uint32_t sector_start;
-    uint32_t sector_end;
+    _sound_file_type_t lib[7];
+    uint8_t exist_flag;
+    uint8_t reading_point;
+    uint8_t writing_point;
 } _sound_file_lib_t;
 
 typedef enum _FILE_OPERATION_MODE_
@@ -147,7 +156,7 @@ OSStatus sound_file_read_write(_sound_file_lib_t *sound_list, _sound_read_write_
 OSStatus SOUND_CHECK_DEFAULT_FILE(void);
 OSStatus SOUND_FILE_CLEAR(void);
 void file_download(void);
-int32_t get_flash_capacity(void);
+uint8_t get_flash_capacity(void);
 OSStatus eland_sound_file_arrange(_sound_file_lib_t *sound_list);
 OSStatus eland_play_rom_sound(_sound_rom_t SOUND);
 /*************************/
