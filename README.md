@@ -3,9 +3,10 @@
 ## v01.29
 2018年8月3日15:59:50
 
-* issue flash write error
-* reserve capacity 2 sector
+* fix flash write error
 * merge change_flash branch
+* reserve capacity 2 sector
+* change flash struct
 
 ## v01.28
 2018年8月1日14:30:37
