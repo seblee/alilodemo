@@ -1,5 +1,11 @@
 # LT10_eland
 
+## v01.29
+2018年8月3日15:59:50
+
+* issue flash write error
+* reserve capacity 2 sector
+* merge change_flash branch
 
 ## v01.28
 2018年8月1日14:30:37
@@ -15,7 +21,7 @@
 * vid:ccccccccc/ddddddd download at120s alarm start
 * distinguish aaaaa bbbbb sound download
 * add aaaaa bbbbbb download when alarm operating
-* issue alarm ofid do not play error;
+* issue alarm ofid do not play error
 * 
 
 

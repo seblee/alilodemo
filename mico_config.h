@@ -35,7 +35,7 @@
 
 #define APP_INFO "Eland Demo"
 
-#define FIRMWARE_REVISION "01.28"
+#define FIRMWARE_REVISION "01.29"
 #define MANUFACTURER "MXCHIP Inc."
 #define SERIAL_NUMBER "20180801"
 #define PROTOCOL "com.mxchip.basic"
