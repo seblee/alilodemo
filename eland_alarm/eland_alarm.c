@@ -620,30 +620,28 @@ OSStatus weather_sound_a_b(_download_type_t type)
     require_quiet(nearest, checkout_over);
     //   alarm_log("nearest_id:%s", nearest->alarm_id);
 
-    if (strlen(nearest->voice_alarm_id) > 10)
+    alarm_log("VID:%s", nearest->voice_alarm_id);
+    if (type == DOWNLOAD_A)
     {
-        alarm_log("VID:%s", nearest->voice_alarm_id);
-        if (type == DOWNLOAD_A)
+        if (strstr(nearest->voice_alarm_id, "aaaaaaaa"))
         {
-            if (strstr(nearest->voice_alarm_id, "aaaaaaaa"))
-            {
-                sound_para[count].sound_type = SOUND_FILE_WEATHER_A;
-                memcpy(sound_para[count].alarm_ID, nearest->voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
-                count++;
-            }
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_A;
+            memcpy(sound_para[count].alarm_ID, nearest->voice_alarm_id, strlen(nearest->voice_alarm_id));
+            count++;
         }
-        else if (type == DOWNLOAD_B)
-        {
-            if (strstr(nearest->alarm_off_voice_alarm_id, "bbbbbbbb"))
-            {
-                sound_para[count].sound_type = SOUND_FILE_WEATHER_B;
-                memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
-                count++;
-            }
-        }
-        else
-            goto checkout_over;
     }
+    else if (type == DOWNLOAD_B)
+    {
+        if (strstr(nearest->alarm_off_voice_alarm_id, "bbbbbbbb"))
+        {
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_B;
+            memcpy(sound_para[count].alarm_ID, nearest->alarm_off_voice_alarm_id, strlen(nearest->alarm_off_voice_alarm_id));
+            count++;
+        }
+    }
+    else
+        goto checkout_over;
+
 checkout_over:
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
