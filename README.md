@@ -1,5 +1,12 @@
 # LT10_eland
 
+## v01.30
+2018年8月8日11:40:00
+
+* set version v01.30
+* change flash districts capacity
+* fix sid ofid bug when sid and bbbbbbbbb
+
 ## v01.29
 2018年8月3日15:59:50
 
