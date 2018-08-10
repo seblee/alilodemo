@@ -1,11 +1,16 @@
 # LT10_eland
 
 ## v01.30
-2018年8月8日11:40:00
+2018年8月10日10:55:08
 
 * set version v01.30
 * change flash districts capacity
 * fix sid ofid bug when sid and bbbbbbbbb
+* change unlock_mutex(&time_Mutex) place
+* add AlarmlibMutex in Alarm_build_JSON
+* add AlarmlibMutex in ELAND_H0B_Send
+* expand AP_mode http response bodylen
+* limit number of 25 aps,into the json
 
 ## v01.29
 2018年8月3日15:59:50

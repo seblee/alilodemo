@@ -673,6 +673,7 @@ static void ELAND_H0B_Send(uint8_t *Cache)
     _alarm_mcu_data_t *alarm_data_mcu = NULL;
     _alarm_mcu_data_t to_mcu_data;
     _alarm_schedules_t *schedule = NULL;
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     if (ELAND_NA == get_eland_mode())
     {
         if (get_schedules_number() == 0)
@@ -699,9 +700,8 @@ static void ELAND_H0B_Send(uint8_t *Cache)
             alarm_data_mcu = &to_mcu_data;
         }
     }
-
 data_parse_over:
-
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     *Cache = Uart_Packet_Header;
     *(Cache + 1) = ALARM_SEND_0B;
     if (alarm_data_mcu)
@@ -856,6 +856,7 @@ static void MODH_Opration_04H(uint8_t *usart_rec)
     mico_rtos_lock_mutex(&time_Mutex);
     MicoRtcSetTime(&cur_time); //初始化 RTC 时钟的时间
     mico_time_set_utc_time_ms(&current_utc);
+    mico_time_get_utc_time(&eland_current_utc);
     mico_rtos_unlock_mutex(&time_Mutex);
 }
 

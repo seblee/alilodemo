@@ -101,7 +101,7 @@ OSStatus Start_Alarm_service(void)
     //eland_state_queue
     err = mico_rtos_init_queue(&http_queue, "http_queue", sizeof(_download_type_t), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
-    err = mico_rtos_init_queue(&download_result, "download_result", sizeof(_download_type_t), 1); //只容纳一个成员 传递的只是地址
+    err = mico_rtos_init_queue(&download_result, "download_result", sizeof(_download_type_t), 2); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
     err = mico_rtos_init_queue(&history_queue, "history_queue", sizeof(AlarmOffHistoryData_t *), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
@@ -160,8 +160,7 @@ void Alarm_Manager(uint32_t arg)
         {
             count_temp = 0;
             utc_time = GET_current_second();
-            if (time_count < 1000)
-                time_count++;
+
             /**************check alarm sound file*********************/
             if ((alarm_list.alarm_nearest->skip_flag == 0) &&
                 (sound_other == 0) &&
@@ -204,6 +203,8 @@ void Alarm_Manager(uint32_t arg)
                 /**operation output alarm**/
                 alarm_operation(alarm_list.alarm_nearest);
             }
+            if (time_count < 1000)
+                time_count++;
         }
         /* check current time per second */
     }
@@ -215,20 +216,22 @@ static void timer_1s_handle(void *arg)
     static mico_utc_time_t eland_utc_cache = 0;
     mico_rtos_lock_mutex(&time_Mutex);
     mico_time_get_utc_time(&eland_current_utc);
-    mico_rtos_unlock_mutex(&time_Mutex);
 
     state = get_eland_mode_state() & 0xff;
-    //   alarm_log("##### timer_1s_handle state:%d ######", state);
+    // alarm_log("##### timer_1s_handle state:%d ######", state);
 
     if ((eland_current_utc % 60) == (netclock_des_g->eland_id % 60) &&
         (eland_utc_cache != eland_current_utc))
     {
         eland_utc_cache = eland_current_utc;
+        mico_rtos_unlock_mutex(&time_Mutex);
         if (state >= CONNECTED_NET)
             TCP_Push_MSG_queue(TCP_HC00_Sem);
         else /*read mcu rtc time*/
             eland_push_uart_send_queue(TIME_READ_04);
     }
+    else
+        mico_rtos_unlock_mutex(&time_Mutex);
 }
 _alarm_list_state_t get_alarm_state(void)
 {
@@ -510,7 +513,7 @@ OSStatus alarm_sound_scan(void)
         if (err != kNoErr)
             result_msg = DOWNLOAD_IDEL;
     }
-    err = mico_rtos_push_to_queue(&download_result, &result_msg, 10);
+    mico_rtos_push_to_queue(&download_result, &result_msg, 10);
     return err;
 }
 
@@ -612,7 +615,7 @@ OSStatus weather_sound_a_b(_download_type_t type)
 {
     OSStatus err = kNoErr;
     uint8_t i, count = 0;
-    _download_type_t result_msg = DOWNLOAD_B;
+    _download_type_t result_msg = type;
     __elsv_alarm_data_t *nearest = NULL;
     _sound_download_para_t sound_para[2];
     mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
@@ -795,20 +798,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 /** record_time **/
                 mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
                 alarm_off_history_record_time(ALARM_ON, &iso8601_time);
-                if (utc_time >= alarm_moment)
-                {
-                    alarm_log("time up first_to_alarming");
-                    //play with delay
-                    Alarm_Play_Control(alarm, AUDIO_PALY);
-                    set_alarm_state(ALARM_SNOOZ_STOP);
-                    break;
-                }
-                /**alarm on notice**/
-                TCP_Push_MSG_queue(TCP_HT00_Sem);
 
-                eland_push_uart_send_queue(ALARM_SEND_0B);
-                if (eland_oid_status(false, 0) == 0)
+                if (utc_time < alarm_moment)
                 {
+                    /**alarm on notice**/
+                    TCP_Push_MSG_queue(TCP_HT00_Sem);
+                    eland_push_uart_send_queue(ALARM_SEND_0B);
                     for (i = 0; i < 33; i++)
                         audio_service_volume_down(&result, 1);
                     volume_value = 0;
@@ -820,12 +815,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                             volume_value++;
                         }
                     }
-                }
-                if (strstr(alarm->voice_alarm_id, "aaaaaaaa"))
-                {
-                    alarm_log("##### DOWNLOAD_A ######");
-                    sprintf(alarm->voice_alarm_id + 24, "%ldbb", utc_time);
-                    eland_push_http_queue(DOWNLOAD_A);
+                    if (strstr(alarm->voice_alarm_id, "aaaaaaaa"))
+                    {
+                        alarm_log("##### DOWNLOAD_A ######");
+                        sprintf(alarm->voice_alarm_id + 24, "%ldbb", utc_time);
+                        eland_push_http_queue(DOWNLOAD_A);
+                    }
                 }
             }
             if ((alarm->volume_stepup_enabled) &&
@@ -867,8 +862,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             alarm_log("alarm_operation stop");
-            if (eland_oid_status(false, 0) == 0)
-                Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
+            Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
             set_alarm_history_send_sem();
             goto exit;
             break;
@@ -880,12 +874,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     first_to_snooze = false;
                     first_to_alarming = true;
                     alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
-                    if (utc_time >= alarm_moment)
-                    {
-                        alarm_log("time up first_to_snooze");
-                        set_alarm_state(ALARM_ING);
-                        break;
-                    }
                     if (eland_oid_status(false, 0) == 0)
                         Alarm_Play_Control(alarm, AUDIO_STOP); //stop
                     alarm_log("time up alarm_moment:%ld", alarm_moment);
@@ -924,7 +912,6 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
     mico_utc_time_t utc_time;
     mscp_status_t audio_status;
     static bool isVoice = false;
-    static uint8_t CMD_bak = AUDIO_NONE;
 
     audio_service_get_audio_status(&result, &audio_status);
     if ((CMD == AUDIO_PALY) && (get_alarm_stream_state() != STREAM_PLAY)) //play
@@ -979,11 +966,14 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
         if (get_alarm_stream_state() == STREAM_PLAY)
             set_alarm_stream_state(STREAM_STOP);
     }
-    else if ((CMD == AUDIO_STOP_PLAY) &&
-             (CMD_bak != AUDIO_STOP_PLAY)) //stop
+    else if (CMD == AUDIO_STOP_PLAY)
     {
         isVoice = false;
         alarm_log("player_flash_thread");
+        while (eland_oid_status(false, 0) != 0)
+        {
+            mico_rtos_thread_msleep(500);
+        }
         if (get_alarm_stream_state() == STREAM_PLAY)
             set_alarm_stream_state(STREAM_STOP);
         if (strlen(alarm->alarm_off_voice_alarm_id) > 10) //alarm off oid
@@ -1015,7 +1005,6 @@ static void Alarm_Play_Control(__elsv_alarm_data_t *alarm, _alarm_play_tyep_t CM
             mico_rtos_create_thread(&play_voice_thread, MICO_APPLICATION_PRIORITY, "stream_thread", play_voice, 0x500, (uint32_t)(&alarm_stream));
         }
     }
-    CMD_bak = CMD;
 }
 
 static void play_voice(mico_thread_arg_t arg)
@@ -1534,6 +1523,7 @@ OSStatus Alarm_build_JSON(char *json_str)
     int year, mon, day;
 
     Json = json_object_new_object();
+    mico_rtos_lock_mutex(&alarm_list.AlarmlibMutex);
     alarm_now = get_nearest_alarm();
     require_quiet(alarm_now, exit);
     require_action_string(Json, exit, err = kNoMemoryErr, "create Json object error!");
@@ -1592,6 +1582,7 @@ OSStatus Alarm_build_JSON(char *json_str)
     memcpy(json_str, generate_data, generate_data_len);
 
 exit:
+    mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     free_json_obj(&Json);
     return err;
 }

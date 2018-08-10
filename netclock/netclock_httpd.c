@@ -105,17 +105,20 @@ static OSStatus build_ssids_json_string(char *data, __http_ssids_list_t *wifi_li
         json_object_object_add(JsonSsidval, "ssid", json_object_new_string((wifi_list->ssids + i)->ssid));
 
         json_object_array_add(JsonList, JsonSsidval);
+        if (i >= 25)
+            break;
     }
     json_object_object_add(Json, "ssids", JsonList);
 
     generate_data = json_object_to_json_string(Json);
     require_action_string(generate_data != NULL, exit, err = kNoMemoryErr, "create generate_data string error!");
     generate_data_len = strlen(generate_data);
-    require_action_string(generate_data_len < 1024, exit, err = kNoMemoryErr, "json data is too long");
+    require_action_string(generate_data_len < HTTP_RESPONSE_LEN, exit, err = kNoMemoryErr, "json data is too long");
     memcpy(data, generate_data, generate_data_len);
     app_httpd_log("data:%s", data);
 exit:
     app_httpd_log("exit ");
+    free_json_obj(&JsonList);
     free_json_obj(&Json);
     return err;
 }
@@ -155,7 +158,7 @@ static int web_send_Get_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
     char *upload_data = NULL;
-    uint32_t upload_data_len = 1024;
+    uint32_t upload_data_len = HTTP_RESPONSE_LEN;
     app_httpd_log("web_send_Get_Request");
     upload_data = malloc(upload_data_len);
     memset(upload_data, 0, upload_data_len);
@@ -181,7 +184,7 @@ static int web_send_Post_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
     int ret;
-    int buf_size = 1024;
+    int buf_size = HTTP_RESPONSE_LEN;
     char *buf = NULL;
 
     buf = malloc(buf_size + 1);
@@ -265,7 +268,7 @@ static int web_send_Get_ssids_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
     char *upload_data = NULL;
-    uint32_t upload_data_len = 1024;
+    uint32_t upload_data_len = HTTP_RESPONSE_LEN;
     app_httpd_log("Get_ssids_Request");
     SendElandStateQueue(ELAPPConnected);
     upload_data = malloc(upload_data_len);
@@ -297,7 +300,7 @@ exit:
 static int web_send_Post_setting_Request(httpd_request_t *req)
 {
     OSStatus err = kNoErr;
-    int buf_size = 1024;
+    int buf_size = HTTP_RESPONSE_LEN;
     char *buf = NULL;
 
     buf = malloc(buf_size + 1);

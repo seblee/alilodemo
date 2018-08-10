@@ -14,7 +14,8 @@
         "netclockconfig.h": "c",
         "xstddef": "c",
         "audio_service.h": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "netclock.h": "c"
     },
     "C_Cpp.dimInactiveRegions": true
 }

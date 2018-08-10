@@ -32,7 +32,7 @@ typedef struct _HTTP_SSIDS_LIST
 } __http_ssids_list_t;
 
 /* Private define ------------------------------------------------------------*/
-
+#define HTTP_RESPONSE_LEN 2048
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
