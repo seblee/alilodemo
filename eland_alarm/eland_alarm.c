@@ -38,7 +38,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 mico_semaphore_t alarm_update = NULL;
-mico_semaphore_t alarm_skip_sem = NULL;
+mico_semaphore_t audio_done = NULL;
 mico_queue_t http_queue = NULL;
 mico_queue_t download_result = NULL;
 mico_mutex_t time_Mutex = NULL;
@@ -105,8 +105,7 @@ OSStatus Start_Alarm_service(void)
     require_noerr(err, exit);
     err = mico_rtos_init_queue(&history_queue, "history_queue", sizeof(AlarmOffHistoryData_t *), 5); //只容纳一个成员 传递的只是地址
     require_noerr(err, exit);
-
-    err = mico_rtos_init_semaphore(&alarm_skip_sem, 1);
+    err = mico_rtos_init_semaphore(&audio_done, 1);
     require_noerr(err, exit);
     err = mico_rtos_init_mutex(&off_history.off_Mutex);
     require_noerr(err, exit);
@@ -248,13 +247,15 @@ static void init_alarm_stream(__elsv_alarm_data_t *alarm, uint8_t sound_type)
     mico_rtos_lock_mutex(&alarm_stream.stream_Mutex);
     memset(alarm_stream.alarm_id, 0, ALARM_ID_LEN + 1);
     alarm_stream.sound_type = sound_type;
-
-    if ((alarm->alarm_pattern == 3) ||
-        (sound_type == SOUND_FILE_OFID))
+    if ((alarm->alarm_pattern == 3) || (sound_type == SOUND_FILE_OFID))
         alarm_stream.stream_count = 1;
     else
-        alarm_stream.stream_count = 0xffff;
-
+    {
+        if (alarm->alarm_continue_sec == 0)
+            alarm_stream.stream_count = alarm->number_of_loops;
+        else
+            alarm_stream.stream_count = 0xffff;
+    }
     switch (sound_type)
     {
     case SOUND_FILE_VID:
@@ -338,7 +339,7 @@ OSStatus elsv_alarm_data_init_MCU(_alarm_mcu_data_t *alarm_mcu_data)
     alarm_data_cache.alarm_pattern = 4;
     alarm_data_cache.alarm_sound_id = 1;
     alarm_data_cache.alarm_volume = 80;
-    alarm_data_cache.alarm_continue_min = 15;
+    alarm_data_cache.alarm_continue_sec = 900;
     alarm_data_cache.alarm_repeat = 1;
     elsv_alarm_data_sort_out(&alarm_data_cache);
     err = alarm_list_clear(&alarm_list);
@@ -752,6 +753,7 @@ exit:
 
 static void alarm_operation(__elsv_alarm_data_t *alarm)
 {
+    OSStatus err;
     _alarm_list_state_t current_state;
     int8_t snooze_count;
     mico_utc_time_t utc_time;
@@ -763,7 +765,11 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     iso8601_time_t iso8601_time;
     uint8_t i = 0;
     uint8_t volume_stepup_count = 0;
-
+    uint8_t loops = 0;
+    /**********test loops*************************/
+    alarm->alarm_continue_sec = 0;
+    alarm->number_of_loops = 3;
+    /******************************************/
     if (alarm->alarm_data_for_mcu.skip_flag)
     {
         alarm_list.state.alarm_stoped = true;
@@ -778,7 +784,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         snooze_count = alarm->snooze_count + 1;
     else
         snooze_count = 1;
-    alarm_moment += (uint32_t)alarm->alarm_continue_min * 60;
+    alarm_moment += (uint32_t)alarm->alarm_continue_sec;
+    loops = (alarm->alarm_continue_sec == 0) ? 1 : 0;
     set_alarm_state(ALARM_ING);
 
     while (1)
@@ -794,12 +801,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 snooze_count--;
                 first_to_alarming = false;
                 first_to_snooze = true;
-
+                alarm_log("first_to_alarming");
                 /** record_time **/
                 mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
                 alarm_off_history_record_time(ALARM_ON, &iso8601_time);
-
-                if (utc_time < alarm_moment)
+                mico_rtos_get_semaphore(&audio_done, 0);
+                if ((utc_time < alarm_moment) || (loops == 1))
                 {
                     /**alarm on notice**/
                     TCP_Push_MSG_queue(TCP_HT00_Sem);
@@ -836,8 +843,13 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     audio_service_volume_up(&result, 1);
                 }
             }
-            if ((utc_time >= alarm_moment) || (eland_oid_status(false, 0) > 0))
+            err = mico_rtos_get_semaphore(&audio_done, 0);
+            // alarm_log("alarming..................");
+
+            if ((((utc_time >= alarm_moment) || (eland_oid_status(false, 0) > 0)) && loops == 0) ||
+                ((loops == 1) && (err == kNoErr)))
             {
+                alarm_log("alarm_off");
                 mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
                 if (eland_oid_status(false, 0) > 0)
                     alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
@@ -886,7 +898,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
                 if (utc_time >= alarm_moment)
                 {
-                    alarm_moment = utc_time + (uint32_t)alarm->alarm_continue_min * 60;
+                    alarm_moment = utc_time + (uint32_t)alarm->alarm_continue_sec;
                     alarm_log("alarm_time on again %d", snooze_count);
                     set_alarm_state(ALARM_ING);
                 }
@@ -1157,7 +1169,7 @@ audio_transfer:
 exit:
     if (err != kNoErr)
         alarm_log("err =%d", err);
-
+    mico_rtos_set_semaphore(&audio_done);
     set_alarm_stream_state(STREAM_IDEL);
     mico_rtos_unlock_mutex(&HTTP_W_R_struct.mutex);
     if (flashdata)
@@ -1185,7 +1197,8 @@ void alarm_print(__elsv_alarm_data_t *alarm_data)
     alarm_log("alarm_off_voice_alarm_id:%s", alarm_data->alarm_off_voice_alarm_id);
     alarm_log("alarm_volume:%d", alarm_data->alarm_volume);
     alarm_log("volume_stepup_enabled:%d", alarm_data->volume_stepup_enabled);
-    alarm_log("alarm_continue_min:%d", alarm_data->alarm_continue_min);
+    alarm_log("alarm_continue_sec:%d", alarm_data->alarm_continue_sec);
+    alarm_log("number_of_loops:%d", alarm_data->number_of_loops);
     alarm_log("alarm_repeat:%d", alarm_data->alarm_repeat);
     alarm_log("alarm_on_days_of_week:%s", alarm_data->alarm_on_days_of_week);
     alarm_log("\r\nalarm_data_for_eland");
@@ -1425,7 +1438,6 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
         memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_off_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
-
         break;
     case ALARM_OFF_SKIP:
         memset(&off_history.HistoryData, 0, sizeof(AlarmOffHistoryData_t));
@@ -1434,12 +1446,10 @@ void alarm_off_history_record_time(alarm_off_history_record_t type, iso8601_time
         memcpy(off_history.HistoryData.alarm_id, nearestAlarm->alarm_id, ALARM_ID_LEN);
         memcpy(&off_history.HistoryData.alarm_on_datetime, iso8601_time, 19);
         off_history.HistoryData.alarm_off_reason = type;
-
         break;
     case ALARM_SNOOZE:
         memcpy(&off_history.HistoryData.snooze_datetime, iso8601_time, 19);
         break;
-
     default:
         break;
     }
@@ -1559,7 +1569,8 @@ OSStatus Alarm_build_JSON(char *json_str)
     json_object_object_add(AlarmJson, "alarm_off_voice_alarm_id", json_object_new_string(alarm_now->alarm_off_voice_alarm_id));
     json_object_object_add(AlarmJson, "alarm_volume", json_object_new_int(alarm_now->alarm_volume));
     json_object_object_add(AlarmJson, "volume_stepup_enabled", json_object_new_int(alarm_now->volume_stepup_enabled));
-    json_object_object_add(AlarmJson, "alarm_continue_min", json_object_new_int(alarm_now->alarm_continue_min));
+    json_object_object_add(AlarmJson, "alarm_continue_sec", json_object_new_int(alarm_now->alarm_continue_sec));
+    json_object_object_add(AlarmJson, "number_of_loops", json_object_new_int(alarm_now->number_of_loops));
     json_object_object_add(AlarmJson, "alarm_repeat", json_object_new_int(alarm_now->alarm_repeat));
     for (i = 0; i < ALARM_ON_OFF_DATES_COUNT; i++)
     {
@@ -1957,10 +1968,16 @@ bool eland_alarm_is_same(__elsv_alarm_data_t *alarm1, __elsv_alarm_data_t *alarm
         alarm_log("volume_stepup_enabled:%d", alarm2->volume_stepup_enabled);
         return false;
     }
-    if (alarm1->alarm_continue_min != alarm2->alarm_continue_min)
+    if (alarm1->alarm_continue_sec != alarm2->alarm_continue_sec)
     {
-        alarm_log("alarm_continue_min:%d", alarm1->alarm_continue_min);
-        alarm_log("alarm_continue_min:%d", alarm2->alarm_continue_min);
+        alarm_log("alarm_continue_sec:%d", alarm1->alarm_continue_sec);
+        alarm_log("alarm_continue_sec:%d", alarm2->alarm_continue_sec);
+        return false;
+    }
+    if (alarm1->number_of_loops != alarm2->number_of_loops)
+    {
+        alarm_log("number_of_loops:%d", alarm1->number_of_loops);
+        alarm_log("number_of_loops:%d", alarm2->number_of_loops);
         return false;
     }
     if (alarm1->alarm_repeat != alarm2->alarm_repeat)

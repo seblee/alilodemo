@@ -1589,9 +1589,13 @@ void TCP_Operate_AL_JSON(json_object *alarm, __elsv_alarm_data_t *alarm_data)
         {
             alarm_data->volume_stepup_enabled = json_object_get_int(val);
         }
-        else if (!strcmp(key, "alarm_continue_min"))
+        else if (!strcmp(key, "alarm_continue_sec"))
         {
-            alarm_data->alarm_continue_min = json_object_get_int(val);
+            alarm_data->alarm_continue_sec = json_object_get_int(val);
+        }
+        else if (!strcmp(key, "number_of_loops"))
+        {
+            alarm_data->number_of_loops = json_object_get_int(val);
         }
         else if (!strcmp(key, "alarm_repeat"))
         {

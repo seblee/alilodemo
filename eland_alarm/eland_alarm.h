@@ -83,7 +83,8 @@ typedef struct _ELSV_ALARM_DATA //闹钟情報结构体
     char alarm_off_voice_alarm_id[VOICE_ALARM_ID_LEN];     //Alarm off 後语音闹钟的ID
     int8_t alarm_volume;                                   //the volume of voice when alarming
     int8_t volume_stepup_enabled;                          //音量升高功能是否有效的标志
-    int8_t alarm_continue_min;                             //鬧鐘自動停止的時間
+    int16_t alarm_continue_sec;                            //鬧鐘自動停止的時間
+    uint8_t number_of_loops;                               //循环执行次数
     int8_t alarm_repeat;                                   //鬧鐘反復條件
     uint16_t alarm_on_dates[ALARM_ON_OFF_DATES_COUNT];     //鬧鐘日期排列
     char alarm_on_days_of_week[ALARM_ON_DAYS_OF_WEEK_LEN]; //鬧鐘播放的星期幾
@@ -200,7 +201,7 @@ extern _eland_alarm_list_t alarm_list;
 extern _elsv_holiday_t holiday_list;
 extern _alarm_stream_t alarm_stream;
 extern mico_semaphore_t alarm_update;
-extern mico_semaphore_t alarm_skip_sem;
+extern mico_semaphore_t audio_done;
 extern mico_queue_t http_queue;
 extern mico_queue_t download_result;
 extern mico_mutex_t time_Mutex;
