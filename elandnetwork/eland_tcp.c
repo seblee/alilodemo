@@ -613,9 +613,6 @@ pop_queue:
         /*******upload alarm on notification********/
         if (tcp_message == TCP_HT00_Sem)
             rc = TCP_upload(&Eland_Client, HT00);
-        /*******upload alarm history********/
-        else if (tcp_message == TCP_HT01_Sem)
-            rc = TCP_upload(&Eland_Client, HT01);
         /*******upload alarm skip notice********/
         else if (tcp_message == TCP_HT02_Sem)
             rc = TCP_upload(&Eland_Client, HT02);

@@ -757,7 +757,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     _alarm_list_state_t current_state;
     int8_t snooze_count;
     mico_utc_time_t utc_time;
-    mico_utc_time_t alarm_moment = alarm->alarm_data_for_eland.moment_second;
+    mico_utc_time_t alarm_moment = GET_current_second();
     bool first_to_snooze = true, first_to_alarming = true;
     mscp_result_t result;
     static uint8_t volume_value = 0;
@@ -766,10 +766,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     uint8_t i = 0;
     uint8_t volume_stepup_count = 0;
     uint8_t loops = 0;
-    /**********test loops*************************/
-    alarm->alarm_continue_sec = 0;
-    alarm->number_of_loops = 3;
-    /******************************************/
     if (alarm->alarm_data_for_mcu.skip_flag)
     {
         alarm_list.state.alarm_stoped = true;

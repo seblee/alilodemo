@@ -363,7 +363,6 @@ typedef enum TCP_CMD_SEM
     TCP_CMD_NONE,
     TCP_Stop_Sem, //stop tcp thread
     TCP_HT00_Sem, //alarm on notice
-    TCP_HT01_Sem, //alarm off notice
     TCP_HT02_Sem, //ALARM skip notice
     TCP_HC00_Sem, //helth check
     TCP_FW01_Sem, //OTA start
