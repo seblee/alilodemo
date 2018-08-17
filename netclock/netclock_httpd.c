@@ -163,7 +163,7 @@ static int web_send_Get_Request(httpd_request_t *req)
     upload_data = malloc(upload_data_len);
     memset(upload_data, 0, upload_data_len);
     InitUpLoadData(upload_data);
-
+    app_httpd_log("DeviceJson:%s", upload_data);
     err = httpd_send_all_header(req, HTTP_RES_200, strlen(upload_data), HTTP_CONTENT_JSON_STR);
     require_noerr_action(err, exit, app_httpd_log("ERROR: Unable to send http wifisetting headers."));
 
