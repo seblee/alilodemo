@@ -1,5 +1,15 @@
 # LT10_eland
 
+## v01.40
+2018年8月17日13:39:23
+
+* set version v01.40
+* add audio_done semaphore
+* alarm continue change to second
+* audio play as number loop when alarm continue ==0
+* alarm play time start current time
+
+
 ## v01.30
 2018年8月10日10:55:08
 
