@@ -241,14 +241,15 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
                             char *request_uri,                                 //uri
                             char *host_name,                                   //host
                             char *http_body,                                   //BODY
-                            ELAND_HTTP_RESPONSE_SETTING_S *user_http_response) //response 指針
+                            ELAND_HTTP_RESPONSE_SETTING_S *user_http_response, //response 指針
+                            _download_type_t download_type)
 {
     OSStatus err = kGeneralErr;
     uint32_t http_req_all_len;
     char ipstr[20] = {0};
     char *eland_host = ELAND_HTTP_DOMAIN_NAME;
     HTTPHeader_t *httpHeader = NULL;
-    http_context_t context = {NULL, 0, 0, 0, 0};
+    http_context_t context = {NULL, 0, 0, 0, 0, 0};
     struct sockaddr_in addr;
     int http_fd = -1;
     int ret = 0;
@@ -259,7 +260,17 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     const char *X_EL_CONTINUED_URL_STR;
     size_t X_EL_CONTINUED_URL_LEN;
     url_field_t *X_EL_CONTINUED_URL;
+    _alarm_list_state_t alarm_state = get_alarm_state();
 
+    if (((alarm_state == ALARM_ADD) ||
+         (alarm_state == ALARM_MINUS) ||
+         (alarm_state == ALARM_SKIP)) &&
+        (download_type != DOWNLOAD_B))
+    {
+        err = kGeneralErr;
+        goto exit;
+    }
+    context.download_type = download_type;
     err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     client_log("lock http_mutex");
 start_http:
@@ -524,6 +535,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
     int32_t contentLen;
     static uint32_t sound_flash_pos = 0;
     static bool is_sound_data = false;
+    _alarm_list_state_t alarm_state = get_alarm_state();
 
     if (inHeader->chunkedData == false)
     {
@@ -570,6 +582,14 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
         if (is_sound_data)
         {
+            if (((alarm_state == ALARM_ADD) ||
+                 (alarm_state == ALARM_MINUS) ||
+                 (alarm_state == ALARM_SKIP)) &&
+                (context->download_type != DOWNLOAD_B))
+            {
+                err = kGeneralErr;
+                goto exit;
+            }
             //client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
                 goto exit;
@@ -657,7 +677,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     int ssl_errno = 0;
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
-    struct timeval t = {3, HTTP_YIELD_TMIE * 1500};
+    struct timeval t = {5, HTTP_YIELD_TMIE * 1500};
 
     const char *X_EL_CONTINUED_URL_STR;
     size_t X_EL_CONTINUED_URL_LEN;

@@ -234,7 +234,11 @@ static void timer_1s_handle(void *arg)
 }
 _alarm_list_state_t get_alarm_state(void)
 {
-    return alarm_list.state.state;
+    _alarm_list_state_t state;
+    mico_rtos_lock_mutex(&alarm_list.state.AlarmStateMutex);
+    state = alarm_list.state.state;
+    mico_rtos_unlock_mutex(&alarm_list.state.AlarmStateMutex);
+    return state;
 }
 void set_alarm_state(_alarm_list_state_t state)
 {
@@ -510,7 +514,7 @@ OSStatus alarm_sound_scan(void)
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
     {
-        err = alarm_sound_download(sound_para_temp[i]);
+        err = alarm_sound_download(sound_para_temp[i], DOWNLOAD_SCAN);
         if (err != kNoErr)
             result_msg = DOWNLOAD_IDEL;
     }
@@ -565,7 +569,7 @@ checkout_over:
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
     {
-        err = alarm_sound_download(sound_para[i]);
+        err = alarm_sound_download(sound_para[i], DOWNLOAD_0_E_F);
         if (err != kNoErr)
             result_msg = DOWNLOAD_IDEL;
     }
@@ -604,7 +608,7 @@ checkout_over:
 
     for (i = 0; i < count; i++)
     {
-        err = alarm_sound_download(sound_para[i]);
+        err = alarm_sound_download(sound_para[i], DOWNLOAD_C_D);
         if (err != kNoErr)
             result_msg = DOWNLOAD_IDEL;
     }
@@ -624,9 +628,9 @@ OSStatus weather_sound_a_b(_download_type_t type)
     require_quiet(nearest, checkout_over);
     //   alarm_log("nearest_id:%s", nearest->alarm_id);
 
-    alarm_log("VID:%s", nearest->voice_alarm_id);
     if (type == DOWNLOAD_A)
     {
+        alarm_log("VID:%s", nearest->voice_alarm_id);
         if (strstr(nearest->voice_alarm_id, "aaaaaaaa"))
         {
             sound_para[count].sound_type = SOUND_FILE_WEATHER_A;
@@ -636,6 +640,7 @@ OSStatus weather_sound_a_b(_download_type_t type)
     }
     else if (type == DOWNLOAD_B)
     {
+        alarm_log("OFID:%s", nearest->alarm_off_voice_alarm_id);
         if (strstr(nearest->alarm_off_voice_alarm_id, "bbbbbbbb"))
         {
             sound_para[count].sound_type = SOUND_FILE_WEATHER_B;
@@ -650,7 +655,7 @@ checkout_over:
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     for (i = 0; i < count; i++)
     {
-        err = alarm_sound_download(sound_para[i]);
+        err = alarm_sound_download(sound_para[i], type);
         if (err != kNoErr)
             result_msg = DOWNLOAD_IDEL;
     }
@@ -756,8 +761,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     OSStatus err;
     _alarm_list_state_t current_state;
     int8_t snooze_count;
-    mico_utc_time_t utc_time;
-    mico_utc_time_t alarm_moment = GET_current_second();
+    mico_utc_time_t utc_time = GET_current_second();
+    mico_utc_time_t alarm_moment;
     bool first_to_snooze = true, first_to_alarming = true;
     mscp_result_t result;
     static uint8_t volume_value = 0;
@@ -780,7 +785,13 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         snooze_count = alarm->snooze_count + 1;
     else
         snooze_count = 1;
-    alarm_moment += (uint32_t)alarm->alarm_continue_sec;
+    if (strstr(alarm->voice_alarm_id, "aaaaaaaa"))
+    {
+        alarm_log("##### DOWNLOAD_A ######");
+        sprintf(alarm->voice_alarm_id + 24, "%ldaa", utc_time);
+        eland_push_http_queue(DOWNLOAD_A);
+    }
+    alarm_moment = GET_current_second() + (uint32_t)alarm->alarm_continue_sec;
     loops = (alarm->alarm_continue_sec == 0) ? 1 : 0;
     set_alarm_state(ALARM_ING);
 
@@ -818,12 +829,6 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                             volume_value++;
                         }
                     }
-                    if (strstr(alarm->voice_alarm_id, "aaaaaaaa"))
-                    {
-                        alarm_log("##### DOWNLOAD_A ######");
-                        sprintf(alarm->voice_alarm_id + 24, "%ldbb", utc_time);
-                        eland_push_http_queue(DOWNLOAD_A);
-                    }
                 }
             }
             if ((alarm->volume_stepup_enabled) &&
@@ -842,7 +847,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             err = mico_rtos_get_semaphore(&audio_done, 0);
             // alarm_log("alarming..................");
 
-            if ((((utc_time >= alarm_moment) || (eland_oid_status(false, 0) > 0)) && loops == 0) ||
+            if ((((utc_time > alarm_moment) || (eland_oid_status(false, 0) > 0)) && loops == 0) ||
                 ((loops == 1) && (err == kNoErr)))
             {
                 alarm_log("alarm_off");
@@ -861,6 +866,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             }
             else
                 Alarm_Play_Control(alarm, AUDIO_PALY); //play with delay
+
             break;
         case ALARM_ADD:
         case ALARM_MINUS:
@@ -894,7 +900,14 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
                 if (utc_time >= alarm_moment)
                 {
-                    alarm_moment = utc_time + (uint32_t)alarm->alarm_continue_sec;
+                    if (strstr(alarm->voice_alarm_id, "aaaaaaaa"))
+                    {
+                        alarm_log("##### DOWNLOAD_A ######");
+                        sprintf(alarm->voice_alarm_id + 24, "%ldaa", utc_time);
+                        eland_push_http_queue(DOWNLOAD_A);
+                    }
+                    alarm_moment = GET_current_second() + (uint32_t)alarm->alarm_continue_sec;
+                    alarm_log("alarm_moment %ld", alarm_moment);
                     alarm_log("alarm_time on again %d", snooze_count);
                     set_alarm_state(ALARM_ING);
                 }
@@ -1811,7 +1824,7 @@ static OSStatus set_alarm_history_send_sem(void)
 {
     OSStatus err = kNoErr;
     AlarmOffHistoryData_t *history_P = NULL;
-    if (strlen(off_history.HistoryData.alarm_id) > 15)
+    if ((strlen(off_history.HistoryData.alarm_id) > 15) && (!mico_rtos_is_queue_full(&history_queue)))
     {
         history_P = malloc(sizeof(AlarmOffHistoryData_t));
         memcpy(history_P, &(off_history.HistoryData), sizeof(AlarmOffHistoryData_t));
@@ -1819,8 +1832,10 @@ static OSStatus set_alarm_history_send_sem(void)
         require_noerr_action(err, exit, alarm_log("[error]history_queue err"));
     }
     memset(&(off_history.HistoryData), 0, sizeof(AlarmOffHistoryData_t));
-
+    return err;
 exit:
+    if (history_P)
+        free(history_P);
     return err;
 }
 OSStatus check_default_sound(void)
@@ -1843,7 +1858,7 @@ check_start:
         memcpy(sound_para.alarm_ID, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK));
         sound_para.sound_type = SOUND_FILE_DEFAULT;
 
-        err = alarm_sound_download(sound_para);
+        err = alarm_sound_download(sound_para, DOWNLOAD_IDEL);
         require_noerr(err, exit);
         goto check_start;
     }

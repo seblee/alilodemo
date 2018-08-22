@@ -488,7 +488,8 @@ OSStatus eland_communication_info_get(void)
                              ELAND_COMMUNICATION_INFO_UPDATE_URI,    //URI參數
                              ELAND_HTTP_DOMAIN_NAME,                 //主機域名
                              NULL,                                   //request body
-                             &user_http_res);                        //response 接收緩存
+                             &user_http_res,
+                             DOWNLOAD_IDEL); //response 接收緩存
     require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)
@@ -546,7 +547,7 @@ exit:
 }
 
 //eland 鬧鐘聲音取得
-OSStatus alarm_sound_download(_sound_download_para_t sound_para)
+OSStatus alarm_sound_download(_sound_download_para_t sound_para, _download_type_t download_type)
 {
     OSStatus err = kGeneralErr;
     char alarm_id_temp[ALARM_ID_LEN + 1];
@@ -607,7 +608,8 @@ OSStatus alarm_sound_download(_sound_download_para_t sound_para)
                              uri_str,                //URI參數
                              ELAND_HTTP_DOMAIN_NAME, //主機域名
                              NULL,                   //request body
-                             &user_http_res);        //response 接收緩存
+                             &user_http_res,
+                             download_type); //response 接收緩存
     // require_noerr(err, exit);
     //处理返回结果
     if (user_http_res.status_code == 200)

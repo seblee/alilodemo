@@ -88,6 +88,7 @@ typedef struct _http_context_t
     uint8_t continue_flag;
     uint8_t with_continue_flag;
     uint8_t capacity_arranged;
+    uint8_t download_type;
 } http_context_t;
 typedef enum __SOUND_DOWNLOAD_STATUS
 {
@@ -118,7 +119,8 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,             //POST 或者 
                             char *request_uri,                    //uri
                             char *host_name,                      //host
                             char *http_body,                      //BODY
-                            ELAND_HTTP_RESPONSE_SETTING_S *user_http_response);
+                            ELAND_HTTP_RESPONSE_SETTING_S *user_http_response,
+                            _download_type_t download_type);
 
 OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
                                   char *request_uri,        //uri
