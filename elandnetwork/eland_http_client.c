@@ -261,7 +261,11 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     size_t X_EL_CONTINUED_URL_LEN;
     url_field_t *X_EL_CONTINUED_URL;
     _alarm_list_state_t alarm_state = get_alarm_state();
-
+    /****
+     * add distingush download type
+     * set time out 
+     * 
+     */
     if (download_type == DOWNLOAD_C_D)
         t.tv_sec = 17;
     if (((alarm_state == ALARM_ADD) ||
