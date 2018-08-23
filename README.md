@@ -1,5 +1,13 @@
 # LT10_eland
 
+* add device json log out 
+* get_alarm_state add AlarmStateMutex
+* alarm_sound_download add download_type
+* change aaa bbb download before continue_sec
+* fix alarm history memory bug
+* always clear alarm when offline --> online
+* 
+
 ## v01.40
 2018年8月17日13:39:23
 
