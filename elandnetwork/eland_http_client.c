@@ -262,6 +262,8 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     url_field_t *X_EL_CONTINUED_URL;
     _alarm_list_state_t alarm_state = get_alarm_state();
 
+    if (download_type == DOWNLOAD_C_D)
+        t.tv_sec = 17;
     if (((alarm_state == ALARM_ADD) ||
          (alarm_state == ALARM_MINUS) ||
          (alarm_state == ALARM_SKIP)) &&
@@ -677,7 +679,7 @@ OSStatus eland_http_file_download(ELAND_HTTP_METHOD method, //POST 或者 GET
     int ssl_errno = 0;
     mico_ssl_t client_ssl = NULL;
     fd_set readfds;
-    struct timeval t = {5, HTTP_YIELD_TMIE * 1500};
+    struct timeval t = {17, HTTP_YIELD_TMIE * 1500};
 
     const char *X_EL_CONTINUED_URL_STR;
     size_t X_EL_CONTINUED_URL_LEN;
