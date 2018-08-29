@@ -590,6 +590,21 @@ OSStatus weather_sound_c_d(void)
     require_quiet(nearest, checkout_over);
     //   alarm_log("nearest_id:%s", nearest->alarm_id);
 
+    if ((nearest->alarm_pattern == 2) ||
+        (nearest->alarm_pattern == 3))
+    {
+        if (strstr(nearest->voice_alarm_id, "cccccccc"))
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_C;
+        else if (strstr(nearest->voice_alarm_id, "dddddddd"))
+            sound_para[count].sound_type = SOUND_FILE_WEATHER_D;
+        else
+            goto checkout_ofid;
+        alarm_log("VID:%s", nearest->voice_alarm_id);
+        sprintf(nearest->voice_alarm_id + 24, "%ldww", nearest->alarm_data_for_eland.moment_second);
+        memcpy(sound_para[count].alarm_ID, nearest->voice_alarm_id, strlen(nearest->voice_alarm_id));
+        count++;
+    }
+checkout_ofid:
     if (strlen(nearest->alarm_off_voice_alarm_id) > 10)
     {
         if (strstr(nearest->alarm_off_voice_alarm_id, "cccccccc"))

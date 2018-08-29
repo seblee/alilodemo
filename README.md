@@ -1,14 +1,19 @@
 # LT10_eland
 
+* LSI additional request: alarm voice add google, See section (6) of 5-2-2
+
+## v01.41
+2018年8月23日16:40:00
+
+* set version v01.41
+* http domain= www.linktime.jp
+* http download for google timeout 6-->20s
 * add device json log out 
 * get_alarm_state add AlarmStateMutex
 * alarm_sound_download add download_type
 * change aaa bbb download before continue_sec
 * fix alarm history memory bug
 * always clear alarm when offline --> online
-* 
-*
-*
 
 ## v01.40
 2018年8月17日13:39:23
