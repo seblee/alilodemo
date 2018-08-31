@@ -1,6 +1,9 @@
 # LT10_eland
 
+## v01.42
+2018年8月31日9:57:00
 * LSI additional request: alarm voice add google, See section (6) of 5-2-2
+* use eland os
 
 ## v01.41
 2018年8月23日16:40:00
