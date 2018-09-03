@@ -1,5 +1,9 @@
 # LT10_eland
 
+## v01.50
+2018年9月03日9:01:00
+* Change version v01.50, release factory MP
+
 ## v01.42
 2018年8月31日9:57:00
 * LSI additional request: alarm voice add google, See section (6) of 5-2-2
