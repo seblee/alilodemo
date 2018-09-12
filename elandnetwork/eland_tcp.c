@@ -298,9 +298,13 @@ TCP_Error_t TCP_Read(Network_t *pNetwork,
     int fd = pNetwork->tlsDataParams.server_fd;
     fd_set readfds;
     _time_t time, current_temp, timeforward = {0, 0};
+    _time_t time_lengthen;
+    uint8_t flag_time_lengthen = 0;
     size_t len = sizeof(_TELEGRAM_t);
     uint8_t *pMsg_p = NULL;
 
+    time_lengthen.tv_sec = 1;
+    time_lengthen.tv_usec = 0;
     pMsg_p = calloc(1, len + 1);
     *pMsg = pMsg_p;
 startread:
@@ -368,8 +372,17 @@ startread:
         // Evaluate timeout after the read to make sure read is done at least once
         if (has_timer_expired(&timeforward))
         {
-            eland_tcp_log("read time out");
-            break;
+            eland_tcp_log("TCP receive timeout, but if no receive is completed, TCP continues to receive");
+            //eland_tcp_log("buffer data:%d", rxlen);
+            if ((rxlen == 0) || (flag_time_lengthen == 1))
+                break;
+            else
+            {
+                memcpy(&time, &time_lengthen, sizeof(_time_t));
+                gettimeofday(&current_temp, NULL);
+                timeradd(&current_temp, &time_lengthen, &timeforward);
+                flag_time_lengthen = 1;
+            }
         }
     }
     if (len == 0)

@@ -260,7 +260,7 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
     const char *X_EL_CONTINUED_URL_STR;
     size_t X_EL_CONTINUED_URL_LEN;
     url_field_t *X_EL_CONTINUED_URL;
-    _alarm_list_state_t alarm_state = get_alarm_state();
+    // _alarm_list_state_t alarm_state = get_alarm_state();
     /****
      * add distingush download type
      * set time out 
@@ -268,15 +268,15 @@ OSStatus eland_http_request(ELAND_HTTP_METHOD method,                          /
      */
     if (download_type == DOWNLOAD_C_D)
         t.tv_sec = 17;
-    if (((alarm_state == ALARM_ADD) ||
-         (alarm_state == ALARM_MINUS) ||
-         (alarm_state == ALARM_SKIP)) &&
-        (download_type != DOWNLOAD_B))
-    {
-        err = kGeneralErr;
-        goto exit;
-    }
-    context.download_type = download_type;
+    //if (((alarm_state == ALARM_ADD) ||
+    //     (alarm_state == ALARM_MINUS) ||
+    //     (alarm_state == ALARM_SKIP)) &&
+    //    (download_type != DOWNLOAD_B))
+    //{
+    //    err = kGeneralErr;
+    //    goto exit;
+    //}
+    //context.download_type = download_type;
     err = mico_rtos_lock_mutex(&http_send_setting_mutex); //这个锁 锁住的资源比较多
     client_log("lock http_mutex");
 start_http:
@@ -541,7 +541,7 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
     int32_t contentLen;
     static uint32_t sound_flash_pos = 0;
     static bool is_sound_data = false;
-    _alarm_list_state_t alarm_state = get_alarm_state();
+    //_alarm_list_state_t alarm_state = get_alarm_state();
 
     if (inHeader->chunkedData == false)
     {
@@ -588,14 +588,14 @@ static OSStatus onReceivedData(struct _HTTPHeader_t *inHeader, uint32_t inPos, u
         }
         if (is_sound_data)
         {
-            if (((alarm_state == ALARM_ADD) ||
-                 (alarm_state == ALARM_MINUS) ||
-                 (alarm_state == ALARM_SKIP)) &&
-                (context->download_type != DOWNLOAD_B))
-            {
-                err = kGeneralErr;
-                goto exit;
-            }
+            //if (((alarm_state == ALARM_ADD) ||
+            //     (alarm_state == ALARM_MINUS) ||
+            //     (alarm_state == ALARM_SKIP)) &&
+            //    (context->download_type != DOWNLOAD_B))
+            //{
+            //    err = kGeneralErr;
+            //    goto exit;
+            //}
             //client_log("##### memory debug:num_of_chunks:%d, free:%d", MicoGetMemoryInfo()->num_of_chunks, MicoGetMemoryInfo()->free_memory);
             if (HTTP_W_R_struct.alarm_w_r_queue == NULL)
                 goto exit;

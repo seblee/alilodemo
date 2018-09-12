@@ -402,7 +402,7 @@ static __elsv_alarm_data_t *Alarm_ergonic_list(_eland_alarm_list_t *list)
 
     for (i = 0; i < list->alarm_number; i++)
     {
-        alarm_log("%d,moment_second:%ld,utc:%ld", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second, utc_time);
+        alarm_log("%d,moment_second:%lu,utc:%lu", i, (list->alarm_lib + i)->alarm_data_for_eland.moment_second, utc_time);
         if ((list->alarm_lib + i)->alarm_data_for_eland.moment_second <= utc_time)
             continue;
         else
@@ -1770,7 +1770,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
     mico_rtos_unlock_mutex(&alarm_list.AlarmlibMutex);
     if (*alarm_nearest)
     {
-        alarm_log("alarm_nearest time:%s,second:%ld,alarm_id:%s,skip_flag:%d", (*alarm_nearest)->alarm_time, (*alarm_nearest)->alarm_data_for_eland.moment_second, (*alarm_nearest)->alarm_id, (*alarm_nearest)->skip_flag);
+        alarm_log("alarm_nearest time:%s,second:%lu,alarm_id:%s,skip_flag:%d", (*alarm_nearest)->alarm_time, (*alarm_nearest)->alarm_data_for_eland.moment_second, (*alarm_nearest)->alarm_id, (*alarm_nearest)->skip_flag);
     }
     else
         alarm_log("NO alarm_nearest ");

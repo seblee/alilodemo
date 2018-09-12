@@ -1090,8 +1090,9 @@ static void eland_mode_operation(uint16_t Count, uint16_t Count_Trg,
         case ELAND_OTA:
             break;
         case ELAND_CLOCK_ALARM:
-        case ELAND_CLOCK_MON:
             alarm_list_clear(&alarm_list);
+        case ELAND_CLOCK_MON:
+
             set_eland_mode(ELAND_NC);
             mico_rtos_set_semaphore(&TCP_Reconnect_sem);
             break;
