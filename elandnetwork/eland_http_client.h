@@ -25,9 +25,9 @@
 
 #define HTTP_YIELD_TMIE (2000) //http超时时间
 
-#define ELAND_HTTP_DOMAIN_NAME ("www.linktime.jp") //HTTP服务器地址
-#define ELAND_HTTP_PORT_SSL (443)                  //fog v2 http SSL端口
-#define HTTP_REQ_LOG (0)                           //log 打印信息開關 1:enable 0:disable
+#define ELAND_HTTP_DOMAIN_NAME ("secure.linktime.jp") //HTTP服务器地址
+#define ELAND_HTTP_PORT_SSL (443)                     //fog v2 http SSL端口
+#define HTTP_REQ_LOG (0)                              //log 打印信息開關 1:enable 0:disable
 
 #define HTTP_REQUEST_BODY_MAX_LEN (2048)
 #define HTTP_REQUEST_HOST_NAME_MAX_LEN (64)

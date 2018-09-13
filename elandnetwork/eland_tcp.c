@@ -495,6 +495,7 @@ static void TCP_thread_main(mico_thread_arg_t arg)
 #ifdef MICO_DISABLE_STDIO
     _ELAND_MODE_t eland_mode;
 #endif
+    uint32_t loop_count = 0;
 
 #ifdef MICO_DISABLE_STDIO
     mico_rtos_thread_msleep(1500);
@@ -524,7 +525,9 @@ recheck_mode:
         mico_rtos_delete_thread(NULL);
     goto recheck_mode;
 #endif
+    MicoWdgInitialize(10000); //Init dog 10s
 GET_CONNECT_INFO:
+    MicoWdgReload(); //feed dog
     /*pop queue*/
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
     if ((err == kNoErr) && (tcp_message == TCP_Stop_Sem))
@@ -559,6 +562,7 @@ GET_CONNECT_INFO:
     rc = TCP_Client_Init(&Eland_Client, &serverPara);
     require_string(TCP_SUCCESS == rc, exit, "Shadow Connection Error");
 RECONN:
+    MicoWdgReload(); //feed dog
     err = mico_rtos_pop_from_queue(&TCP_queue, &tcp_message, 0);
     if ((err == kNoErr) && (tcp_message == TCP_Stop_Sem))
     {
@@ -602,6 +606,7 @@ RECONN:
     require_string(((TCP_SUCCESS == rc) || (NETWORK_SSL_NOTHING_TO_READ == rc)), exit, "TCP_update_alarm Error");
 
 little_cycle_loop:
+    MicoWdgReload(); //feed dog
     timer.tv_sec = 1;
     timer.tv_usec = 0;
     rc = TCP_receive_packet(&Eland_Client, &timer);
@@ -653,6 +658,7 @@ pop_queue:
 
             set_eland_mode(ELAND_OTA);
             eland_push_http_queue(DOWNLOAD_OTA);
+            MicoWdgFinalize();
         }
         /**Alarm clock schedule**/
         else if (tcp_message == TCP_SD00_Sem)
