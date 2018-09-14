@@ -1,5 +1,12 @@
 # LT10_eland
 
+## v01.51
+2018年9月14日2:05:00
+* set version v01.51
+* http domain= secure.linktime.jp
+* add watch dog
+* TCP receive timeout BUG
+
 ## v01.50
 2018年9月03日9:01:00
 * Change version v01.50, release factory MP
