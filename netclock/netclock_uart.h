@@ -143,6 +143,15 @@ typedef struct eland_data_2_mcu
     uint32_t night_mode_end_time;
 } __ELAND_DATA_2_MCU_t;
 
+typedef enum
+{
+    Thread_UART_recv_dead = (uint16_t)0x0001,       /*!< uart thread is flag of dead */
+    Thread_TCP_dead = (uint16_t)0x0002,             /*!< tcp thread is flag of dead */
+    Thread_UART_ELAND_test_dead = (uint16_t)0x2000, /*!< ELAND_test is flag of dead */
+    Thread_UART_ELAND_AP_dead = (uint16_t)0x4000,   /*!< uart SOFTAP thread is flag of dead */
+    Thread_TCP_FW01_dead = (uint16_t)0x8000,        /*!< tcp TCP_FW01 is flag of dead */
+} Thread_State_dead_TypeDef;
+extern uint16_t Thread_State_dead;
 /* Private define ------------------------------------------------------------*/
 #define Uart_Packet_Header (uint8_t)(0x55)
 #define Uart_Packet_Trail (uint8_t)(0xaa)

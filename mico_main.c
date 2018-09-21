@@ -94,7 +94,9 @@ int application_start(void)
     /*check default sound */
     err = check_default_sound();
     require_noerr(err, exit);
-
+#ifndef MICO_DISABLE_WATCHDOG
+    MicoWdgInitialize(20000); //Init dog 20s
+#endif
     err = TCP_Service_Start();
     require_noerr(err, exit);
     err = kNoErr;

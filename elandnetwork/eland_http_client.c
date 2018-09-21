@@ -826,6 +826,7 @@ send_request:
             if (httpHeader->statusCode >= 500)
             {
                 client_log("[ERROR]eland http response error, code:%d", httpHeader->statusCode);
+                err = kGeneralErr;
                 break;
             }
             if (httpHeader->statusCode == 400) //認證錯誤

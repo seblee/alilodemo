@@ -15,7 +15,8 @@
         "xstddef": "c",
         "audio_service.h": "c",
         "xutility": "c",
-        "netclock.h": "c"
+        "netclock.h": "c",
+        "eland_tcp.h": "c"
     },
     "C_Cpp.dimInactiveRegions": true
 }

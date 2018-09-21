@@ -43,6 +43,7 @@
 /* Private variables ---------------------------------------------------------*/
 volatile ring_buffer_t rx_buffer;
 volatile uint8_t rx_data[UART_BUFFER_LENGTH];
+uint16_t Thread_State_dead = 0;
 
 mico_queue_t eland_uart_receive_queue = NULL; //eland usart
 mico_queue_t eland_uart_CMD_queue = NULL;     //eland usart
@@ -50,6 +51,7 @@ mico_queue_t eland_state_queue = NULL;        //eland usart
 mico_semaphore_t Is_usart_complete_sem = NULL;
 mico_timer_t timer100_key;
 __ELAND_MODE_STATE_t eland_mode_state = {ELAND_MODE_NONE, ElandNone, NULL};
+
 /* Private function prototypes -----------------------------------------------*/
 //static void uart_service(uint32_t arg);
 static void Eland_H01_Send(uint8_t *Cache);
@@ -231,6 +233,7 @@ static void Opration_Packet(uint8_t *data)
         break;
     case KEY_READ_02:
         MODH_Opration_02H(data);
+        Thread_State_dead |= Thread_UART_recv_dead; //feed dog
         break;
     case TIME_SET_03:
         MODH_Opration_xxH(*(data + 1), data);
@@ -343,6 +346,16 @@ static void timer100_key_handle(void *arg)
     }
     else
         eland_cmd = KEY_READ_02;
+    if ((Thread_State_dead & Thread_TCP_FW01_dead) || (Thread_State_dead & Thread_UART_ELAND_AP_dead) || (Thread_State_dead & Thread_UART_ELAND_test_dead))
+    {
+        //MicoWdgFinalize();
+        MicoWdgReload(); //feed dog
+    }
+    else if ((Thread_State_dead & Thread_TCP_dead) && (Thread_State_dead & Thread_UART_recv_dead))
+    {
+        MicoWdgReload(); //feed dog
+        Thread_State_dead = 0;
+    }
     eland_push_uart_send_queue(eland_cmd);
 }
 
@@ -958,6 +971,7 @@ static void eland_test(uint16_t Count, uint16_t Count_Trg, uint16_t Restain, uin
     if (((key_count == ELAND_KEY_COUNT) || (Count & KEY_TEST)) && (eland_mode != ELAND_TEST))
     {
         key_count++;
+        Thread_State_dead |= Thread_UART_ELAND_test_dead;
         set_eland_mode(ELAND_TEST);
         /**stop tcp communication**/
         TCP_Push_MSG_queue(TCP_Stop_Sem);
@@ -1050,6 +1064,7 @@ static void eland_mode_operation(uint16_t Count, uint16_t Count_Trg,
                 time_delay_counter = 0;
                 eland_push_http_queue(GO_INTO_AP_MODE);
                 Start_wifi_Station_SoftSP_Thread(Soft_AP);
+                Thread_State_dead |= Thread_UART_ELAND_AP_dead; //feed dog
             }
             break;
         case ELAND_NA:
