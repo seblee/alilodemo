@@ -23,7 +23,7 @@
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-extern const unsigned char error_sound[40365];
+extern const unsigned char error_sound[28557];
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
