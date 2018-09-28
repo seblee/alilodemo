@@ -85,7 +85,7 @@ static TCP_Error_t TCP_receive_packet(_Client_t *pClient, _time_t *timer);
 static TCP_Error_t eland_set_client_state(_Client_t *pClient, ClientState_t expectedCurrentState, ClientState_t newState);
 static TCP_Error_t TCP_Operate(const char *buff);
 static TCP_Error_t TCP_Operate_HC01(char *buf);
-static TCP_Error_t TCP_Operate_DV01(char *buf);
+static TCP_Error_t TCP_Operate_DV01(char *buf, _TCP_CMD_t telegram_cmd);
 static TCP_Error_t TCP_Operate_ALXX(char *buf, _TCP_CMD_t telegram_cmd, _TELEGRAM_t *telegram);
 static TCP_Error_t TCP_Operate_HD0X(char *buf, _elsv_holiday_t *list);
 static TCP_Error_t TCP_Operate_FW00(char *buf);
@@ -1207,7 +1207,8 @@ static TCP_Error_t TCP_Operate(const char *buff)
         break;
     case DV01: //05 eland info response
     case DV02: //06 eland info change Notification
-        rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)));
+        eland_tcp_log("cmd:%.4s,lenth:%ld,reserved:%ld,telegram:%s", telegram->command, telegram->lenth, telegram->reserved, (char *)(buff + sizeof(_TELEGRAM_t)));
+        rc = TCP_Operate_DV01((char *)(buff + sizeof(_TELEGRAM_t)), tep_cmd);
         eland_push_uart_send_queue(ELAND_DATA_0C);
         break;
     case DV03: //07 eland info remove Notification
@@ -1293,7 +1294,7 @@ static TCP_Error_t TCP_Operate_HC01(char *buf)
     free_json_obj(&ReceivedJsonCache);
     return TCP_SUCCESS;
 }
-static TCP_Error_t TCP_Operate_DV01(char *buf)
+static TCP_Error_t TCP_Operate_DV01(char *buf, _TCP_CMD_t telegram_cmd)
 {
     TCP_Error_t rc = TCP_SUCCESS;
     bool des_data_chang_flag = false;
@@ -1373,6 +1374,26 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
         {
             des_data_cache.dhcp_enabled = json_object_get_int(val);
         }
+        else if (!strcmp(key, "ip_address"))
+        {
+            memset(des_data_cache.ip_address, 0, ip_address_Len);
+            sprintf(des_data_cache.ip_address, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "subnet_mask"))
+        {
+            memset(des_data_cache.subnet_mask, 0, ip_address_Len);
+            sprintf(des_data_cache.subnet_mask, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "default_gateway"))
+        {
+            memset(des_data_cache.default_gateway, 0, ip_address_Len);
+            sprintf(des_data_cache.default_gateway, "%s", json_object_get_string(val));
+        }
+        else if (!strcmp(key, "primary_dns"))
+        {
+            memset(des_data_cache.primary_dns, 0, ip_address_Len);
+            sprintf(des_data_cache.primary_dns, "%s", json_object_get_string(val));
+        }
         else if (!strcmp(key, "time_display_format"))
         {
             des_data_cache.time_display_format = json_object_get_int(val);
@@ -1421,7 +1442,8 @@ static TCP_Error_t TCP_Operate_DV01(char *buf)
     mico_rtos_unlock_mutex(&netclock_des_g->des_mutex);
 
     /**refresh flash inside**/
-    eland_update_flash();
+    if ((eland_update_flash() == true) && (telegram_cmd == DV02))
+        MicoSystemReboot();
     /**stop tcp communication**/
     if (des_data_chang_flag)
     {

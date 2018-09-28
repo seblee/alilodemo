@@ -721,9 +721,10 @@ OSStatus Eland_Rtc_Init(void)
     return status;
 }
 
-void eland_update_flash(void)
+bool eland_update_flash(void)
 {
     bool needupdateflash = false;
+    bool needupdateflash_DHCP = false;
     mico_Context_t *context = NULL;
     context = mico_system_context_get();
 
@@ -738,6 +739,7 @@ void eland_update_flash(void)
         needupdateflash = true;
     }
 
+    Eland_log("device_state->dhcp_enabled:%d   netclock_des_g->dhcp_enabled:%d", device_state->dhcp_enabled, netclock_des_g->dhcp_enabled);
     if (device_state->dhcp_enabled != netclock_des_g->dhcp_enabled)
     {
         device_state->dhcp_enabled = netclock_des_g->dhcp_enabled;
@@ -747,8 +749,13 @@ void eland_update_flash(void)
         else if (netclock_des_g->dhcp_enabled == 0)
             context->micoSystemConfig.dhcpEnable = DHCP_Disable; /* Fetch Ip address from DHCP server */
         needupdateflash = true;
+        needupdateflash_DHCP = true;
     }
 
+    Eland_log("device_state->ip_address:%s   netclock_des_g->ip_address:%s", device_state->ip_address, netclock_des_g->ip_address);
+    Eland_log("device_state->subnet_mask:%s   netclock_des_g->subnet_mask:%s", device_state->subnet_mask, netclock_des_g->subnet_mask);
+    Eland_log("device_state->default_gateway:%s   netclock_des_g->default_gateway:%s", device_state->default_gateway, netclock_des_g->default_gateway);
+    Eland_log("device_state->dnsServer:%s   netclock_des_g->primary_dns:%s", device_state->primary_dns, netclock_des_g->primary_dns);
     if (device_state->dhcp_enabled == 0)
     {
         if (strncmp(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len) != 0)
@@ -765,6 +772,8 @@ void eland_update_flash(void)
             memcpy(device_state->ip_address, netclock_des_g->ip_address, ip_address_Len);
             memcpy(device_state->subnet_mask, netclock_des_g->subnet_mask, ip_address_Len);
             memcpy(device_state->default_gateway, netclock_des_g->default_gateway, ip_address_Len);
+            memcpy(device_state->primary_dns, netclock_des_g->primary_dns, ip_address_Len);
+            needupdateflash_DHCP = true;
         }
         if (needupdateflash)
         {
@@ -797,6 +806,8 @@ void eland_update_flash(void)
 
     if (needupdateflash == true)
         mico_system_context_update(context);
+    Eland_log("needupdateflash_DHCP:%d", needupdateflash_DHCP);
+    return needupdateflash_DHCP;
 }
 
 int8_t get_notification_volume(void)
