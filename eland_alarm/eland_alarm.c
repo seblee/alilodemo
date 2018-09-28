@@ -847,8 +847,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
             }
             if ((alarm->volume_stepup_enabled) &&
-                (++volume_stepup_count > 10) &&
-                (eland_oid_status(false, 0) == 0))
+                (++volume_stepup_count > 10))
             {
                 volume_stepup_count = 0;
                 if ((volume_change_counter++ > 1) &&
@@ -862,15 +861,12 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             err = mico_rtos_get_semaphore(&audio_done, 0);
             // alarm_log("alarming..................");
 
-            if ((((utc_time > alarm_moment) || (eland_oid_status(false, 0) > 0)) && loops == 0) ||
+            if (((utc_time > alarm_moment) && loops == 0) ||
                 ((loops == 1) && (err == kNoErr)))
             {
                 alarm_log("alarm_off");
                 mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)utc_time * 1000), &iso8601_time);
-                if (eland_oid_status(false, 0) > 0)
-                    alarm_off_history_record_time(ALARM_OFF_SNOOZE, &iso8601_time);
-                else
-                    alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
+                alarm_off_history_record_time(ALARM_OFF_AUTOOFF, &iso8601_time);
                 set_alarm_state(ALARM_SNOOZ_STOP);
                 if (snooze_count == 0)
                 {
@@ -903,8 +899,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     first_to_snooze = false;
                     first_to_alarming = true;
                     alarm_moment = utc_time + (uint32_t)alarm->snooze_interval_min * 60;
-                    if (eland_oid_status(false, 0) == 0)
-                        Alarm_Play_Control(alarm, AUDIO_STOP); //stop
+                    Alarm_Play_Control(alarm, AUDIO_STOP); //stop
                     alarm_log("time up alarm_moment:%ld", alarm_moment);
                     mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)alarm_moment * 1000), &iso8601_time);
                     alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
