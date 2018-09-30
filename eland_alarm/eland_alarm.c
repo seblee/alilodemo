@@ -778,7 +778,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
     int8_t snooze_count;
     mico_utc_time_t utc_time = GET_current_second();
     mico_utc_time_t alarm_moment;
-    bool first_to_snooze = true, first_to_alarming = true;
+    bool first_to_snooze = true, first_to_alarming = true, first_to_alarming_volume = false;
     mscp_result_t result;
     static uint8_t volume_value = 0;
     uint8_t volume_change_counter = 0;
@@ -833,17 +833,7 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     /**alarm on notice**/
                     TCP_Push_MSG_queue(TCP_HT00_Sem);
                     eland_push_uart_send_queue(ALARM_SEND_0B);
-                    for (i = 0; i < 33; i++)
-                        audio_service_volume_down(&result, 1);
-                    volume_value = 0;
-                    if (alarm->volume_stepup_enabled == 0)
-                    {
-                        for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
-                        {
-                            audio_service_volume_up(&result, 1);
-                            volume_value++;
-                        }
-                    }
+                    first_to_alarming_volume = true;
                 }
             }
             if ((alarm->volume_stepup_enabled) &&
@@ -876,7 +866,24 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 }
             }
             else
+            {
+                if ((get_alarm_stream_state() != STREAM_PLAY) && (first_to_alarming_volume == true))
+                {
+                    first_to_alarming_volume = false;
+                    for (i = 0; i < 33; i++)
+                        audio_service_volume_down(&result, 1);
+                    volume_value = 0;
+                    if (alarm->volume_stepup_enabled == 0)
+                    {
+                        for (i = 0; i < (alarm->alarm_volume * 32 / 100 + 1); i++)
+                        {
+                            audio_service_volume_up(&result, 1);
+                            volume_value++;
+                        }
+                    }
+                }
                 Alarm_Play_Control(alarm, AUDIO_PALY); //play with delay
+            }
 
             break;
         case ALARM_ADD:

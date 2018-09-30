@@ -1,5 +1,12 @@
 # LT10_eland
 
+## v01.52
+2018年9月30日10:30:00
+* set version v01.52
+* change error sound
+* not skip alarm playing when oid is on
+* CMD==DV02,DHCP auto\ manual addition
+
 ## v01.51
 2018年9月14日2:05:00
 * set version v01.51
