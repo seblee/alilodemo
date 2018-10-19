@@ -791,7 +791,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
         alarm_list.state.alarm_stoped = true;
         mico_time_get_iso8601_time(&iso8601_time);
         alarm_off_history_record_time(ALARM_OFF_SKIP, &iso8601_time);
-        set_alarm_history_send_sem();
+        if (strncmp(alarm->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK)))
+            set_alarm_history_send_sem();
         set_alarm_state(ALARM_STOP);
         goto exit;
     }
@@ -831,7 +832,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 if ((utc_time < alarm_moment) || (loops == 1))
                 {
                     /**alarm on notice**/
-                    TCP_Push_MSG_queue(TCP_HT00_Sem);
+                    if (strncmp(alarm->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK)))
+                        TCP_Push_MSG_queue(TCP_HT00_Sem);
                     eland_push_uart_send_queue(ALARM_SEND_0B);
                     first_to_alarming_volume = true;
                 }
@@ -860,7 +862,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                 set_alarm_state(ALARM_SNOOZ_STOP);
                 if (snooze_count == 0)
                 {
-                    set_alarm_history_send_sem();
+                    if (strncmp(alarm->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK)))
+                        set_alarm_history_send_sem();
                     Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
                     goto exit;
                 }
@@ -895,7 +898,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
             alarm_off_history_record_time(ALARM_OFF_ALARMOFF, &iso8601_time);
             alarm_log("alarm_operation stop");
             Alarm_Play_Control(alarm, AUDIO_STOP_PLAY); //stop
-            set_alarm_history_send_sem();
+            if (strncmp(alarm->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK)))
+                set_alarm_history_send_sem();
             goto exit;
             break;
         case ALARM_SNOOZ_STOP:
@@ -911,7 +915,8 @@ static void alarm_operation(__elsv_alarm_data_t *alarm)
                     mico_time_convert_utc_ms_to_iso8601((mico_utc_time_ms_t)((mico_utc_time_ms_t)alarm_moment * 1000), &iso8601_time);
                     alarm_off_history_record_time(ALARM_SNOOZE, &iso8601_time);
                     /**add json for tcp**/
-                    set_alarm_history_send_sem();
+                    if (strncmp(alarm->alarm_id, ALARM_ID_OF_DEFAULT_CLOCK, strlen(ALARM_ID_OF_DEFAULT_CLOCK)))
+                        set_alarm_history_send_sem();
                     alarm_log("Alarm_Play_Control: first_to_snooze");
                     eland_push_uart_send_queue(ALARM_SEND_0B);
                 }

@@ -339,6 +339,7 @@ static void timer100_key_handle(void *arg)
 {
     static uint16_t Timer_count = 0;
     __msg_function_t eland_cmd = KEY_READ_02;
+    _ELAND_MODE_t eland_mode = get_eland_mode();
     if (Timer_count++ > 50)
     {
         Timer_count = 0;
@@ -346,7 +347,7 @@ static void timer100_key_handle(void *arg)
     }
     else
         eland_cmd = KEY_READ_02;
-    if ((Thread_State_dead & Thread_TCP_FW01_dead) || (Thread_State_dead & Thread_UART_ELAND_AP_dead) || (Thread_State_dead & Thread_UART_ELAND_test_dead))
+    if ((Thread_State_dead & Thread_TCP_FW01_dead) || (Thread_State_dead & Thread_UART_ELAND_AP_dead) || (Thread_State_dead & Thread_UART_ELAND_test_dead) || (eland_mode == ELAND_CLOCK_ALARM) || (eland_mode == ELAND_CLOCK_MON))
     {
         //MicoWdgFinalize();
         MicoWdgReload(); //feed dog
