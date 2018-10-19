@@ -1783,7 +1783,7 @@ static void combing_alarm(_eland_alarm_list_t *list, __elsv_alarm_data_t **alarm
         alarm_log("NO alarm_nearest ");
     set_alarm_state(ALARM_IDEL);
     set_display_na_serial(SCHEDULE_MAX);
-    if (skip_flag_push)
+    if ((skip_flag_push) && (list->alarm_number != 0))
         TCP_Push_MSG_queue(TCP_HT02_Sem);
 }
 
