@@ -1,5 +1,10 @@
 # LT10_eland
 
+## v01.53
+2018年10月19日11:25:00
+* set version v01.53
+* delete alarm ON notification (HT00) and alarm OFF history notification (HT01) for simple_clock
+
 ## v01.52
 2018年9月30日10:30:00
 * set version v01.52
